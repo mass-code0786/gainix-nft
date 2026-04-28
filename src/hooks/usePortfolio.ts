@@ -52,12 +52,14 @@ interface TradesHistoryResponse {
       id: string;
       tokenId: string;
       name: string;
+      description?: string;
+      category?: string;
       imageUrl: string;
       basePrice: number;
       currentPrice: number;
       lastBuyPrice: number | null;
       totalTrades: number;
-      status: "marketplace" | "owned" | "listed" | "sold";
+      status: "marketplace" | "owned" | "listed" | "sold" | "draft";
       ownerUserId: string | null;
       lastPriceIncreasePercent: number | null;
       createdAt: string;

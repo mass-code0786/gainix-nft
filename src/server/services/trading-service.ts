@@ -151,6 +151,26 @@ interface UpdateReserveInput {
   balance: number;
 }
 
+interface AdminCreateNftInput {
+  tokenId: string;
+  name: string;
+  imageUrl: string;
+  basePrice: number;
+  category: string;
+  description: string;
+  status: "draft" | "live";
+}
+
+interface AdminUpdateNftInput {
+  nftId: string;
+  currentPrice?: number;
+  status?: "draft" | "live";
+}
+
+interface AdminDeleteNftInput {
+  nftId: string;
+}
+
 interface ApproveWithdrawalInput {
   withdrawalId: string;
 }
@@ -2161,6 +2181,115 @@ export async function getMarketplaceNfts() {
     settings: toPublicSettings(state.admin_settings),
     serverTime: nowIso(),
   };
+}
+
+export async function getAdminNfts() {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const nfts = state.nfts
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((item) => toPublicNft(state, item));
+
+    return {
+      nfts,
+      total: nfts.length,
+    };
+  });
+}
+
+export async function createAdminMarketplaceNft(input: AdminCreateNftInput) {
+  await ensureStoreInitialized();
+  validatePositiveAmount(input.basePrice, "NFT base price");
+
+  return withStoreTransaction(async (state) => {
+    const tokenId = input.tokenId.trim();
+    const existing = state.nfts.find((item) => item.tokenId === tokenId);
+    if (existing) {
+      throw new ApiError(409, "NFT tokenId already exists.");
+    }
+
+    const now = nowIso();
+    const price = roundAmount(input.basePrice);
+    const nft: NftRecord = {
+      id: makeId("nft"),
+      tokenId,
+      name: input.name.trim(),
+      description: input.description.trim(),
+      category: input.category.trim(),
+      imageUrl: input.imageUrl.trim(),
+      basePrice: price,
+      currentPrice: price,
+      lastBuyPrice: null,
+      totalTrades: 0,
+      status: input.status === "draft" ? "draft" : "marketplace",
+      ownerUserId: null,
+      lastPriceIncreasePercent: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    state.nfts.push(nft);
+
+    return {
+      message:
+        input.status === "draft"
+          ? "NFT created as draft."
+          : "NFT created and listed on marketplace.",
+      nft: toPublicNft(state, nft),
+    };
+  });
+}
+
+export async function updateAdminNft(input: AdminUpdateNftInput) {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const nft = requireNft(state, input.nftId);
+    if (nft.status !== "draft" && nft.status !== "marketplace") {
+      throw new ApiError(409, "Only draft or live marketplace NFTs can be edited.");
+    }
+
+    if (typeof input.currentPrice === "number") {
+      validatePositiveAmount(input.currentPrice, "NFT price");
+      const nextPrice = roundAmount(input.currentPrice);
+      nft.currentPrice = nextPrice;
+      if (nft.totalTrades === 0) {
+        nft.basePrice = nextPrice;
+      }
+    }
+
+    if (input.status) {
+      nft.status = input.status === "draft" ? "draft" : "marketplace";
+    }
+
+    nft.updatedAt = nowIso();
+
+    return {
+      message: "NFT updated.",
+      nft: toPublicNft(state, nft),
+    };
+  });
+}
+
+export async function deleteAdminNft(input: AdminDeleteNftInput) {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const nft = requireNft(state, input.nftId);
+    const hasTradeHistory = state.nft_trades.some((trade) => trade.nftId === nft.id);
+    if (hasTradeHistory || nft.totalTrades > 0) {
+      throw new ApiError(409, "NFT cannot be deleted after trade history exists.");
+    }
+
+    state.nfts = state.nfts.filter((item) => item.id !== nft.id);
+
+    return {
+      message: "NFT deleted.",
+      nftId: nft.id,
+    };
+  });
 }
 
 export async function getWalletBalances(selector: UserSelector) {

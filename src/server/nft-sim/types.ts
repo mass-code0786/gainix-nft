@@ -1,4 +1,5 @@
 export type NftStatus = "marketplace" | "owned" | "listed" | "sold";
+export type AdminNftStatus = NftStatus | "draft";
 export type TradeStatus = "bought" | "listed" | "auto_sold";
 export type TradeSource = "manual" | "bot";
 export type IncomeLedgerType =
@@ -43,12 +44,14 @@ export interface NftRecord {
   id: string;
   tokenId: string;
   name: string;
+  description: string;
+  category: string;
   imageUrl: string;
   basePrice: number;
   currentPrice: number;
   lastBuyPrice: number | null;
   totalTrades: number;
-  status: NftStatus;
+  status: AdminNftStatus;
   ownerUserId: string | null;
   lastPriceIncreasePercent: number | null;
   createdAt: string;

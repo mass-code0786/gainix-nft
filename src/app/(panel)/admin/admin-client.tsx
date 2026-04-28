@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BarChart3,
   CircleDollarSign,
+  ImagePlus,
   LoaderCircle,
   PauseCircle,
   PlayCircle,
@@ -64,6 +65,16 @@ export default function AdminPage() {
   });
   const [reserveAdjustment, setReserveAdjustment] = useState("0");
   const [reserveMode, setReserveMode] = useState<ReserveMode>("add");
+  const [nftForm, setNftForm] = useState({
+    tokenId: "",
+    name: "",
+    imageUrl: "",
+    basePrice: "",
+    category: "",
+    description: "",
+    status: "live" as "draft" | "live",
+  });
+  const [nftEdits, setNftEdits] = useState<Record<string, { price: string; status: "draft" | "live" }>>({});
 
   useEffect(() => {
     if (!admin.data) {
@@ -121,6 +132,28 @@ export default function AdminPage() {
 
     return Math.max(0, currentBalance - adjustment);
   }, [reserve?.balance, reserveAdjustment, reserveMode]);
+  const createdNfts = admin.nfts ?? [];
+
+  async function createMarketplaceNft() {
+    await admin.createNft({
+      tokenId: nftForm.tokenId,
+      name: nftForm.name,
+      imageUrl: nftForm.imageUrl,
+      basePrice: parseAmount(nftForm.basePrice),
+      category: nftForm.category,
+      description: nftForm.description,
+      status: nftForm.status,
+    });
+    setNftForm({
+      tokenId: "",
+      name: "",
+      imageUrl: "",
+      basePrice: "",
+      category: "",
+      description: "",
+      status: "live",
+    });
+  }
 
   if (!isConnected) {
     return (
@@ -364,6 +397,197 @@ export default function AdminPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="muted-label">Marketplace NFTs</p>
+              <h2 className="mt-2 font-display text-2xl font-semibold text-white">
+                Admin mint and list
+              </h2>
+            </div>
+            <ImagePlus className="h-5 w-5 text-red-200" />
+          </div>
+          <p className="mt-2 text-sm text-zinc-400">
+            Live marketplace NFTs are created only from this admin flow.
+          </p>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm text-zinc-400">Token ID</span>
+              <input
+                className="input-shell"
+                inputMode="numeric"
+                value={nftForm.tokenId}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, tokenId: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-zinc-400">Starting price</span>
+              <input
+                className="input-shell"
+                inputMode="decimal"
+                value={nftForm.basePrice}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, basePrice: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-zinc-400">Category</span>
+              <input
+                className="input-shell"
+                value={nftForm.category}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, category: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm text-zinc-400">Status</span>
+              <select
+                className="input-shell"
+                value={nftForm.status}
+                onChange={(event) =>
+                  setNftForm((current) => ({
+                    ...current,
+                    status: event.target.value === "draft" ? "draft" : "live",
+                  }))
+                }
+              >
+                <option value="live">Live</option>
+                <option value="draft">Draft</option>
+              </select>
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block text-sm text-zinc-400">Name</span>
+              <input
+                className="input-shell"
+                value={nftForm.name}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, name: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block text-sm text-zinc-400">Image URL</span>
+              <input
+                className="input-shell"
+                value={nftForm.imageUrl}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, imageUrl: event.target.value }))
+                }
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-2 block text-sm text-zinc-400">Description</span>
+              <textarea
+                className="input-shell min-h-24 resize-y"
+                value={nftForm.description}
+                onChange={(event) =>
+                  setNftForm((current) => ({ ...current, description: event.target.value }))
+                }
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void createMarketplaceNft()}
+            disabled={admin.isSaving || admin.isSigning}
+            className="premium-button mt-5 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {admin.isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Mint and list NFT
+          </button>
+
+          <div className="mt-5 space-y-3">
+            {createdNfts.slice(0, 12).map((nft) => {
+              const edit = nftEdits[nft.id] ?? {
+                price: String(nft.currentPrice),
+                status: nft.status === "draft" ? "draft" : "live",
+              };
+              const hasTradeHistory = nft.totalTrades > 0;
+
+              return (
+              <div
+                key={nft.id}
+                className="rounded-[22px] border border-white/10 bg-black/25 p-4 text-sm"
+              >
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium text-white">{nft.name}</p>
+                    <p className="mt-1 text-zinc-400">
+                      Token #{nft.tokenId} | {nft.category} | {nft.status === "marketplace" ? "live" : nft.status}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-zinc-500">{nft.description || "No description"}</p>
+                  </div>
+                  <span className="text-emerald-200">{formatUsdt(nft.currentPrice)}</span>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr_auto_auto]">
+                  <input
+                    className="input-shell"
+                    inputMode="decimal"
+                    value={edit.price}
+                    onChange={(event) =>
+                      setNftEdits((current) => ({
+                        ...current,
+                        [nft.id]: { ...edit, price: event.target.value },
+                      }))
+                    }
+                  />
+                  <select
+                    className="input-shell"
+                    value={edit.status}
+                    onChange={(event) =>
+                      setNftEdits((current) => ({
+                        ...current,
+                        [nft.id]: {
+                          ...edit,
+                          status: event.target.value === "draft" ? "draft" : "live",
+                        },
+                      }))
+                    }
+                  >
+                    <option value="live">Live</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void admin.updateNft({
+                        nftId: nft.id,
+                        currentPrice: parseAmount(edit.price),
+                        status: edit.status,
+                      })
+                    }
+                    disabled={admin.isSaving || admin.isSigning}
+                    className="secondary-button disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void admin.deleteNft(nft.id)}
+                    disabled={admin.isSaving || admin.isSigning || hasTradeHistory}
+                    className="secondary-button border-rose-500/30 text-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+              );
+            })}
+
+            {!admin.isLoading && createdNfts.length === 0 ? (
+              <div className="rounded-[22px] border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
+                No NFTs created yet. Marketplace will stay empty until an admin mints and lists one.
+              </div>
+            ) : null}
+          </div>
+        </section>
+
         <section className="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
           <p className="muted-label">Settings</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">

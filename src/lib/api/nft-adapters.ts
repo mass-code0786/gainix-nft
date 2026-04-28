@@ -1,17 +1,18 @@
 import { nftContract } from "@/contracts";
-import { getMockNfts } from "@/lib/data-sources/mock-source";
 import type { NFTItem } from "@/types";
 
 type BackendNftRecord = {
   id: string;
   tokenId: string;
   name: string;
+  description?: string;
+  category?: string;
   imageUrl: string;
   basePrice: number;
   currentPrice: number;
   lastBuyPrice: number | null;
   totalTrades: number;
-  status: "marketplace" | "owned" | "listed" | "sold";
+  status: "marketplace" | "owned" | "listed" | "sold" | "draft";
   ownerUserId: string | null;
   lastPriceIncreasePercent: number | null;
   createdAt: string;
@@ -41,7 +42,6 @@ type BackendTradeRecord = {
 };
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
-const mockNftMap = new Map(getMockNfts().map((item) => [item.tokenId, item]));
 
 function slugify(value: string) {
   return value
@@ -59,7 +59,6 @@ export function adaptBackendNftToItem(
   },
 ): NFTItem {
   const tokenId = Number(nft.tokenId);
-  const mock = mockNftMap.get(tokenId);
   const ownerAddress = options?.ownerAddress ?? nft.owner?.walletAddress ?? ZERO_ADDRESS;
   const listedPrice =
     typeof options?.listedPrice === "number"
@@ -79,32 +78,32 @@ export function adaptBackendNftToItem(
   return {
     id: nft.id,
     tokenId,
-    slug: mock?.slug ?? `${slugify(nft.name)}-${tokenId}`,
+    slug: `${slugify(nft.name)}-${tokenId}`,
     name: nft.name,
-    animalType: mock?.animalType ?? "Gainix NFT",
-    collection: mock?.collection ?? "Gainix NFT Marketplace",
+    animalType: nft.category ?? "Gainix NFT",
+    collection: "Gainix NFT Marketplace",
     currentPrice,
     listedPrice,
     changePercent: Number(derivedChange.toFixed(2)),
-    rarity: mock?.rarity ?? "Rare",
-    accent: mock?.accent ?? "#f43f5e",
-    secondaryAccent: mock?.secondaryAccent ?? "#450a0a",
-    description: mock?.description ?? `${nft.name} available in the Gainix marketplace.`,
+    rarity: "Rare",
+    accent: "#f43f5e",
+    secondaryAccent: "#450a0a",
+    description: nft.description || `${nft.name} available in the Gainix marketplace.`,
     owner: ownerAddress,
-    creator: mock?.creator ?? ZERO_ADDRESS,
+    creator: ZERO_ADDRESS,
     seller: options?.sellerAddress ?? (listedPrice !== null ? ownerAddress : undefined),
-    floorPrice: mock?.floorPrice ?? basePrice,
-    previewSymbol: mock?.previewSymbol ?? nft.name.slice(0, 2).toUpperCase(),
-    supply: mock?.supply ?? 1,
-    rank: mock?.rank ?? tokenId,
-    tags: mock?.tags ?? ["Marketplace"],
+    floorPrice: basePrice,
+    previewSymbol: nft.name.slice(0, 2).toUpperCase(),
+    supply: 1,
+    rank: tokenId,
+    tags: nft.category ? [nft.category] : ["Marketplace"],
     activity: [],
-    relatedSlugs: mock?.relatedSlugs ?? [],
-    contractAddress: mock?.contractAddress ?? nftContract.address,
+    relatedSlugs: [],
+    contractAddress: nftContract.address,
     listingId: listedPrice !== null ? nft.id : undefined,
-    tokenUri: mock?.tokenUri ?? `ipfs://gainix/${tokenId}.json`,
-    ipfsMetadataUri: mock?.ipfsMetadataUri ?? `ipfs://gainix/${tokenId}.json`,
-    imageUri: nft.imageUrl || mock?.imageUri || "",
+    tokenUri: `ipfs://gainix/${tokenId}.json`,
+    ipfsMetadataUri: `ipfs://gainix/${tokenId}.json`,
+    imageUri: nft.imageUrl || "",
     network: "BNB Smart Chain",
   };
 }

@@ -5,7 +5,6 @@ import type { Address } from "viem";
 import { useWallet } from "@/hooks/useWallet";
 import { fetchJson } from "@/lib/api/client";
 import { adaptBackendNftToItem } from "@/lib/api/nft-adapters";
-import { getMockNfts } from "@/lib/data-sources/mock-source";
 import { isSameAddress } from "@/lib/web3/wallet-utils";
 import { formatWallet } from "@/utils/format";
 import type { NFTItem } from "@/types";
@@ -15,12 +14,14 @@ interface BackendMarketplaceResponse {
     id: string;
     tokenId: string;
     name: string;
+    description?: string;
+    category?: string;
     imageUrl: string;
     basePrice: number;
     currentPrice: number;
     lastBuyPrice: number | null;
     totalTrades: number;
-    status: "marketplace" | "owned" | "listed" | "sold";
+    status: "marketplace" | "owned" | "listed" | "sold" | "draft";
     ownerUserId: string | null;
     lastPriceIncreasePercent: number | null;
     createdAt: string;
@@ -29,14 +30,13 @@ interface BackendMarketplaceResponse {
       id: string;
       walletAddress: `0x${string}`;
     } | null;
-  }>;
+  }>; 
 }
 
 export function useMarketplaceListings() {
   const { fullAddress } = useWallet();
-  const mockListings = useMemo(() => getMockNfts(), []);
   const [liveListings, setLiveListings] = useState<NFTItem[]>([]);
-  const [source, setSource] = useState<"chain" | "mock">("chain");
+  const [source] = useState<"chain">("chain");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,11 +51,9 @@ export function useMarketplaceListings() {
         .sort((left, right) => right.tokenId - left.tokenId);
 
       setLiveListings(nextListings);
-      setSource("chain");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load marketplace.");
       setLiveListings([]);
-      setSource("mock");
     } finally {
       setIsRefreshing(false);
     }
@@ -141,6 +139,6 @@ export function useMarketplaceListings() {
       avgPrice,
     },
     refresh,
-    previewTemplates: mockListings,
+    previewTemplates: [],
   };
 }

@@ -123,6 +123,8 @@ model NFT {
   id                       String        @id @default(cuid())
   tokenId                  String        @unique
   name                     String
+  description              String        @default("")
+  category                 String        @default("General")
   imageUrl                 String
   basePrice                Float
   currentPrice             Float

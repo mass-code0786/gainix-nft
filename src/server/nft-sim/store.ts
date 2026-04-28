@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { NftSimState, NftRecord, UserRecord, WalletRecord } from "@/server/nft-sim/types";
+import { NftSimState, UserRecord, WalletRecord } from "@/server/nft-sim/types";
 
 const DATA_DIRECTORY = path.join(process.cwd(), "data");
 const DATA_FILE_PATH = path.join(DATA_DIRECTORY, "nft-sim-db.json");
@@ -14,71 +14,6 @@ function cloneState<T>(value: T): T {
 
 function nowIso() {
   return new Date().toISOString();
-}
-
-function seedNfts(now: string): NftRecord[] {
-  return [
-    {
-      id: "nft-1",
-      tokenId: "1001",
-      name: "Gainix Alpha Tiger",
-      imageUrl: "https://images.unsplash.com/photo-1549366021-9f761d450615?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 120,
-      currentPrice: 120,
-      lastBuyPrice: null,
-      totalTrades: 0,
-      status: "marketplace",
-      ownerUserId: null,
-      lastPriceIncreasePercent: null,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "nft-2",
-      tokenId: "1002",
-      name: "Gainix Neon Falcon",
-      imageUrl: "https://images.unsplash.com/photo-1520808663317-647b476a81b9?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 175,
-      currentPrice: 175,
-      lastBuyPrice: null,
-      totalTrades: 0,
-      status: "marketplace",
-      ownerUserId: null,
-      lastPriceIncreasePercent: null,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "nft-3",
-      tokenId: "1003",
-      name: "Gainix Solar Panther",
-      imageUrl: "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 235,
-      currentPrice: 235,
-      lastBuyPrice: null,
-      totalTrades: 0,
-      status: "marketplace",
-      ownerUserId: null,
-      lastPriceIncreasePercent: null,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "nft-4",
-      tokenId: "1004",
-      name: "Gainix Prism Wolf",
-      imageUrl: "https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 310,
-      currentPrice: 310,
-      lastBuyPrice: null,
-      totalTrades: 0,
-      status: "marketplace",
-      ownerUserId: null,
-      lastPriceIncreasePercent: null,
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
 }
 
 function createSeedState(): NftSimState {
@@ -115,7 +50,7 @@ function createSeedState(): NftSimState {
   return {
     users: [demoUser],
     wallets: [demoWallet],
-    nfts: seedNfts(now),
+    nfts: [],
     nft_trades: [],
     wallet_ledger: [],
     income_ledger: [],
@@ -200,6 +135,12 @@ function normalizeState(state: NftSimState): NftSimState {
     ...entry,
     vipLevel: entry.vipLevel ?? null,
     payoutDate: entry.payoutDate ?? null,
+  }));
+
+  state.nfts = state.nfts.map((nft) => ({
+    ...nft,
+    description: nft.description ?? "",
+    category: nft.category ?? "General",
   }));
 
   state.withdrawals = state.withdrawals.map((withdrawal) => ({

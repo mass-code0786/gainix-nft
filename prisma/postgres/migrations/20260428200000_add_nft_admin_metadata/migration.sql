@@ -1,0 +1,2 @@
+ALTER TABLE "nfts" ADD COLUMN "description" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "nfts" ADD COLUMN "category" TEXT NOT NULL DEFAULT 'General';

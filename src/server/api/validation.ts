@@ -32,6 +32,11 @@ const payoutDaySchema = z
 const optionalStringSchema = z.string().trim().min(1).optional();
 const nftIdSchema = z.string().trim().min(1, "nftId is required.");
 const planIdSchema = z.enum(["bot_10", "bot_20", "bot_50", "bot_100", "bot_500"]);
+const tokenIdSchema = z
+  .string()
+  .trim()
+  .min(1, "tokenId is required.")
+  .regex(/^[0-9]+$/, "tokenId must be numeric.");
 
 export const authNonceInputSchema = z.object({
   walletAddress: walletAddressSchema,
@@ -126,6 +131,30 @@ export const adminReserveInputSchema = z.object({
   balance: nonNegativeAmountSchema,
 });
 
+export const adminCreateNftInputSchema = z.object({
+  tokenId: tokenIdSchema,
+  name: z.string().trim().min(2, "name must be at least 2 characters."),
+  imageUrl: z.string().trim().url("imageUrl must be a valid URL."),
+  basePrice: amountSchema,
+  category: z.string().trim().min(1, "category is required."),
+  description: z.string().trim().min(1, "description is required."),
+  status: z.enum(["draft", "live"]).default("live"),
+});
+
+export const adminUpdateNftInputSchema = z
+  .object({
+    nftId: nftIdSchema,
+    currentPrice: amountSchema.optional(),
+    status: z.enum(["draft", "live"]).optional(),
+  })
+  .refine((value) => typeof value.currentPrice === "number" || Boolean(value.status), {
+    message: "Provide currentPrice or status.",
+  });
+
+export const adminDeleteNftInputSchema = z.object({
+  nftId: nftIdSchema,
+});
+
 export const approveWithdrawalInputSchema = z.object({
   withdrawalId: z.string().trim().min(1, "withdrawalId is required."),
 });
@@ -144,5 +173,8 @@ export type NftMutationInput = z.infer<typeof nftMutationInputSchema>;
 export type BotBuyInput = z.infer<typeof botBuyInputSchema>;
 export type AdminSettingsInput = z.infer<typeof adminSettingsInputSchema>;
 export type AdminReserveInput = z.infer<typeof adminReserveInputSchema>;
+export type AdminCreateNftInput = z.infer<typeof adminCreateNftInputSchema>;
+export type AdminUpdateNftInput = z.infer<typeof adminUpdateNftInputSchema>;
+export type AdminDeleteNftInput = z.infer<typeof adminDeleteNftInputSchema>;
 export type ApproveWithdrawalInput = z.infer<typeof approveWithdrawalInputSchema>;
 export type PayoutControlInput = z.infer<typeof payoutControlInputSchema>;

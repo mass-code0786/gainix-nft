@@ -27,7 +27,7 @@ export default function MarketplacePage() {
         <div className="grid grid-cols-2 gap-3 sm:gap-4 2xl:grid-cols-3">
           {liveListings.length === 0 ? (
             <div className="col-span-full rounded-3xl border border-white/10 bg-black/20 p-4 sm:p-5 text-sm text-zinc-300">
-              No listings available right now.
+              No NFTs available yet.
             </div>
           ) : (
             liveListings.map((nft) => <NFTCard key={nft.id} nft={nft} />)

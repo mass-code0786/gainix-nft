@@ -49,60 +49,12 @@ function normalizeDepositStatus(status: string) {
   return status.toLowerCase() as DepositRecord["status"];
 }
 
-function seedNfts() {
-  return [
-    {
-      tokenId: "1001",
-      name: "Gainix Alpha Tiger",
-      imageUrl:
-        "https://images.unsplash.com/photo-1549366021-9f761d450615?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 120,
-      currentPrice: 120,
-      status: "marketplace",
-    },
-    {
-      tokenId: "1002",
-      name: "Gainix Neon Falcon",
-      imageUrl:
-        "https://images.unsplash.com/photo-1520808663317-647b476a81b9?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 175,
-      currentPrice: 175,
-      status: "marketplace",
-    },
-    {
-      tokenId: "1003",
-      name: "Gainix Solar Panther",
-      imageUrl:
-        "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 235,
-      currentPrice: 235,
-      status: "marketplace",
-    },
-    {
-      tokenId: "1004",
-      name: "Gainix Prism Wolf",
-      imageUrl:
-        "https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=1200&q=80",
-      basePrice: 310,
-      currentPrice: 310,
-      status: "marketplace",
-    },
-  ];
-}
-
 export async function ensureStoreInitialized() {
   await prisma.$transaction(async (tx) => {
-    const [nftCount, adminSetting, reserve] = await Promise.all([
-      tx.nFT.count(),
+    const [adminSetting, reserve] = await Promise.all([
       tx.adminSetting.findFirst(),
       tx.systemReserve.findFirst(),
     ]);
-
-    if (nftCount === 0) {
-      await tx.nFT.createMany({
-        data: seedNfts(),
-      });
-    }
 
     if (!adminSetting) {
       await tx.adminSetting.create({
@@ -200,6 +152,8 @@ async function buildState(db: DbClient) {
       id: item.id,
       tokenId: item.tokenId,
       name: item.name,
+      description: item.description,
+      category: item.category,
       imageUrl: item.imageUrl,
       basePrice: item.basePrice,
       currentPrice: item.currentPrice,
@@ -430,6 +384,8 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         id: item.id,
         tokenId: item.tokenId,
         name: item.name,
+        description: item.description,
+        category: item.category,
         imageUrl: item.imageUrl,
         basePrice: item.basePrice,
         currentPrice: item.currentPrice,

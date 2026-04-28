@@ -4,15 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { fetchJson } from "@/lib/api/client";
-import type { AdminAnalytics, AdminOverview } from "@/types";
+import type { AdminAnalytics, AdminNftRecord, AdminOverview } from "@/types";
 
 type AdminSettingsPayload = Partial<AdminOverview["settings"]>;
+interface CreateAdminNftPayload {
+  tokenId: string;
+  name: string;
+  imageUrl: string;
+  basePrice: number;
+  category: string;
+  description: string;
+  status: "draft" | "live";
+}
 
 export function useAdminPanel(enabled: boolean) {
   const { fullAddress } = useWallet();
   const { ensureVerifiedSession, signPrompt, isSigning } = useWalletAuth(fullAddress);
   const [data, setData] = useState<AdminOverview | null>(null);
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
+  const [nfts, setNfts] = useState<AdminNftRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +32,7 @@ export function useAdminPanel(enabled: boolean) {
     if (!enabled) {
       setData(null);
       setAnalytics(null);
+      setNfts([]);
       setError(null);
       setIsLoading(false);
       return;
@@ -32,12 +43,14 @@ export function useAdminPanel(enabled: boolean) {
 
     try {
       await ensureVerifiedSession();
-      const [overview, analyticsPayload] = await Promise.all([
+      const [overview, analyticsPayload, nftPayload] = await Promise.all([
         fetchJson<AdminOverview>("/api/admin/overview"),
         fetchJson<AdminAnalytics>("/api/admin/analytics"),
+        fetchJson<{ nfts: AdminNftRecord[] }>("/api/admin/nfts"),
       ]);
       setData(overview);
       setAnalytics(analyticsPayload);
+      setNfts(nftPayload.nfts);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load admin data.");
     } finally {
@@ -162,9 +175,81 @@ export function useAdminPanel(enabled: boolean) {
     }
   }, [ensureVerifiedSession, refresh]);
 
+  const createNft = useCallback(async (payload: CreateAdminNftPayload) => {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await ensureVerifiedSession();
+      const response = await fetchJson<{ message: string; nft: AdminNftRecord }>(
+        "/api/admin/nfts/create",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+      setNfts((current) => [response.nft, ...current]);
+      setNotice(response.message);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to create NFT.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [ensureVerifiedSession]);
+
+  const updateNft = useCallback(async (payload: { nftId: string; currentPrice?: number; status?: "draft" | "live" }) => {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await ensureVerifiedSession();
+      const response = await fetchJson<{ message: string; nft: AdminNftRecord }>(
+        "/api/admin/nfts",
+        {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        },
+      );
+      setNfts((current) =>
+        current.map((item) => (item.id === response.nft.id ? response.nft : item)),
+      );
+      setNotice(response.message);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to update NFT.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [ensureVerifiedSession]);
+
+  const deleteNft = useCallback(async (nftId: string) => {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await ensureVerifiedSession();
+      const response = await fetchJson<{ message: string; nftId: string }>(
+        "/api/admin/nfts",
+        {
+          method: "DELETE",
+          body: JSON.stringify({ nftId }),
+        },
+      );
+      setNfts((current) => current.filter((item) => item.id !== response.nftId));
+      setNotice(response.message);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to delete NFT.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [ensureVerifiedSession]);
+
   return {
     data,
     analytics,
+    nfts,
     isLoading,
     isSaving,
     error,
@@ -176,5 +261,8 @@ export function useAdminPanel(enabled: boolean) {
     saveReserve,
     togglePayouts,
     approve,
+    createNft,
+    updateNft,
+    deleteNft,
   };
 }
