@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { HeroActionButtons, HeroPrimaryActions } from "@/components/sections/hero-primary-actions";
 import { nfts } from "@/data/mock-data";
 import { resolveNftImageUri } from "@/lib/web3/token-metadata";
@@ -42,7 +43,9 @@ export default function SplashPage() {
             </p>
 
             <div className="mt-4">
-              <HeroActionButtons />
+              <Suspense fallback={null}>
+                <HeroActionButtons />
+              </Suspense>
             </div>
           </div>
         </section>

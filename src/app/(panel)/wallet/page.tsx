@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { CircleDollarSign, Clock3, Gem, Layers3, WalletCards } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { StatCard } from "@/components/ui/stat-card";
@@ -65,10 +65,22 @@ export default function WalletPage() {
   const { summary, wallet, refresh } = usePortfolio();
   const { history, isLoading: isHistoryLoading, error: historyError, refresh: refreshHistory } = useWalletHistory();
   const { fullAddress, shortAddress, chainName, isConnected } = useWallet();
+  const [referralCopyMessage, setReferralCopyMessage] = useState<string | null>(null);
+  const referralLink = fullAddress ? `https://gainixnft.live/register?ref=${fullAddress}` : "";
 
   const refreshWalletData = useCallback(async () => {
     await Promise.all([refresh(), refreshHistory()]);
   }, [refresh, refreshHistory]);
+
+  const copyReferralLink = useCallback(async () => {
+    if (!referralLink) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(referralLink);
+    setReferralCopyMessage("Referral link copied.");
+    window.setTimeout(() => setReferralCopyMessage(null), 2500);
+  }, [referralLink]);
 
   return (
     <AnimatedPage>
@@ -94,6 +106,34 @@ export default function WalletPage() {
           </span>
         </div>
       </div>
+
+      <section className="section-shell space-y-4">
+        <div>
+          <p className="muted-label">My Referral Link</p>
+          <h2 className="mt-2 font-display text-2xl font-semibold text-white">Invite new members</h2>
+        </div>
+
+        {!isConnected || !fullAddress ? (
+          <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
+            Connect wallet to get your referral link.
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-200">
+              <p className="break-all">{referralLink}</p>
+            </div>
+            <button type="button" onClick={() => void copyReferralLink()} className="premium-button w-full lg:w-auto">
+              Copy Referral Link
+            </button>
+          </div>
+        )}
+
+        {referralCopyMessage ? (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            {referralCopyMessage}
+          </div>
+        ) : null}
+      </section>
 
       <WalletActionPanel
         walletAddress={fullAddress}

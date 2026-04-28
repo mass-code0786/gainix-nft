@@ -2,7 +2,7 @@
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { UserPlus, Wallet2 } from "lucide-react";
 import { useRegistration } from "@/hooks/useRegistration";
 import { useWallet } from "@/hooks/useWallet";
@@ -44,6 +44,7 @@ const infoCards = [
 
 export function HeroActionButtons() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { openConnectModal } = useConnectModal();
   const {
     fullAddress: liveWalletAddress,
@@ -66,6 +67,7 @@ export function HeroActionButtons() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"default" | "warning" | "success">("default");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const referralWalletAddress = searchParams.get("ref");
   const walletStatusLabel = !hasMounted
     ? "Connect Wallet"
     : isConnected
@@ -95,7 +97,7 @@ export function HeroActionButtons() {
     setStatusTone("default");
 
     try {
-      const result = await registerWallet();
+      const result = await registerWallet(referralWalletAddress);
       setStatusMessage(result.message);
       setStatusTone("success");
       router.push("/dashboard");

@@ -8,7 +8,7 @@ interface UseRegistrationResult {
   isCheckingRegistration: boolean;
   registrationError: string | null;
   refreshRegistration: () => Promise<void>;
-  registerWallet: () => Promise<{ message: string }>;
+  registerWallet: (sponsorWalletAddress?: string | null) => Promise<{ message: string }>;
 }
 
 export function useRegistration(walletAddress?: string | null, isConnected = false): UseRegistrationResult {
@@ -73,18 +73,19 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
     }
   }
 
-  async function registerWallet() {
+  async function registerWallet(sponsorWalletAddress?: string | null) {
     if (!walletAddress) {
       throw new Error("Connect a wallet before registering.");
     }
 
     setRegistrationError(null);
+    const registrationPayload = sponsorWalletAddress
+      ? { walletAddress, sponsorWalletAddress }
+      : { walletAddress };
 
     const result = await fetchJson<{ message: string }>("/api/register", {
       method: "POST",
-      body: JSON.stringify({
-        walletAddress,
-      }),
+      body: JSON.stringify(registrationPayload),
     });
 
     setIsRegistered(true);
