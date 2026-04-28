@@ -1,0 +1,47 @@
+[
+  {
+    "id": "cat",
+    "metadataFilename": "cat.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/cat.json"
+  },
+  {
+    "id": "dog-premium",
+    "metadataFilename": "dog-premium.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/dog-premium.json"
+  },
+  {
+    "id": "dog",
+    "metadataFilename": "dog.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/dog.json"
+  },
+  {
+    "id": "lion-premium",
+    "metadataFilename": "lion-premium.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/lion-premium.json"
+  },
+  {
+    "id": "lion",
+    "metadataFilename": "lion.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/lion.json"
+  },
+  {
+    "id": "monkey-premium",
+    "metadataFilename": "monkey-premium.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/monkey-premium.json"
+  },
+  {
+    "id": "monkey",
+    "metadataFilename": "monkey.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/monkey.json"
+  },
+  {
+    "id": "parrot-premium",
+    "metadataFilename": "parrot-premium.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/parrot-premium.json"
+  },
+  {
+    "id": "parrot",
+    "metadataFilename": "parrot.json",
+    "metadataUri": "ipfs://bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq/parrot.json"
+  }
+]

@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --header-height: 58px;
+    --font-sans: "Sora", "Aptos", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    --font-display: "Orbitron", "Bahnschrift", "Segoe UI Variable Display", "Trebuchet MS", sans-serif;
+    --panel-bg: rgba(14, 14, 18, 0.82);
+    --panel-border: rgba(255, 255, 255, 0.11);
+    --panel-highlight: rgba(255, 255, 255, 0.08);
+  }
+
+  * {
+    @apply border-white/10;
+  }
+
+  html {
+    @apply bg-[#040406] scroll-smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-[#040406] font-sans text-zinc-50 antialiased;
+    background-image:
+      radial-gradient(circle at 8% 8%, rgba(239, 68, 68, 0.24), transparent 24%),
+      radial-gradient(circle at 88% 10%, rgba(136, 19, 55, 0.32), transparent 28%),
+      radial-gradient(circle at 52% 100%, rgba(127, 29, 29, 0.24), transparent 34%),
+      linear-gradient(170deg, #0f0b0c 0%, #09070a 42%, #040406 100%);
+  }
+
+  a {
+    @apply text-inherit no-underline;
+  }
+
+  ::selection {
+    @apply bg-gainix-500/30 text-white;
+  }
+}
+
+@media (min-width: 640px) {
+  :root {
+    --header-height: 62px;
+  }
+}
+
+@layer components {
+  .header-shell {
+    @apply relative overflow-hidden rounded-b-[28px] border backdrop-blur-2xl;
+    background:
+      linear-gradient(180deg, rgba(10, 9, 13, 0.9), rgba(8, 7, 10, 0.78)) padding-box,
+      linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(239, 68, 68, 0.2), rgba(245, 158, 11, 0.14)) border-box;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 18px 40px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(225, 29, 72, 0.08);
+  }
+
+  .header-shell::after {
+    content: "";
+    position: absolute;
+    inset: auto 16px 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), rgba(244, 63, 94, 0.36), transparent);
+    pointer-events: none;
+  }
+
+  .glass-card {
+    @apply rounded-[28px] border backdrop-blur-xl;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(170deg, rgba(24, 18, 22, 0.78), rgba(10, 9, 12, 0.94)) padding-box,
+      linear-gradient(140deg, rgba(255, 255, 255, 0.08), rgba(190, 24, 93, 0.16), rgba(15, 12, 16, 0.92)) border-box;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 14px 32px rgba(0, 0, 0, 0.28);
+  }
+
+  .section-shell {
+    @apply glass-card lux-card p-4 sm:p-5;
+  }
+
+  .interactive-surface {
+    @apply transition-transform duration-200 ease-out;
+    transform: translateZ(0) scale(1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 14px 30px rgba(0, 0, 0, 0.24);
+    will-change: transform;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .interactive-surface:hover {
+      transform: scale(1.02);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 18px 36px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(190, 24, 93, 0.1);
+    }
+  }
+
+  .lux-card {
+    @apply relative overflow-hidden;
+  }
+
+  .lux-card::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: 26px;
+    background:
+      radial-gradient(circle at 88% 0%, rgba(190, 24, 93, 0.12), transparent 34%),
+      radial-gradient(circle at 14% 88%, rgba(69, 10, 20, 0.18), transparent 40%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .lux-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .input-shell {
+    @apply w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-100 outline-none transition focus:border-gainix-400/60 focus:bg-white/10 focus:ring-2 focus:ring-gainix-500/30;
+  }
+
+  .premium-button {
+    @apply inline-flex items-center justify-center rounded-2xl border border-gainix-400/30 bg-gradient-to-r from-rose-700 via-red-600 to-red-800 px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98];
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 0 0 1px rgba(244, 63, 94, 0.24),
+      0 16px 40px rgba(127, 29, 29, 0.44);
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-3 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.1] active:scale-[0.98];
+  }
+
+  .muted-label {
+    @apply text-[11px] uppercase tracking-[0.24em] text-zinc-500;
+  }
+
+  .header-wallet-pill {
+    @apply inline-flex h-9 items-center justify-center rounded-full border border-white/10 px-3 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.08] sm:h-10 sm:px-4;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+      linear-gradient(135deg, rgba(17, 17, 20, 0.9), rgba(9, 8, 11, 0.94));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 12px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .header-wallet-pill[data-tone="primary"] {
+    @apply border-gainix-400/25 text-white;
+    background:
+      linear-gradient(180deg, rgba(244, 63, 94, 0.16), rgba(244, 63, 94, 0.06)),
+      linear-gradient(135deg, rgba(19, 14, 17, 0.94), rgba(11, 8, 10, 0.98));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 12px 28px rgba(0, 0, 0, 0.32),
+      0 0 0 1px rgba(244, 63, 94, 0.08),
+      0 0 20px rgba(244, 63, 94, 0.08);
+  }
+
+  .header-wallet-pill[data-tone="warning"] {
+    @apply border-amber-500/30 bg-amber-500/10 text-amber-200;
+  }
+
+  .soft-divider {
+    @apply border-t border-white/10;
+  }
+
+  .glow-ring {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 0 1px rgba(244, 63, 94, 0.12),
+      0 24px 80px rgba(127, 29, 29, 0.32);
+  }
+
+  .screen-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05];
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    animation: shimmer 1.8s infinite;
+  }
+
+  .market-card {
+    @apply relative block overflow-hidden rounded-[28px] border p-4 sm:p-5;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+      radial-gradient(circle at 12% 10%, rgba(190, 24, 93, 0.14), transparent 28%),
+      radial-gradient(circle at 88% 14%, rgba(69, 10, 20, 0.12), transparent 24%),
+      linear-gradient(160deg, rgba(18, 12, 16, 0.9), rgba(9, 7, 10, 0.94));
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(22px);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 0 0 1px rgba(190, 24, 93, 0.06),
+      0 16px 34px rgba(0,0,0,0.34);
+    transform: translateY(0) scale(1);
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease,
+      border-color 0.3s ease,
+      background 0.3s ease;
+  }
+
+  .market-card-compact {
+    @apply rounded-[22px] p-2.5 sm:p-3.5;
+  }
+
+  .market-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(190, 24, 93, 0.22), rgba(24, 18, 22, 0.84));
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0.52;
+    pointer-events: none;
+  }
+
+  .market-card::after {
+    content: "";
+    position: absolute;
+    left: -14%;
+    top: -10%;
+    height: 180px;
+    width: 180px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(190, 24, 93, 0.18), transparent 68%);
+    filter: blur(36px);
+    opacity: 0.5;
+    pointer-events: none;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+
+  .market-card:hover {
+    transform: scale(1.02);
+    border-color: rgba(190, 24, 93, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.08),
+      0 0 0 1px rgba(190, 24, 93, 0.1),
+      0 20px 40px rgba(0,0,0,0.38);
+  }
+
+  .market-card:active {
+    transform: translateY(-2px) scale(0.99);
+  }
+
+  .market-card:hover::after {
+    opacity: 0.72;
+    transform: translate3d(4%, -4%, 0) scale(1.04);
+  }
+
+  .market-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .market-card-preview {
+    transition:
+      transform 0.3s ease,
+      box-shadow 0.3s ease,
+      border-color 0.3s ease;
+  }
+
+  .market-card:hover .market-card-preview {
+    border-color: rgba(251, 113, 133, 0.18);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.06),
+      0 22px 44px rgba(0,0,0,0.42),
+      0 0 32px rgba(239, 68, 68, 0.12);
+  }
+
+  .market-card-compact .market-card-preview {
+    @apply rounded-[18px];
+  }
+
+  .market-card-panel {
+    @apply rounded-[22px] border backdrop-blur-xl;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

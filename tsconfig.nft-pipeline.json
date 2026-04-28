@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "incremental": false,
+    "outDir": "./.nft-pipeline-dist",
+    "rootDir": ".",
+    "jsx": "preserve",
+    "plugins": [],
+    "types": ["node"]
+  },
+  "include": ["scripts/nft-pipeline/**/*.ts"],
+  "exclude": ["node_modules", ".next", ".nft-pipeline-dist"]
+}

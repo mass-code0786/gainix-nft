@@ -1,0 +1,151 @@
+{
+  "name": "Gainix NFT #0001",
+  "description": "Gainix NFT is a premium dark-luxury Web3 collection built around five elite animal families: Monkey, Dog, Cat, Lion, and Parrot.",
+  "image": "ipfs://__COLLECTION_CID__/gainix-nft-0001.png",
+  "external_url": "https://gainix.io/nft",
+  "edition": 1,
+  "dna": "cat|background:background-obsidian-halo|body:body-cat-velvet-shadow|outfit:outfit-velvet-blazer|neckItem:neck-slim-chain|mouth:mouth-closed-royal|eyes:eyes-amber-guard|eyewear:eyewear-none|headwear:headwear-bare-head|specialEffect:effect-ember-particles",
+  "compiler": "gainix-nft-pipeline@1.0.0",
+  "date": "2026-04-19T17:59:55.053Z",
+  "family": "Cat",
+  "attributes": [
+    {
+      "trait_type": "Family",
+      "value": "Cat"
+    },
+    {
+      "trait_type": "Background",
+      "value": "Obsidian Halo",
+      "rarity_tier": "common",
+      "weight": 180,
+      "asset": "traits/backgrounds/background__obsidian-halo__common.png"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Velvet Shadow",
+      "rarity_tier": "common",
+      "weight": 73,
+      "asset": "cat/cat__body__velvet-shadow__common.png"
+    },
+    {
+      "trait_type": "Outfit",
+      "value": "Velvet Blazer",
+      "rarity_tier": "uncommon",
+      "weight": 92,
+      "asset": "traits/outfits/outfit__velvet-blazer__uncommon.png"
+    },
+    {
+      "trait_type": "Neck Item",
+      "value": "Slim Chain",
+      "rarity_tier": "common",
+      "weight": 145,
+      "asset": "traits/neck-items/neck-item__slim-chain__common.png"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Closed Royal",
+      "rarity_tier": "common",
+      "weight": 190,
+      "asset": "traits/mouth/mouth__closed-royal__common.png"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Amber Guard",
+      "rarity_tier": "common",
+      "weight": 150,
+      "asset": "traits/eyes/eyes__amber-guard__common.png"
+    },
+    {
+      "trait_type": "Eyewear",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 250,
+      "asset": "traits/eyewear/eyewear__none__common.png"
+    },
+    {
+      "trait_type": "Headwear",
+      "value": "Bare Head",
+      "rarity_tier": "common",
+      "weight": 220,
+      "asset": "traits/headwear/headwear__bare-head__common.png"
+    },
+    {
+      "trait_type": "Special Effect",
+      "value": "Ember Particles",
+      "rarity_tier": "common",
+      "weight": 122,
+      "asset": "traits/effects/effect__ember-particles__common.png"
+    }
+  ],
+  "gainix": {
+    "family": {
+      "id": "cat",
+      "name": "Cat"
+    },
+    "layer_manifest": [
+      {
+        "category": "background",
+        "traitId": "background-obsidian-halo",
+        "traitName": "Obsidian Halo",
+        "asset": "traits/backgrounds/background__obsidian-halo__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "body",
+        "traitId": "body-cat-velvet-shadow",
+        "traitName": "Velvet Shadow",
+        "asset": "cat/cat__body__velvet-shadow__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "outfit",
+        "traitId": "outfit-velvet-blazer",
+        "traitName": "Velvet Blazer",
+        "asset": "traits/outfits/outfit__velvet-blazer__uncommon.png",
+        "rarity": "uncommon"
+      },
+      {
+        "category": "neckItem",
+        "traitId": "neck-slim-chain",
+        "traitName": "Slim Chain",
+        "asset": "traits/neck-items/neck-item__slim-chain__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "mouth",
+        "traitId": "mouth-closed-royal",
+        "traitName": "Closed Royal",
+        "asset": "traits/mouth/mouth__closed-royal__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "eyes",
+        "traitId": "eyes-amber-guard",
+        "traitName": "Amber Guard",
+        "asset": "traits/eyes/eyes__amber-guard__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "eyewear",
+        "traitId": "eyewear-none",
+        "traitName": "None",
+        "asset": "traits/eyewear/eyewear__none__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "headwear",
+        "traitId": "headwear-bare-head",
+        "traitName": "Bare Head",
+        "asset": "traits/headwear/headwear__bare-head__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "specialEffect",
+        "traitId": "effect-ember-particles",
+        "traitName": "Ember Particles",
+        "asset": "traits/effects/effect__ember-particles__common.png",
+        "rarity": "common"
+      }
+    ]
+  }
+}

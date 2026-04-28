@@ -1,0 +1,30 @@
+{
+  "collection": "Gainix NFT",
+  "slug": "gainix-nft",
+  "generatedAt": "2026-04-19T17:59:55.034Z",
+  "count": 3,
+  "metadataOnly": true,
+  "editions": [
+    {
+      "edition": 1,
+      "family": "Cat",
+      "dna": "cat|background:background-obsidian-halo|body:body-cat-velvet-shadow|outfit:outfit-velvet-blazer|neckItem:neck-slim-chain|mouth:mouth-closed-royal|eyes:eyes-amber-guard|eyewear:eyewear-none|headwear:headwear-bare-head|specialEffect:effect-ember-particles",
+      "image": "images\\gainix-nft-0001.png",
+      "metadata": "metadata\\gainix-nft-0001.json"
+    },
+    {
+      "edition": 2,
+      "family": "Cat",
+      "dna": "cat|background:background-crimson-vault|body:body-cat-velvet-shadow|outfit:outfit-carbon-armor|neckItem:neck-none|mouth:mouth-closed-royal|eyes:eyes-scarlet-slit|eyewear:eyewear-none|headwear:headwear-velvet-cap|specialEffect:effect-none",
+      "image": "images\\gainix-nft-0002.png",
+      "metadata": "metadata\\gainix-nft-0002.json"
+    },
+    {
+      "edition": 3,
+      "family": "Cat",
+      "dna": "cat|background:background-eclipse-throne|body:body-cat-ruby-phantom|outfit:outfit-velvet-blazer|neckItem:neck-obsidian-torque|mouth:mouth-closed-royal|eyes:eyes-amber-guard|eyewear:eyewear-none|headwear:headwear-carbon-snapback|specialEffect:effect-none",
+      "image": "images\\gainix-nft-0003.png",
+      "metadata": "metadata\\gainix-nft-0003.json"
+    }
+  ]
+}

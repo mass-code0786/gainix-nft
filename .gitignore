@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+dist/
+.nft-pipeline-dist/
+
+# local env/secrets
+.env
+.env.local
+.env.*.local
+
+# local databases
+prisma/dev.db
+prisma/dev.db-*
+data/*.json
+
+# caches
+.npm-cache/
+*.tsbuildinfo
+
+# logs
+*.log
+.codex-*.out.log
+.codex-*.err.log
+
+# local QA/browser artifacts
+.edge-*.html
+edge-*.json
+edge-*.txt
+edge-*.html
+edge-*.png
+
+# OS/editor
+.DS_Store
+Thumbs.db

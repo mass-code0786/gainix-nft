@@ -1,0 +1,560 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  ArrowDownToLine,
+  ArrowRightLeft,
+  ArrowUpFromLine,
+  LoaderCircle,
+  X,
+} from "lucide-react";
+import { isAddress, parseUnits, zeroAddress } from "viem";
+import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { ApiRequestError, fetchJson } from "@/lib/api/client";
+import {
+  erc20TransferAbi,
+  hasUsdtPaymentConfig,
+  USDT_DECIMALS,
+  USDT_SYMBOL,
+  usdtPaymentConfig,
+} from "@/lib/web3/usdt";
+import { formatCurrency } from "@/utils/format";
+
+export type WalletAction = "deposit" | "withdraw" | "transfer";
+
+interface WalletMutationResponse {
+  wallet: {
+    tradingWallet: number;
+    withdrawalWallet: number;
+  };
+}
+
+interface DepositVerifyResponse extends WalletMutationResponse {
+  deposit: {
+    txHash: string;
+    creditedAmount: number;
+    status: "confirmed";
+  };
+}
+
+interface RecentWalletAction {
+  id: string;
+  type: WalletAction;
+  amount: number;
+  netAmount?: number;
+  createdAt: string;
+}
+
+interface WalletActionPanelProps {
+  walletAddress: string | null;
+  tradingWallet: number;
+  withdrawalWallet: number;
+  totalBuyCount?: number;
+  totalSellCount?: number;
+  dailyBuyCount?: number;
+  dailySellCount?: number;
+  dailyBuyLimit?: number;
+  dailySellLimit?: number;
+  currentVipLevel?: number;
+  bonusTrades?: number;
+  capitalUnlocked?: boolean;
+  capitalTransferredAt?: string | null;
+  onRefresh: () => Promise<void>;
+}
+
+interface WalletActionModalProps extends WalletActionPanelProps {
+  action: WalletAction;
+  onClose: () => void;
+  onRecorded: (item: RecentWalletAction) => void;
+}
+
+function parseAmount(value: string) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function shortHash(value: string) {
+  return `${value.slice(0, 10)}...${value.slice(-8)}`;
+}
+
+function hasValidUsdtPaymentConfig() {
+  return (
+    hasUsdtPaymentConfig() &&
+    isAddress(usdtPaymentConfig.tokenAddress) &&
+    isAddress(usdtPaymentConfig.treasuryAddress) &&
+    usdtPaymentConfig.treasuryAddress.toLowerCase() !== zeroAddress
+  );
+}
+
+function numberFromPayload(payload: Record<string, unknown> | null, key: string) {
+  const value = payload?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function capitalLockedMessage(
+  payload: Record<string, unknown> | null,
+  fallbackBuyCount: number,
+  fallbackSellCount: number,
+) {
+  const requiredBuyCount = numberFromPayload(payload, "requiredBuyCount") ?? 300;
+  const requiredSellCount = numberFromPayload(payload, "requiredSellCount") ?? 300;
+  const buyCount = Math.min(
+    numberFromPayload(payload, "buyCount") ?? fallbackBuyCount,
+    requiredBuyCount,
+  );
+  const sellCount = Math.min(
+    numberFromPayload(payload, "sellCount") ?? fallbackSellCount,
+    requiredSellCount,
+  );
+  const remainingBuyCount =
+    numberFromPayload(payload, "remainingBuyCount") ?? Math.max(requiredBuyCount - buyCount, 0);
+  const remainingSellCount =
+    numberFromPayload(payload, "remainingSellCount") ?? Math.max(requiredSellCount - sellCount, 0);
+
+  return `Your capital is still locked. You have completed ${buyCount}/${requiredBuyCount} buys and ${sellCount}/${requiredSellCount} sells. Remaining: ${remainingBuyCount} buys and ${remainingSellCount} sells.`;
+}
+
+function transferErrorMessage(error: unknown, buyCount: number, sellCount: number) {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 403) {
+      return capitalLockedMessage(error.payload, buyCount, sellCount);
+    }
+
+    if (error.message === "Capital has already been transferred.") {
+      return error.message;
+    }
+
+    return error.message;
+  }
+
+  return error instanceof Error ? error.message : "Transfer capital failed.";
+}
+
+function WalletActionModal({
+  action,
+  walletAddress,
+  tradingWallet,
+  withdrawalWallet,
+  totalBuyCount = 0,
+  totalSellCount = 0,
+  onClose,
+  onRefresh,
+  onRecorded,
+}: WalletActionModalProps) {
+  const { chainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: usdtPaymentConfig.chainId });
+  const walletAuth = useWalletAuth(walletAddress);
+  const [amountInput, setAmountInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const amount = parseAmount(amountInput);
+  const transferAmount = Number(tradingWallet.toFixed(2));
+  const feeAmount = action === "withdraw" ? Number((amount * 0.1).toFixed(2)) : 0;
+  const netAmount = action === "withdraw" ? Number((amount - feeAmount).toFixed(2)) : amount;
+  const title = action === "deposit" ? "Deposit" : action === "withdraw" ? "Withdraw" : "Transfer capital";
+  const depositConfigReady = hasValidUsdtPaymentConfig();
+
+  const validationError = useMemo(() => {
+    if (action === "transfer") {
+      return null;
+    }
+
+    if (amountInput.trim().length === 0) {
+      return null;
+    }
+
+    if (amount <= 0) {
+      return "Amount must be greater than 0.";
+    }
+
+    if (action === "deposit" && !/^\d+(\.\d{1,18})?$/.test(amountInput.trim())) {
+      return "Enter a valid USDT amount.";
+    }
+
+    if (action === "withdraw" && amount < 10) {
+      return "Minimum withdrawal is $10.";
+    }
+
+    if (action === "withdraw" && amount > withdrawalWallet) {
+      return "Amount exceeds your withdrawal wallet balance.";
+    }
+
+    if (action === "deposit" && !depositConfigReady) {
+      return "USDT deposit settings are not configured.";
+    }
+
+    return null;
+  }, [
+    action,
+    amount,
+    amountInput,
+    depositConfigReady,
+    withdrawalWallet,
+  ]);
+
+  async function submit() {
+    setError(null);
+    setSuccess(null);
+
+    if (!walletAddress) {
+      setError("Connect your wallet to continue.");
+      return;
+    }
+
+    if (action !== "transfer" && amount <= 0) {
+      setError("Amount must be greater than 0.");
+      return;
+    }
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await walletAuth.ensureVerifiedSession();
+
+      if (action === "deposit") {
+        if (!publicClient) {
+          throw new Error("BSC RPC client is not available.");
+        }
+
+        if (chainId !== usdtPaymentConfig.chainId && switchChainAsync) {
+          await switchChainAsync({ chainId: usdtPaymentConfig.chainId });
+        }
+
+        const hash = await writeContractAsync({
+          address: usdtPaymentConfig.tokenAddress,
+          abi: erc20TransferAbi,
+          functionName: "transfer",
+          args: [
+            usdtPaymentConfig.treasuryAddress,
+            parseUnits(amountInput.trim(), USDT_DECIMALS),
+          ],
+          chainId: usdtPaymentConfig.chainId,
+        });
+        setTxHash(hash);
+
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("USDT transfer was not successful.");
+        }
+        await fetchJson<DepositVerifyResponse>("/api/deposit/verify", {
+          method: "POST",
+          body: JSON.stringify({
+            walletAddress,
+            txHash: hash,
+            expectedAmount: amount,
+          }),
+        });
+      } else {
+        await fetchJson<WalletMutationResponse>(action === "withdraw" ? "/api/withdraw" : "/api/wallet/transfer-capital", {
+          method: "POST",
+          body: JSON.stringify(
+            action === "withdraw"
+              ? {
+                  walletAddress,
+                  amount,
+                }
+              : {
+                  walletAddress,
+                },
+          ),
+        });
+      }
+      await onRefresh();
+      onRecorded({
+        id: `${action}-${Date.now()}`,
+        type: action,
+        amount: action === "transfer" ? transferAmount : amount,
+        netAmount: action === "withdraw" ? netAmount : undefined,
+        createdAt: new Date().toISOString(),
+      });
+      setSuccess(
+        action === "deposit"
+          ? "USDT deposit verified and credited to trading wallet."
+          : action === "withdraw"
+            ? "USDT withdrawal request created for admin approval."
+            : "Capital transferred to withdrawal wallet.",
+      );
+      setAmountInput("");
+    } catch (submitError) {
+      setError(
+        action === "transfer"
+          ? transferErrorMessage(submitError, totalBuyCount, totalSellCount)
+          : submitError instanceof Error
+            ? submitError.message
+            : `${title} failed.`,
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/75 px-3 py-4 backdrop-blur-sm sm:items-center sm:justify-center">
+      <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(25,8,10,0.98),rgba(8,8,12,0.99))] p-4 shadow-2xl shadow-red-950/30 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="muted-label">Wallet action</p>
+            <h2 className="mt-2 font-display text-2xl font-semibold text-white">{title}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+            aria-label="Close modal"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {action === "transfer" ? (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
+            <div className="flex items-center justify-between gap-3">
+              <span>Capital transfer</span>
+              <span className="text-white">Full principal</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span>Amount</span>
+              <span className="text-emerald-200">{formatCurrency(transferAmount)}</span>
+            </div>
+          </div>
+        ) : (
+          <label className="mt-5 block">
+            <span className="mb-2 block text-sm text-zinc-400">Amount</span>
+            <input
+              className="input-shell"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={amountInput}
+              onChange={(event) => {
+                setAmountInput(event.target.value);
+                setError(null);
+                setSuccess(null);
+                setTxHash(null);
+              }}
+            />
+          </label>
+        )}
+
+        {action === "deposit" ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
+            <div className="flex items-center justify-between gap-3">
+              <span>Asset</span>
+              <span className="text-white">{USDT_SYMBOL} BEP20</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 text-zinc-500">
+              <span>Gas</span>
+              <span>BNB</span>
+            </div>
+            {txHash ? (
+              <div className="mt-2 flex items-center justify-between gap-3 text-zinc-500">
+                <span>Tx hash</span>
+                <span className="text-zinc-300">{shortHash(txHash)}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {action === "withdraw" || action === "transfer" ? (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
+            {action === "withdraw" ? (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <span>USDT withdrawal</span>
+                  <span className="text-white">Admin approval</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>Fee 10%</span>
+                  <span className="text-rose-200">{formatCurrency(feeAmount)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>Net amount</span>
+                  <span className="text-emerald-200">{formatCurrency(Math.max(netAmount, 0))}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <span>Capital transfer</span>
+                <span className="text-white">Trading to withdrawal</span>
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-between gap-3 text-zinc-500">
+              <span>Available</span>
+              <span>{formatCurrency(action === "withdraw" ? withdrawalWallet : tradingWallet)}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {validationError ? (
+          <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {validationError}
+          </div>
+        ) : null}
+        {error ? (
+          <div className="mt-4 whitespace-pre-line rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            {error}
+          </div>
+        ) : null}
+        {success ? (
+          <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            {success}
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={isSubmitting || walletAuth.isSigning || Boolean(validationError)}
+          className="premium-button mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting || walletAuth.isSigning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {walletAuth.signPrompt ?? (action === "deposit" ? `Send ${USDT_SYMBOL}` : title)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function WalletActionPanel({
+  walletAddress,
+  tradingWallet,
+  withdrawalWallet,
+  totalBuyCount = 0,
+  totalSellCount = 0,
+  dailyBuyCount = 0,
+  dailySellCount = 0,
+  dailyBuyLimit = 6,
+  dailySellLimit = 6,
+  currentVipLevel = 0,
+  bonusTrades = 0,
+  capitalUnlocked = false,
+  capitalTransferredAt = null,
+  onRefresh,
+}: WalletActionPanelProps) {
+  const [walletAction, setWalletAction] = useState<WalletAction | null>(null);
+  const [recentActions, setRecentActions] = useState<RecentWalletAction[]>([]);
+
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.18),transparent_30%),linear-gradient(160deg,rgba(18,7,9,0.96),rgba(8,8,12,0.98))] p-4 sm:p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="muted-label">Wallet Summary</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-sm text-zinc-400">Trading Wallet</p>
+              <p className="mt-1 font-display text-2xl font-semibold text-white">
+                {formatCurrency(tradingWallet)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <p className="text-sm text-zinc-400">Withdrawal Wallet</p>
+              <p className="mt-1 font-display text-2xl font-semibold text-white">
+                {formatCurrency(withdrawalWallet)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-4">
+            <div className="grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <span>Buy</span>
+                <span className="text-white">{dailyBuyCount} / {dailyBuyLimit}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <span>Sell</span>
+                <span className="text-white">{dailySellCount} / {dailySellLimit}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <span>VIP Level</span>
+                <span className="text-white">VIP{currentVipLevel}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <span>Bonus</span>
+                <span className="text-white">+{bonusTrades} trades</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
+          <button
+            type="button"
+            onClick={() => setWalletAction("deposit")}
+            disabled={!walletAddress}
+            className="premium-button w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <ArrowDownToLine className="mr-2 h-4 w-4" />
+            Deposit
+          </button>
+          <button
+            type="button"
+            onClick={() => setWalletAction("withdraw")}
+            disabled={!walletAddress}
+            className="secondary-button w-full border-rose-500/25 bg-rose-500/10 text-rose-100 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <ArrowUpFromLine className="mr-2 h-4 w-4" />
+            Withdraw
+          </button>
+          <button
+            type="button"
+            onClick={() => setWalletAction("transfer")}
+            disabled={!walletAddress}
+            className="secondary-button w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            Transfer Capital
+          </button>
+        </div>
+      </div>
+
+      {recentActions.length > 0 ? (
+        <div className="mt-5 border-t border-white/10 pt-4">
+          <p className="muted-label">Recent wallet actions</p>
+          <div className="mt-3 space-y-2">
+            {recentActions.slice(0, 3).map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm">
+                <span className="text-zinc-300">
+                  {item.type === "deposit" ? "Deposit" : item.type === "withdraw" ? "Withdraw" : "Transfer Capital"}
+                </span>
+                <span className="text-white">
+                  {formatCurrency(item.type === "withdraw" ? item.netAmount ?? item.amount : item.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {walletAction ? (
+        <WalletActionModal
+          action={walletAction}
+          walletAddress={walletAddress}
+          tradingWallet={tradingWallet}
+          withdrawalWallet={withdrawalWallet}
+          totalBuyCount={totalBuyCount}
+          totalSellCount={totalSellCount}
+          dailyBuyCount={dailyBuyCount}
+          dailySellCount={dailySellCount}
+          dailyBuyLimit={dailyBuyLimit}
+          dailySellLimit={dailySellLimit}
+          currentVipLevel={currentVipLevel}
+          bonusTrades={bonusTrades}
+          capitalUnlocked={capitalUnlocked}
+          capitalTransferredAt={capitalTransferredAt}
+          onClose={() => setWalletAction(null)}
+          onRefresh={onRefresh}
+          onRecorded={(item) =>
+            setRecentActions((current) => [item, ...current].slice(0, 5))
+          }
+        />
+      ) : null}
+    </section>
+  );
+}

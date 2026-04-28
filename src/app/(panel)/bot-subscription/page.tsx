@@ -1,0 +1,166 @@
+"use client";
+
+import { useState } from "react";
+import { ActiveBotPreview } from "@/components/bot-pass/active-bot-preview";
+import { BotActivityTimeline } from "@/components/bot-pass/bot-activity-timeline";
+import { BotPlanCard } from "@/components/bot-pass/bot-plan-card";
+import { AnimatedPage } from "@/components/ui/animated-page";
+import { useBotSubscription } from "@/hooks/useBotSubscription";
+import { useWallet } from "@/hooks/useWallet";
+import { useWalletAuth } from "@/hooks/useWalletAuth";
+
+function formatLatestAction(label: string | null | undefined) {
+  if (!label) {
+    return "Waiting for next bot cycle";
+  }
+
+  if (label === "AUTO_BUY") {
+    return "Auto Bought NFT";
+  }
+
+  if (label === "AUTO_LIST") {
+    return "Listed For Sell";
+  }
+
+  if (label === "AUTO_SELL") {
+    return "Auto Sold";
+  }
+
+  return label;
+}
+
+export default function BotSubscriptionPage() {
+  const { fullAddress, isConnected } = useWallet();
+  const walletAuth = useWalletAuth(fullAddress);
+  const {
+    plans,
+    activeSubscription,
+    timeline,
+    latestActivity,
+    todayBotProfit,
+    totalBotProfit,
+    progress,
+    status,
+    isLoading,
+    refresh,
+  } = useBotSubscription();
+  const [isPurchasing, setIsPurchasing] = useState<string | null>(null);
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+  async function handleBuy(planId: string) {
+    if (!fullAddress) {
+      return;
+    }
+
+    setIsPurchasing(planId);
+    setPurchaseMessage(null);
+    setPurchaseError(null);
+
+    try {
+      await walletAuth.ensureVerifiedSession();
+      const response = await fetch("/api/bot/buy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          walletAddress: fullAddress,
+          planId,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? "Bot purchase failed.");
+      }
+
+      const payload = (await response.json()) as { message?: string };
+      setPurchaseMessage(payload.message ?? "Bot plan purchased successfully.");
+      await refresh();
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : "Bot purchase failed.");
+    } finally {
+      setIsPurchasing(null);
+    }
+  }
+
+  return (
+    <AnimatedPage>
+      <div className="section-shell lux-card">
+        <h1 className="font-display text-[2rem] font-semibold tracking-tight text-white sm:text-[2.35rem]">
+          Auto Trading Bot
+        </h1>
+      </div>
+
+      <div className="space-y-3 sm:space-y-4">
+        {plans.map((plan) => (
+          <BotPlanCard
+            key={plan.planId}
+            name={plan.planName}
+            price={plan.price}
+            buyLimit={plan.buyTrades}
+            sellLimit={plan.sellTrades}
+            onBuy={() => void handleBuy(plan.planId)}
+            isDisabled={!isConnected || isPurchasing === plan.planId}
+          />
+        ))}
+      </div>
+
+      <ActiveBotPreview
+        botName={activeSubscription?.planName ?? "No Active Bot"}
+        statusLabel={
+          activeSubscription
+            ? activeSubscription.status === "completed"
+              ? "Completed"
+              : "Running"
+            : status === "fallback"
+              ? "Paused"
+              : "Paused"
+        }
+        completedBuyTrades={
+          activeSubscription
+            ? `${activeSubscription.completedBuyTrades} / ${activeSubscription.totalBuyTrades}`
+            : "0 / 0"
+        }
+        completedSellTrades={
+          activeSubscription
+            ? `${activeSubscription.completedSellTrades} / ${activeSubscription.totalSellTrades}`
+            : "0 / 0"
+        }
+        remainingTrades={
+          activeSubscription
+            ? `${activeSubscription.remainingBuyTrades + activeSubscription.remainingSellTrades}`
+            : "0"
+        }
+        progress={progress}
+        todayProfit={todayBotProfit}
+        totalProfit={totalBotProfit}
+        latestAction={formatLatestAction(latestActivity?.action)}
+      />
+
+      <BotActivityTimeline activity={timeline} />
+
+      {isLoading ? (
+        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-400">
+          Loading bot automation data.
+        </div>
+      ) : null}
+      {purchaseMessage ? (
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {purchaseMessage}
+        </div>
+      ) : null}
+      {purchaseError ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          {purchaseError}
+        </div>
+      ) : null}
+      {walletAuth.signPrompt && isConnected ? (
+        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-300">
+          {walletAuth.signPrompt}
+        </div>
+      ) : null}
+    </AnimatedPage>
+  );
+}

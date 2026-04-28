@@ -1,0 +1,151 @@
+{
+  "name": "Gainix NFT #0003",
+  "description": "Gainix NFT is a premium dark-luxury Web3 collection built around five elite animal families: Monkey, Dog, Cat, Lion, and Parrot.",
+  "image": "ipfs://__COLLECTION_CID__/gainix-nft-0003.png",
+  "external_url": "https://gainix.io/nft",
+  "edition": 3,
+  "dna": "cat|background:background-eclipse-throne|body:body-cat-ruby-phantom|outfit:outfit-velvet-blazer|neckItem:neck-obsidian-torque|mouth:mouth-closed-royal|eyes:eyes-amber-guard|eyewear:eyewear-none|headwear:headwear-carbon-snapback|specialEffect:effect-none",
+  "compiler": "gainix-nft-pipeline@1.0.0",
+  "date": "2026-04-19T17:59:55.058Z",
+  "family": "Cat",
+  "attributes": [
+    {
+      "trait_type": "Family",
+      "value": "Cat"
+    },
+    {
+      "trait_type": "Background",
+      "value": "Eclipse Throne",
+      "rarity_tier": "epic",
+      "weight": 18,
+      "asset": "traits/backgrounds/background__eclipse-throne__epic.png"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Ruby Phantom",
+      "rarity_tier": "rare",
+      "weight": 17,
+      "asset": "cat/cat__body__ruby-phantom__rare.png"
+    },
+    {
+      "trait_type": "Outfit",
+      "value": "Velvet Blazer",
+      "rarity_tier": "uncommon",
+      "weight": 92,
+      "asset": "traits/outfits/outfit__velvet-blazer__uncommon.png"
+    },
+    {
+      "trait_type": "Neck Item",
+      "value": "Obsidian Torque",
+      "rarity_tier": "uncommon",
+      "weight": 82,
+      "asset": "traits/neck-items/neck-item__obsidian-torque__uncommon.png"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Closed Royal",
+      "rarity_tier": "common",
+      "weight": 190,
+      "asset": "traits/mouth/mouth__closed-royal__common.png"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Amber Guard",
+      "rarity_tier": "common",
+      "weight": 150,
+      "asset": "traits/eyes/eyes__amber-guard__common.png"
+    },
+    {
+      "trait_type": "Eyewear",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 250,
+      "asset": "traits/eyewear/eyewear__none__common.png"
+    },
+    {
+      "trait_type": "Headwear",
+      "value": "Carbon Snapback",
+      "rarity_tier": "uncommon",
+      "weight": 98,
+      "asset": "traits/headwear/headwear__carbon-snapback__uncommon.png"
+    },
+    {
+      "trait_type": "Special Effect",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 250,
+      "asset": "traits/effects/effect__none__common.png"
+    }
+  ],
+  "gainix": {
+    "family": {
+      "id": "cat",
+      "name": "Cat"
+    },
+    "layer_manifest": [
+      {
+        "category": "background",
+        "traitId": "background-eclipse-throne",
+        "traitName": "Eclipse Throne",
+        "asset": "traits/backgrounds/background__eclipse-throne__epic.png",
+        "rarity": "epic"
+      },
+      {
+        "category": "body",
+        "traitId": "body-cat-ruby-phantom",
+        "traitName": "Ruby Phantom",
+        "asset": "cat/cat__body__ruby-phantom__rare.png",
+        "rarity": "rare"
+      },
+      {
+        "category": "outfit",
+        "traitId": "outfit-velvet-blazer",
+        "traitName": "Velvet Blazer",
+        "asset": "traits/outfits/outfit__velvet-blazer__uncommon.png",
+        "rarity": "uncommon"
+      },
+      {
+        "category": "neckItem",
+        "traitId": "neck-obsidian-torque",
+        "traitName": "Obsidian Torque",
+        "asset": "traits/neck-items/neck-item__obsidian-torque__uncommon.png",
+        "rarity": "uncommon"
+      },
+      {
+        "category": "mouth",
+        "traitId": "mouth-closed-royal",
+        "traitName": "Closed Royal",
+        "asset": "traits/mouth/mouth__closed-royal__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "eyes",
+        "traitId": "eyes-amber-guard",
+        "traitName": "Amber Guard",
+        "asset": "traits/eyes/eyes__amber-guard__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "eyewear",
+        "traitId": "eyewear-none",
+        "traitName": "None",
+        "asset": "traits/eyewear/eyewear__none__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "headwear",
+        "traitId": "headwear-carbon-snapback",
+        "traitName": "Carbon Snapback",
+        "asset": "traits/headwear/headwear__carbon-snapback__uncommon.png",
+        "rarity": "uncommon"
+      },
+      {
+        "category": "specialEffect",
+        "traitId": "effect-none",
+        "traitName": "None",
+        "asset": "traits/effects/effect__none__common.png",
+        "rarity": "common"
+      }
+    ]
+  }
+}

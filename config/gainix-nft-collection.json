@@ -1,0 +1,105 @@
+{
+  "name": "Gainix NFT",
+  "network": "bscTestnet",
+  "contracts": {
+    "nft": "0x1c5C376FfCD55A5aF975B0Ca25Da0A8336464F70",
+    "marketplace": "0x8eE364d178f1ecafC0187E77c5a1B04428131942",
+    "botPass": "0xA1C5d81561a1238527Dc2fc7f4322f2D9bABc454"
+  },
+  "ipfs": {
+    "imageCid": "bafybeiayunsjyqar6kdykbwz2wadptfq3c3wpj7cy33oh6srjbzeckmphq",
+    "metadataCid": "bafybeihw5r5vakqino3ttkvjl6rfws34litl2uizxqmigt2junzojwcvxq"
+  },
+  "assets": [
+    {
+      "id": "cat",
+      "name": "Gainix Cat",
+      "imageFilename": "cat.jpeg",
+      "metadataFilename": "cat.json",
+      "attributes": {
+        "Category": "Cat",
+        "Tier": "Standard"
+      }
+    },
+    {
+      "id": "dog-premium",
+      "name": "Gainix Dog Premium",
+      "imageFilename": "dog premium.jpeg",
+      "metadataFilename": "dog-premium.json",
+      "attributes": {
+        "Category": "Dog",
+        "Tier": "Premium"
+      }
+    },
+    {
+      "id": "dog",
+      "name": "Gainix Dog",
+      "imageFilename": "dog.jpeg",
+      "metadataFilename": "dog.json",
+      "attributes": {
+        "Category": "Dog",
+        "Tier": "Standard"
+      }
+    },
+    {
+      "id": "lion-premium",
+      "name": "Gainix Lion Premium",
+      "imageFilename": "lion premium.jpeg",
+      "metadataFilename": "lion-premium.json",
+      "attributes": {
+        "Category": "Lion",
+        "Tier": "Premium"
+      }
+    },
+    {
+      "id": "lion",
+      "name": "Gainix Lion",
+      "imageFilename": "lion.jpeg",
+      "metadataFilename": "lion.json",
+      "attributes": {
+        "Category": "Lion",
+        "Tier": "Standard"
+      }
+    },
+    {
+      "id": "monkey-premium",
+      "name": "Gainix Monkey Premium",
+      "imageFilename": "monkey premium.jpeg",
+      "metadataFilename": "monkey-premium.json",
+      "attributes": {
+        "Category": "Monkey",
+        "Tier": "Premium"
+      }
+    },
+    {
+      "id": "monkey",
+      "name": "Gainix Monkey",
+      "imageFilename": "monkey.jpeg",
+      "metadataFilename": "monkey.json",
+      "attributes": {
+        "Category": "Monkey",
+        "Tier": "Standard"
+      }
+    },
+    {
+      "id": "parrot-premium",
+      "name": "Gainix Parrot Premium",
+      "imageFilename": "parrot premium.jpeg",
+      "metadataFilename": "parrot-premium.json",
+      "attributes": {
+        "Category": "Parrot",
+        "Tier": "Premium"
+      }
+    },
+    {
+      "id": "parrot",
+      "name": "Gainix Parrot",
+      "imageFilename": "parrot.jpeg",
+      "metadataFilename": "parrot.json",
+      "attributes": {
+        "Category": "Parrot",
+        "Tier": "Standard"
+      }
+    }
+  ]
+}

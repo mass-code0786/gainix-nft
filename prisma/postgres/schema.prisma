@@ -1,0 +1,364 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WalletLedgerType {
+  DEPOSIT_TO_TRADING
+  NFT_BUY_DEBIT
+  NFT_SELL_PRINCIPAL_RETURN
+  NFT_TRADING_PROFIT
+  LEVEL_INCOME
+  BOT_PURCHASE_UPLINE_INCOME
+  BOT_TRADING_PROFIT
+  ROYALTY_INCOME
+  CAPITAL_TRANSFER_TO_WITHDRAWAL
+  CAPITAL_TRANSFER
+  WITHDRAWAL_REQUEST
+  WITHDRAWAL_FEE
+  BOT_PURCHASE_DEBIT
+}
+
+enum TradeStatus {
+  BOUGHT
+  LISTED
+  AUTO_SOLD
+}
+
+enum TradeSource {
+  MANUAL
+  BOT
+}
+
+enum IncomeLedgerType {
+  NFT_TRADING_INCOME
+  LEVEL_INCOME
+  BOT_PURCHASE_UPLINE_INCOME
+  BOT_TRADING_INCOME
+  ROYALTY_INCOME
+}
+
+enum BotSubscriptionStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum BotActivityAction {
+  AUTO_BUY
+  AUTO_LIST
+  AUTO_SELL
+}
+
+enum BotActivityStatus {
+  SUCCESS
+  WAITING
+  COMPLETED
+  SKIPPED
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  APPROVED_PENDING_TX
+}
+
+enum DepositStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+model User {
+  id                String            @id @default(cuid())
+  walletAddress     String            @unique
+  selfPackageAmount Float             @default(0)
+  currentVipLevel   Int               @default(0)
+  vipAchievedAt     DateTime?
+  totalBuyCount     Int               @default(0)
+  totalSellCount    Int               @default(0)
+  dailyBuyCount     Int               @default(0)
+  dailySellCount    Int               @default(0)
+  lastTradeResetAt  DateTime          @default(now())
+  capitalUnlocked   Boolean           @default(false)
+  capitalUnlockedAt DateTime?
+  capitalTransferredAt DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  wallet            Wallet?
+  nfts              NFT[]             @relation("OwnedNfts")
+  nftTrades         NFTTrade[]
+  walletLedger      WalletLedger[]
+  incomeLedger      IncomeLedger[]
+  botSubscriptions  BotSubscription[]
+  botActivities     BotActivity[]
+  withdrawals       Withdrawal[]
+  deposits          Deposit[]
+  mlmDescendants    MLMTree[]         @relation("MlmDescendant")
+  mlmAncestors      MLMTree[]         @relation("MlmAncestor")
+
+  @@map("users")
+}
+
+model Wallet {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  tradingWallet     Float    @default(0)
+  withdrawalWallet  Float    @default(0)
+  totalDeposited    Float    @default(0)
+  buyCount          Int      @default(0)
+  sellCount         Int      @default(0)
+  isCapitalUnlocked Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+model NFT {
+  id                       String        @id @default(cuid())
+  tokenId                  String        @unique
+  name                     String
+  imageUrl                 String
+  basePrice                Float
+  currentPrice             Float
+  lastBuyPrice             Float?
+  totalTrades              Int           @default(0)
+  status                   String
+  ownerUserId              String?
+  lastPriceIncreasePercent Float?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  owner                    User?         @relation("OwnedNfts", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  trades                   NFTTrade[]
+  activities               BotActivity[]
+
+  @@map("nfts")
+}
+
+model NFTTrade {
+  id                String           @id @default(cuid())
+  nftId             String
+  userId            String
+  buyPrice          Float
+  sellPrice         Float?
+  profit            Float?
+  status            TradeStatus
+  listedAt          DateTime?
+  autoSellAt        DateTime?
+  soldAt            DateTime?
+  saleJobId         String?
+  source            TradeSource      @default(MANUAL)
+  botSubscriptionId String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  nft               NFT              @relation(fields: [nftId], references: [id], onDelete: Cascade)
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  botSubscription   BotSubscription? @relation(fields: [botSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([nftId, createdAt])
+  @@map("nft_trades")
+}
+
+model WalletLedger {
+  id          String           @id @default(cuid())
+  userId      String
+  type        WalletLedgerType
+  amount      Float
+  referenceId String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("wallet_ledger")
+}
+
+model Deposit {
+  id             String        @id @default(cuid())
+  userId         String
+  txHash         String        @unique
+  chainId        Int
+  tokenAddress   String
+  expectedAmount Float
+  creditedAmount Float?
+  status         DepositStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  confirmedAt    DateTime?
+  rejectedAt     DateTime?
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("deposits")
+}
+
+model IncomeLedger {
+  id            String           @id @default(cuid())
+  userId        String
+  type          IncomeLedgerType
+  amount        Float
+  sourceTradeId String
+  level         Int?
+  sourceUserId  String?
+  vipLevel      Int?
+  payoutDate    DateTime?
+  createdAt     DateTime         @default(now())
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@unique([userId, vipLevel, payoutDate])
+  @@map("income_ledger")
+}
+
+model MLMTree {
+  id             String   @id @default(cuid())
+  userId         String
+  ancestorUserId String
+  level          Int
+  createdAt      DateTime @default(now())
+  user           User     @relation("MlmDescendant", fields: [userId], references: [id], onDelete: Cascade)
+  ancestor       User     @relation("MlmAncestor", fields: [ancestorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ancestorUserId])
+  @@index([ancestorUserId, level])
+  @@map("mlm_tree")
+}
+
+model BotSubscription {
+  id                  String                @id @default(cuid())
+  userId              String
+  planId              String
+  planName            String
+  price               Float
+  totalBuyTrades      Int
+  totalSellTrades     Int
+  completedBuyTrades  Int                   @default(0)
+  completedSellTrades Int                   @default(0)
+  remainingBuyTrades  Int
+  remainingSellTrades Int
+  status              BotSubscriptionStatus @default(ACTIVE)
+  lastExecutedAt      DateTime?
+  uplineIncomePaidAt  DateTime?
+  purchasedAt         DateTime              @default(now())
+  completedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades              NFTTrade[]
+  activities          BotActivity[]
+
+  @@index([userId, createdAt])
+  @@map("bot_subscriptions")
+}
+
+model BotActivity {
+  id                String            @id @default(cuid())
+  userId            String
+  botSubscriptionId String
+  nftId             String?
+  action            BotActivityAction
+  amount            Float
+  profit            Float?
+  status            BotActivityStatus
+  createdAt         DateTime          @default(now())
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  botSubscription   BotSubscription   @relation(fields: [botSubscriptionId], references: [id], onDelete: Cascade)
+  nft               NFT?              @relation(fields: [nftId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("bot_activity")
+}
+
+model Withdrawal {
+  id           String           @id @default(cuid())
+  userId       String
+  grossAmount  Float
+  feeAmount    Float
+  netAmount    Float
+  status       WithdrawalStatus @default(REQUESTED)
+  approvedAt   DateTime?
+  payoutTxHash String?
+  payoutStatus String           @default("NOT_STARTED")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("withdrawals")
+}
+
+model AdminSetting {
+  id                              String   @id @default(cuid())
+  nftPriceIncreaseMinPercent      Float    @default(0.25)
+  nftPriceIncreaseMaxPercent      Float    @default(0.35)
+  autoSellDelayMinMinutes         Int      @default(10)
+  autoSellDelayMaxMinutes         Int      @default(30)
+  botProfitMinPercent             Float    @default(0.25)
+  botProfitMaxPercent             Float    @default(0.35)
+  withdrawalMinimumAmount         Float    @default(10)
+  withdrawalFeePercent            Float    @default(10)
+  vipMinimumTeamPackageAmount     Float    @default(100)
+  vipFirstPayoutDay               Int      @default(10)
+  vipSecondPayoutDay              Int      @default(20)
+  vipRecurringEnabled             Boolean  @default(true)
+  payoutsPaused                   Boolean  @default(false)
+  systemStopped                   Boolean  @default(false)
+  globalDailyPayoutCap            Float    @default(10000)
+  perUserDailyPayoutCap           Float    @default(1000)
+  maxDailyWithdrawalAmountPerUser Float    @default(500)
+  minimumTradeAmount              Float    @default(10)
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  @@map("admin_settings")
+}
+
+model SystemReserve {
+  id                         String   @id @default(cuid())
+  balance                    Float
+  totalMlmPaid               Float    @default(0)
+  totalRoyaltyPaid           Float    @default(0)
+  totalNftTradingPaid        Float    @default(0)
+  totalBotTradingPaid        Float    @default(0)
+  totalBotPurchaseUplinePaid Float    @default(0)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@map("system_reserve")
+}
+
+model SafetyLog {
+  id        String   @id @default(cuid())
+  eventType String
+  userId    String?
+  amount    Float?
+  reason    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@map("safety_logs")
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String?
+  walletAddress String?
+  action        String
+  status        String
+  ip            String?
+  userAgent     String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([walletAddress, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}

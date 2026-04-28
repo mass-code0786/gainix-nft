@@ -1,0 +1,155 @@
+{
+  "collection": {
+    "name": "Gainix NFT",
+    "slug": "gainix-nft",
+    "description": "Gainix NFT is a premium dark-luxury Web3 collection built around five elite animal families: Monkey, Dog, Cat, Lion, and Parrot.",
+    "externalUrl": "https://gainix.io/nft",
+    "baseImageUri": "ipfs://__COLLECTION_CID__/",
+    "sellerFeeBasisPoints": 750,
+    "width": 2048,
+    "height": 2048,
+    "totalSupply": 2500,
+    "startEdition": 1,
+    "imageExtension": "png",
+    "layerOrder": [
+      "background",
+      "body",
+      "outfit",
+      "neckItem",
+      "mouth",
+      "eyes",
+      "eyewear",
+      "headwear",
+      "specialEffect"
+    ]
+  },
+  "families": [
+    { "id": "monkey", "name": "Monkey", "weight": 22, "silhouette": "Pronounced brow, tapered jaw, alert ears", "personality": "Tactical and fast-thinking" },
+    { "id": "dog", "name": "Dog", "weight": 22, "silhouette": "Broad muzzle, upright chest, stable posture", "personality": "Protective and disciplined" },
+    { "id": "cat", "name": "Cat", "weight": 20, "silhouette": "Angular cheekbones, elegant neck line", "personality": "Elite and surgical" },
+    { "id": "lion", "name": "Lion", "weight": 18, "silhouette": "Large mane, broad head block, regal mass", "personality": "Sovereign and ceremonial" },
+    { "id": "parrot", "name": "Parrot", "weight": 18, "silhouette": "Hooked beak, crest shape, tall shoulder line", "personality": "Flamboyant and high-status" }
+  ],
+  "traits": [
+    {
+      "id": "background",
+      "name": "Background",
+      "variants": [
+        { "id": "background-obsidian-halo", "name": "Obsidian Halo", "rarity": "common", "weight": 180, "asset": "traits/backgrounds/background__obsidian-halo__common.png" },
+        { "id": "background-crimson-vault", "name": "Crimson Vault", "rarity": "common", "weight": 170, "asset": "traits/backgrounds/background__crimson-vault__common.png" },
+        { "id": "background-noir-fog", "name": "Noir Fog", "rarity": "uncommon", "weight": 110, "asset": "traits/backgrounds/background__noir-fog__uncommon.png" },
+        { "id": "background-ember-grid", "name": "Ember Grid", "rarity": "uncommon", "weight": 95, "asset": "traits/backgrounds/background__ember-grid__uncommon.png" },
+        { "id": "background-ruby-signal", "name": "Ruby Signal", "rarity": "rare", "weight": 58, "asset": "traits/backgrounds/background__ruby-signal__rare.png" },
+        { "id": "background-carbon-tunnel", "name": "Carbon Tunnel", "rarity": "rare", "weight": 44, "asset": "traits/backgrounds/background__carbon-tunnel__rare.png" },
+        { "id": "background-eclipse-throne", "name": "Eclipse Throne", "rarity": "epic", "weight": 18, "asset": "traits/backgrounds/background__eclipse-throne__epic.png" },
+        { "id": "background-inferno-singularity", "name": "Inferno Singularity", "rarity": "legendary", "weight": 5, "asset": "traits/backgrounds/background__inferno-singularity__legendary.png" }
+      ]
+    },
+    {
+      "id": "body",
+      "name": "Body",
+      "variants": [
+        { "id": "body-monkey-midnight-sable", "name": "Midnight Sable", "rarity": "common", "weight": 72, "families": ["monkey"], "asset": "monkey/monkey__body__midnight-sable__common.png" },
+        { "id": "body-monkey-crimson-cipher", "name": "Crimson Cipher", "rarity": "rare", "weight": 18, "families": ["monkey"], "asset": "monkey/monkey__body__crimson-cipher__rare.png" },
+        { "id": "body-dog-obsidian-guard", "name": "Obsidian Guard", "rarity": "common", "weight": 74, "families": ["dog"], "asset": "dog/dog__body__obsidian-guard__common.png" },
+        { "id": "body-dog-inferno-warden", "name": "Inferno Warden", "rarity": "rare", "weight": 16, "families": ["dog"], "asset": "dog/dog__body__inferno-warden__rare.png" },
+        { "id": "body-cat-velvet-shadow", "name": "Velvet Shadow", "rarity": "common", "weight": 73, "families": ["cat"], "asset": "cat/cat__body__velvet-shadow__common.png" },
+        { "id": "body-cat-ruby-phantom", "name": "Ruby Phantom", "rarity": "rare", "weight": 17, "families": ["cat"], "asset": "cat/cat__body__ruby-phantom__rare.png" },
+        { "id": "body-lion-regal-umber", "name": "Regal Umber", "rarity": "uncommon", "weight": 66, "families": ["lion"], "asset": "lion/lion__body__regal-umber__uncommon.png" },
+        { "id": "body-lion-solar-regent", "name": "Solar Regent", "rarity": "epic", "weight": 10, "families": ["lion"], "asset": "lion/lion__body__solar-regent__epic.png" },
+        { "id": "body-parrot-midnight-plume", "name": "Midnight Plume", "rarity": "uncommon", "weight": 68, "families": ["parrot"], "asset": "parrot/parrot__body__midnight-plume__uncommon.png" },
+        { "id": "body-parrot-celestial-flight", "name": "Celestial Flight", "rarity": "legendary", "weight": 8, "families": ["parrot"], "asset": "parrot/parrot__body__celestial-flight__legendary.png" }
+      ]
+    },
+    {
+      "id": "eyes",
+      "name": "Eyes",
+      "variants": [
+        { "id": "eyes-ember-focus", "name": "Ember Focus", "rarity": "common", "weight": 160, "asset": "traits/eyes/eyes__ember-focus__common.png" },
+        { "id": "eyes-amber-guard", "name": "Amber Guard", "rarity": "common", "weight": 150, "asset": "traits/eyes/eyes__amber-guard__common.png" },
+        { "id": "eyes-scarlet-slit", "name": "Scarlet Slit", "rarity": "uncommon", "weight": 100, "asset": "traits/eyes/eyes__scarlet-slit__uncommon.png" },
+        { "id": "eyes-teal-signal", "name": "Teal Signal", "rarity": "uncommon", "weight": 84, "asset": "traits/eyes/eyes__teal-signal__uncommon.png" },
+        { "id": "eyes-ruby-laser", "name": "Ruby Laser", "rarity": "rare", "weight": 54, "asset": "traits/eyes/eyes__ruby-laser__rare.png" },
+        { "id": "eyes-void-mask", "name": "Void Mask", "rarity": "epic", "weight": 16, "asset": "traits/eyes/eyes__void-mask__epic.png" },
+        { "id": "eyes-genesis-star", "name": "Genesis Star", "rarity": "legendary", "weight": 4, "asset": "traits/eyes/eyes__genesis-star__legendary.png" }
+      ]
+    },
+    {
+      "id": "mouth",
+      "name": "Mouth",
+      "variants": [
+        { "id": "mouth-closed-royal", "name": "Closed Royal", "rarity": "common", "weight": 190, "asset": "traits/mouth/mouth__closed-royal__common.png" },
+        { "id": "mouth-sly-smirk", "name": "Sly Smirk", "rarity": "common", "weight": 148, "asset": "traits/mouth/mouth__sly-smirk__common.png" },
+        { "id": "mouth-fang-bare", "name": "Fang Bare", "rarity": "uncommon", "weight": 96, "asset": "traits/mouth/mouth__fang-bare__uncommon.png" },
+        { "id": "mouth-gold-tooth", "name": "Gold Tooth", "rarity": "rare", "weight": 40, "asset": "traits/mouth/mouth__gold-tooth__rare.png" },
+        { "id": "mouth-ember-snarl", "name": "Ember Snarl", "rarity": "epic", "weight": 12, "asset": "traits/mouth/mouth__ember-snarl__epic.png" },
+        { "id": "mouth-void-breath", "name": "Void Breath", "rarity": "legendary", "weight": 3, "asset": "traits/mouth/mouth__void-breath__legendary.png" }
+      ]
+    },
+    {
+      "id": "headwear",
+      "name": "Headwear",
+      "variants": [
+        { "id": "headwear-bare-head", "name": "Bare Head", "rarity": "common", "weight": 220, "asset": "traits/headwear/headwear__bare-head__common.png" },
+        { "id": "headwear-velvet-cap", "name": "Velvet Cap", "rarity": "common", "weight": 138, "asset": "traits/headwear/headwear__velvet-cap__common.png" },
+        { "id": "headwear-carbon-snapback", "name": "Carbon Snapback", "rarity": "uncommon", "weight": 98, "asset": "traits/headwear/headwear__carbon-snapback__uncommon.png" },
+        { "id": "headwear-trader-headset", "name": "Trader Headset", "rarity": "uncommon", "weight": 90, "asset": "traits/headwear/headwear__trader-headset__uncommon.png" },
+        { "id": "headwear-signal-crown", "name": "Signal Crown", "rarity": "rare", "weight": 52, "asset": "traits/headwear/headwear__signal-crown__rare.png" },
+        { "id": "headwear-captain-tricorne", "name": "Captain Tricorne", "rarity": "rare", "weight": 44, "asset": "traits/headwear/headwear__captain-tricorne__rare.png" },
+        { "id": "headwear-sovereign-tiara", "name": "Sovereign Tiara", "rarity": "epic", "weight": 16, "asset": "traits/headwear/headwear__sovereign-tiara__epic.png" },
+        { "id": "headwear-phoenix-halo", "name": "Phoenix Halo", "rarity": "legendary", "weight": 4, "asset": "traits/headwear/headwear__phoenix-halo__legendary.png" }
+      ]
+    },
+    {
+      "id": "eyewear",
+      "name": "Eyewear",
+      "variants": [
+        { "id": "eyewear-none", "name": "None", "rarity": "common", "weight": 250, "asset": "traits/eyewear/eyewear__none__common.png" },
+        { "id": "eyewear-smoked-lenses", "name": "Smoked Lenses", "rarity": "common", "weight": 130, "asset": "traits/eyewear/eyewear__smoked-lenses__common.png" },
+        { "id": "eyewear-redline-frames", "name": "Redline Frames", "rarity": "uncommon", "weight": 88, "asset": "traits/eyewear/eyewear__redline-frames__uncommon.png" },
+        { "id": "eyewear-obsidian-visor", "name": "Obsidian Visor", "rarity": "rare", "weight": 45, "asset": "traits/eyewear/eyewear__obsidian-visor__rare.png" },
+        { "id": "eyewear-diamond-monocle", "name": "Diamond Monocle", "rarity": "epic", "weight": 15, "asset": "traits/eyewear/eyewear__diamond-monocle__epic.png" },
+        { "id": "eyewear-holo-mask", "name": "Holo Mask", "rarity": "legendary", "weight": 4, "asset": "traits/eyewear/eyewear__holo-mask__legendary.png" }
+      ]
+    },
+    {
+      "id": "neckItem",
+      "name": "Neck Item",
+      "variants": [
+        { "id": "neck-none", "name": "None", "rarity": "common", "weight": 210, "asset": "traits/neck-items/neck-item__none__common.png" },
+        { "id": "neck-slim-chain", "name": "Slim Chain", "rarity": "common", "weight": 145, "asset": "traits/neck-items/neck-item__slim-chain__common.png" },
+        { "id": "neck-ruby-pendant", "name": "Ruby Pendant", "rarity": "uncommon", "weight": 88, "asset": "traits/neck-items/neck-item__ruby-pendant__uncommon.png" },
+        { "id": "neck-obsidian-torque", "name": "Obsidian Torque", "rarity": "uncommon", "weight": 82, "asset": "traits/neck-items/neck-item__obsidian-torque__uncommon.png" },
+        { "id": "neck-layered-chain", "name": "Layered Chain", "rarity": "rare", "weight": 52, "asset": "traits/neck-items/neck-item__layered-chain__rare.png" },
+        { "id": "neck-relic-fang", "name": "Relic Fang", "rarity": "epic", "weight": 14, "asset": "traits/neck-items/neck-item__relic-fang__epic.png" },
+        { "id": "neck-genesis-key", "name": "Genesis Key", "rarity": "legendary", "weight": 4, "asset": "traits/neck-items/neck-item__genesis-key__legendary.png" }
+      ]
+    },
+    {
+      "id": "outfit",
+      "name": "Outfit",
+      "variants": [
+        { "id": "outfit-noir-turtleneck", "name": "Noir Turtleneck", "rarity": "common", "weight": 180, "asset": "traits/outfits/outfit__noir-turtleneck__common.png" },
+        { "id": "outfit-crimson-bomber", "name": "Crimson Bomber", "rarity": "common", "weight": 150, "asset": "traits/outfits/outfit__crimson-bomber__common.png" },
+        { "id": "outfit-velvet-blazer", "name": "Velvet Blazer", "rarity": "uncommon", "weight": 92, "asset": "traits/outfits/outfit__velvet-blazer__uncommon.png" },
+        { "id": "outfit-tactical-harness", "name": "Tactical Harness", "rarity": "uncommon", "weight": 86, "asset": "traits/outfits/outfit__tactical-harness__uncommon.png" },
+        { "id": "outfit-silk-kimono", "name": "Silk Kimono", "rarity": "rare", "weight": 52, "asset": "traits/outfits/outfit__silk-kimono__rare.png" },
+        { "id": "outfit-carbon-armor", "name": "Carbon Armor", "rarity": "rare", "weight": 42, "asset": "traits/outfits/outfit__carbon-armor__rare.png" },
+        { "id": "outfit-sovereign-cape", "name": "Sovereign Cape", "rarity": "epic", "weight": 14, "asset": "traits/outfits/outfit__sovereign-cape__epic.png" },
+        { "id": "outfit-phoenix-drape", "name": "Phoenix Drape", "rarity": "legendary", "weight": 4, "asset": "traits/outfits/outfit__phoenix-drape__legendary.png" }
+      ]
+    },
+    {
+      "id": "specialEffect",
+      "name": "Special Effect",
+      "variants": [
+        { "id": "effect-none", "name": "None", "rarity": "common", "weight": 250, "asset": "traits/effects/effect__none__common.png" },
+        { "id": "effect-ember-particles", "name": "Ember Particles", "rarity": "common", "weight": 122, "asset": "traits/effects/effect__ember-particles__common.png" },
+        { "id": "effect-data-rain", "name": "Data Rain", "rarity": "uncommon", "weight": 88, "asset": "traits/effects/effect__data-rain__uncommon.png" },
+        { "id": "effect-crimson-smoke", "name": "Crimson Smoke", "rarity": "rare", "weight": 46, "asset": "traits/effects/effect__crimson-smoke__rare.png" },
+        { "id": "effect-halo-runes", "name": "Halo Runes", "rarity": "epic", "weight": 14, "asset": "traits/effects/effect__halo-runes__epic.png" },
+        { "id": "effect-singularity-ring", "name": "Singularity Ring", "rarity": "legendary", "weight": 4, "asset": "traits/effects/effect__singularity-ring__legendary.png" }
+      ]
+    }
+  ]
+}

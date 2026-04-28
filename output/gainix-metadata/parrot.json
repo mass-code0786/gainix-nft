@@ -1,0 +1,20 @@
+{
+  "name": "Gainix Parrot",
+  "description": "Gainix Parrot from the Gainix NFT collection on BNB testnet.",
+  "image": "ipfs://bafybeiayunsjyqar6kdykbwz2wadptfq3c3wpj7cy33oh6srjbzeckmphq/parrot.jpeg",
+  "external_url": "https://gainix.io",
+  "attributes": [
+    {
+      "trait_type": "Category",
+      "value": "Parrot"
+    },
+    {
+      "trait_type": "Tier",
+      "value": "Standard"
+    },
+    {
+      "trait_type": "Collection",
+      "value": "Gainix NFT"
+    }
+  ]
+}

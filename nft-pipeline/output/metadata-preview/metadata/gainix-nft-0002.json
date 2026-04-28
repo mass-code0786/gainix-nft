@@ -1,0 +1,151 @@
+{
+  "name": "Gainix NFT #0002",
+  "description": "Gainix NFT is a premium dark-luxury Web3 collection built around five elite animal families: Monkey, Dog, Cat, Lion, and Parrot.",
+  "image": "ipfs://__COLLECTION_CID__/gainix-nft-0002.png",
+  "external_url": "https://gainix.io/nft",
+  "edition": 2,
+  "dna": "cat|background:background-crimson-vault|body:body-cat-velvet-shadow|outfit:outfit-carbon-armor|neckItem:neck-none|mouth:mouth-closed-royal|eyes:eyes-scarlet-slit|eyewear:eyewear-none|headwear:headwear-velvet-cap|specialEffect:effect-none",
+  "compiler": "gainix-nft-pipeline@1.0.0",
+  "date": "2026-04-19T17:59:55.056Z",
+  "family": "Cat",
+  "attributes": [
+    {
+      "trait_type": "Family",
+      "value": "Cat"
+    },
+    {
+      "trait_type": "Background",
+      "value": "Crimson Vault",
+      "rarity_tier": "common",
+      "weight": 170,
+      "asset": "traits/backgrounds/background__crimson-vault__common.png"
+    },
+    {
+      "trait_type": "Body",
+      "value": "Velvet Shadow",
+      "rarity_tier": "common",
+      "weight": 73,
+      "asset": "cat/cat__body__velvet-shadow__common.png"
+    },
+    {
+      "trait_type": "Outfit",
+      "value": "Carbon Armor",
+      "rarity_tier": "rare",
+      "weight": 42,
+      "asset": "traits/outfits/outfit__carbon-armor__rare.png"
+    },
+    {
+      "trait_type": "Neck Item",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 210,
+      "asset": "traits/neck-items/neck-item__none__common.png"
+    },
+    {
+      "trait_type": "Mouth",
+      "value": "Closed Royal",
+      "rarity_tier": "common",
+      "weight": 190,
+      "asset": "traits/mouth/mouth__closed-royal__common.png"
+    },
+    {
+      "trait_type": "Eyes",
+      "value": "Scarlet Slit",
+      "rarity_tier": "uncommon",
+      "weight": 100,
+      "asset": "traits/eyes/eyes__scarlet-slit__uncommon.png"
+    },
+    {
+      "trait_type": "Eyewear",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 250,
+      "asset": "traits/eyewear/eyewear__none__common.png"
+    },
+    {
+      "trait_type": "Headwear",
+      "value": "Velvet Cap",
+      "rarity_tier": "common",
+      "weight": 138,
+      "asset": "traits/headwear/headwear__velvet-cap__common.png"
+    },
+    {
+      "trait_type": "Special Effect",
+      "value": "None",
+      "rarity_tier": "common",
+      "weight": 250,
+      "asset": "traits/effects/effect__none__common.png"
+    }
+  ],
+  "gainix": {
+    "family": {
+      "id": "cat",
+      "name": "Cat"
+    },
+    "layer_manifest": [
+      {
+        "category": "background",
+        "traitId": "background-crimson-vault",
+        "traitName": "Crimson Vault",
+        "asset": "traits/backgrounds/background__crimson-vault__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "body",
+        "traitId": "body-cat-velvet-shadow",
+        "traitName": "Velvet Shadow",
+        "asset": "cat/cat__body__velvet-shadow__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "outfit",
+        "traitId": "outfit-carbon-armor",
+        "traitName": "Carbon Armor",
+        "asset": "traits/outfits/outfit__carbon-armor__rare.png",
+        "rarity": "rare"
+      },
+      {
+        "category": "neckItem",
+        "traitId": "neck-none",
+        "traitName": "None",
+        "asset": "traits/neck-items/neck-item__none__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "mouth",
+        "traitId": "mouth-closed-royal",
+        "traitName": "Closed Royal",
+        "asset": "traits/mouth/mouth__closed-royal__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "eyes",
+        "traitId": "eyes-scarlet-slit",
+        "traitName": "Scarlet Slit",
+        "asset": "traits/eyes/eyes__scarlet-slit__uncommon.png",
+        "rarity": "uncommon"
+      },
+      {
+        "category": "eyewear",
+        "traitId": "eyewear-none",
+        "traitName": "None",
+        "asset": "traits/eyewear/eyewear__none__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "headwear",
+        "traitId": "headwear-velvet-cap",
+        "traitName": "Velvet Cap",
+        "asset": "traits/headwear/headwear__velvet-cap__common.png",
+        "rarity": "common"
+      },
+      {
+        "category": "specialEffect",
+        "traitId": "effect-none",
+        "traitName": "None",
+        "asset": "traits/effects/effect__none__common.png",
+        "rarity": "common"
+      }
+    ]
+  }
+}
