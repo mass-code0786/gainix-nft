@@ -152,7 +152,7 @@ async function buildState(db: DbClient) {
       id: item.id,
       tokenId: item.tokenId,
       name: item.name,
-      description: item.description,
+      description: "",
       category: item.category,
       imageUrl: item.imageUrl,
       basePrice: item.basePrice,
