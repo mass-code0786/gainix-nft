@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatUnits } from "viem";
 import { useAccount, useBalance, useDisconnect } from "wagmi";
 import { getChainMetadata, shortenAddress } from "@/lib/web3/wallet-utils";
 
@@ -43,7 +44,7 @@ export function useWallet() {
     isWalletHydrating,
     hasResolvedWalletSession,
     previewMode: !isConnected,
-    walletBalance: nativeBalance ? Number(nativeBalance.formatted) : 0,
+    walletBalance: nativeBalance ? Number(formatUnits(nativeBalance.value, nativeBalance.decimals)) : 0,
     disconnect,
   };
 }
