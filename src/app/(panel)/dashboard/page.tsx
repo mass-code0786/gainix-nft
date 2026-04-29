@@ -9,7 +9,6 @@ import {
   Gem,
   Layers3,
   Network,
-  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -230,9 +229,6 @@ export default function DashboardPage() {
 
   const totalTeam =
     teamData?.levelBreakdown.reduce((total, item) => total + item.downlineCount, 0) ?? 0;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayTeam = teamData?.directs.filter((member) => new Date(member.createdAt) >= todayStart).length ?? 0;
   const vipLevel = teamData?.royalty.currentVipLevel ?? teamData?.vipStatus.currentVipLevel ?? 0;
   const nextVipLevel = teamData?.royalty.nextVipLevel ?? teamData?.vipStatus.nextVipLevel ?? null;
   const completedCycles = activeSubscription
@@ -339,13 +335,6 @@ export default function DashboardPage() {
             value={`VIP ${vipLevel}`}
             detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
             icon={Crown}
-          />
-          <TeamSummaryCard
-            label="Today Team"
-            value={`${todayTeam}`}
-            detail="New referrals today"
-            icon={TrendingUp}
-            tone="green"
           />
         </div>
       </SectionShell>
