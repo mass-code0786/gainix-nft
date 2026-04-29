@@ -9,6 +9,7 @@ import {
   Gem,
   Layers3,
   Network,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -101,6 +102,51 @@ function SectionShell({
   );
 }
 
+function TeamSummaryCard({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  tone = "red",
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  icon: LucideIcon;
+  tone?: "red" | "green";
+}) {
+  const isGreen = tone === "green";
+
+  return (
+    <div
+      className={`h-full rounded-2xl border p-4 shadow-[0_0_28px_rgba(239,68,68,0.12)] ${
+        isGreen
+          ? "border-green-500/30 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_34%),linear-gradient(155deg,rgba(9,18,12,0.92),rgba(6,8,8,0.96))] shadow-[0_0_28px_rgba(34,197,94,0.12)]"
+          : "border-red-500/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.16),transparent_34%),linear-gradient(155deg,rgba(25,8,10,0.92),rgba(8,8,12,0.96))]"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+          <p className={`mt-2 truncate font-display text-2xl font-semibold ${isGreen ? "text-green-400" : "text-white"}`}>
+            {value}
+          </p>
+          {detail ? <p className="mt-1 truncate text-sm text-zinc-400">{detail}</p> : null}
+        </div>
+        <div
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl border ${
+            isGreen
+              ? "border-green-500/30 bg-green-500/10 text-green-400"
+              : "border-red-400/20 bg-red-500/10 text-red-100"
+          }`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function latestActionLabel(action: string | undefined) {
   if (action === "AUTO_BUY") {
     return "Auto Buy";
@@ -184,6 +230,9 @@ export default function DashboardPage() {
 
   const totalTeam =
     teamData?.levelBreakdown.reduce((total, item) => total + item.downlineCount, 0) ?? 0;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayTeam = teamData?.directs.filter((member) => new Date(member.createdAt) >= todayStart).length ?? 0;
   const vipLevel = teamData?.royalty.currentVipLevel ?? teamData?.vipStatus.currentVipLevel ?? 0;
   const nextVipLevel = teamData?.royalty.nextVipLevel ?? teamData?.vipStatus.nextVipLevel ?? null;
   const completedCycles = activeSubscription
@@ -274,22 +323,29 @@ export default function DashboardPage() {
       </SectionShell>
 
       <SectionShell title="Team Summary">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <SummaryCard
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TeamSummaryCard
             label="Total Team"
             value={`${totalTeam}`}
             icon={Users}
           />
-          <SummaryCard
+          <TeamSummaryCard
             label="Referral Team"
             value={`${teamData?.directCount ?? 0}`}
             icon={Network}
           />
-          <SummaryCard
+          <TeamSummaryCard
             label="VIP/Royalty"
             value={`VIP ${vipLevel}`}
             detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
             icon={Crown}
+          />
+          <TeamSummaryCard
+            label="Today Team"
+            value={`${todayTeam}`}
+            detail="New referrals today"
+            icon={TrendingUp}
+            tone="green"
           />
         </div>
       </SectionShell>

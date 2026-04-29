@@ -88,6 +88,25 @@ interface WalletActionModalProps extends WalletActionPanelProps {
   onRecorded: (item: RecentWalletAction) => void;
 }
 
+function WalletBalanceCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-red-500/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_38%),linear-gradient(155deg,rgba(18,7,9,0.92),rgba(8,8,12,0.96))] p-3 shadow-[0_0_22px_rgba(239,68,68,0.10)] sm:p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500 sm:text-xs">
+        {label}
+      </p>
+      <p className="mt-2 truncate font-display text-[1.15rem] font-semibold leading-tight text-white sm:text-2xl">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function parseAmount(value: string) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : 0;
@@ -614,31 +633,21 @@ export function WalletActionPanel({
   return (
     <section className="rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.18),transparent_30%),linear-gradient(160deg,rgba(18,7,9,0.96),rgba(8,8,12,0.98))] p-4 sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="muted-label">Wallet Summary</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-              <p className="text-sm text-zinc-400">Trading Wallet</p>
-              <p className="mt-1 font-display text-2xl font-semibold text-white">
-                {formatCurrency(tradingWallet)}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-              <p className="text-sm text-zinc-400">Withdrawal Wallet</p>
-              <p className="mt-1 font-display text-2xl font-semibold text-white">
-                {formatCurrency(withdrawalWallet)}
-              </p>
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-purple-400/20 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_45%),linear-gradient(145deg,rgba(14,8,20,0.95),rgba(4,4,7,0.98))] p-4">
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <WalletBalanceCard label="Trading Wallet" value={formatCurrency(tradingWallet)} />
+            <WalletBalanceCard label="Withdrawal Wallet" value={formatCurrency(withdrawalWallet)} />
+            <div className="col-span-2 overflow-hidden rounded-2xl border border-purple-400/20 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.22),transparent_40%),linear-gradient(145deg,rgba(14,8,20,0.95),rgba(4,4,7,0.98))] p-3 shadow-[0_0_26px_rgba(168,85,247,0.14)] sm:p-4">
               <div className="flex items-center gap-3">
                 <img
                   src="/images/gxn-token.png"
                   alt="GXN TOKEN"
-                  className="h-12 w-12 rounded-full border border-amber-300/30 object-cover shadow-lg shadow-purple-500/20"
+                  className="h-10 w-10 rounded-full border border-amber-300/30 object-cover shadow-lg shadow-purple-500/20 sm:h-12 sm:w-12"
                 />
                 <div className="min-w-0">
-                  <p className="text-sm text-zinc-300">GXN TOKEN</p>
-                  <p className="mt-1 font-display text-xl font-semibold text-white">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-300 sm:text-xs">GXN TOKEN</p>
+                  <p className="mt-1 truncate font-display text-lg font-semibold text-white sm:text-xl">
                     {gxnTokenBalance.toLocaleString()} GXN
                   </p>
                 </div>

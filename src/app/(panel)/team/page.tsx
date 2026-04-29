@@ -1,12 +1,30 @@
 "use client";
 
-import { Crown, Share2, Target, Users } from "lucide-react";
+import { Crown, Share2, Users } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { useTeam } from "@/hooks/useTeam";
 import { formatUsdt } from "@/utils/format";
 import { formatWallet } from "@/utils/format";
+
+function TeamMetricCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="h-full rounded-2xl border border-red-400/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.18),transparent_34%),linear-gradient(155deg,rgba(25,8,10,0.92),rgba(8,8,12,0.96))] p-4 shadow-[0_0_28px_rgba(239,68,68,0.12)] backdrop-blur-xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+      <p className="mt-3 font-display text-2xl font-semibold text-white">{value}</p>
+      {detail ? <p className="mt-2 text-xs text-zinc-400">{detail}</p> : null}
+    </div>
+  );
+}
 
 export default function TeamPage() {
   const { data, isLoading, error } = useTeam();
@@ -124,12 +142,17 @@ export default function TeamPage() {
                   <p className="mt-3 font-display text-2xl font-semibold text-white">{progress.qualifiedLevel2Users ?? 0}</p>
                   <p className="mt-2 text-xs text-zinc-400">Need {progress.qualifiedLevel2Required ?? 10} users</p>
                 </div>
-                <div className="glass-card rounded-3xl p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Min team package</p>
-                  <p className="mt-3 font-display text-2xl font-semibold text-white">
-                    {formatUsdt(progress.minimumTeamPackageAmount ?? 100)}
-                  </p>
-                  <p className="mt-2 text-xs text-zinc-400">Only qualified package users count</p>
+                <div className="grid gap-3 sm:col-span-2 lg:grid-cols-2 xl:col-span-4">
+                  <TeamMetricCard
+                    label="Min team package"
+                    value={formatUsdt(progress.minimumTeamPackageAmount ?? 100)}
+                    detail="Only qualified package users count"
+                  />
+                  <TeamMetricCard
+                    label="Team sales"
+                    value={formatUsdt(progress.teamSalesAmount ?? 0)}
+                    detail="Total qualified team sales"
+                  />
                 </div>
               </>
             ) : (

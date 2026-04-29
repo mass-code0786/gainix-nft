@@ -34,6 +34,7 @@ interface TeamOverviewResponse {
           qualifiedLevel2Users?: number;
           qualifiedLevel2Required?: number;
           minimumTeamPackageAmount?: number;
+          teamSalesAmount?: number;
           directQualifiedUsers?: number;
           directQualifiedRequired?: number;
           previousVipLevelRequired?: number;
@@ -54,6 +55,7 @@ interface RoyaltyStatusResponse {
         qualifiedLevel2Users?: number;
         qualifiedLevel2Required?: number;
         minimumTeamPackageAmount?: number;
+        teamSalesAmount?: number;
         directQualifiedUsers?: number;
         directQualifiedRequired?: number;
         previousVipLevelRequired?: number;
