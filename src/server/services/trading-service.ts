@@ -29,9 +29,11 @@ import {
 import { verifyUsdtDepositTransaction } from "@/server/services/usdt-payment";
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
+const GXN_TOKEN_VALUE_USD = 0.05;
+const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
 const VIP_LEVELS = [
-  { level: 1, selfPackageAmount: 100, payoutAmount: 20 },
-  { level: 2, selfPackageAmount: 200, payoutAmount: 50 },
+  { level: 1, selfPackageAmount: 100, payoutAmount: 30 },
+  { level: 2, selfPackageAmount: 200, payoutAmount: 60 },
   { level: 3, selfPackageAmount: 400, payoutAmount: 100 },
   { level: 4, selfPackageAmount: 700, payoutAmount: 200 },
   { level: 5, selfPackageAmount: 1000, payoutAmount: 200 },
@@ -82,6 +84,10 @@ const BOT_PLANS = {
 
 const BASE_DAILY_TRADE_LIMIT = 6;
 const TRADE_RESET_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
+const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
+const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
+const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -175,6 +181,12 @@ interface ApproveWithdrawalInput {
   withdrawalId: string;
 }
 
+interface ConfirmWithdrawalInput {
+  withdrawalId: string;
+  walletAddress: string;
+  txHash: string;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -249,6 +261,7 @@ function createUserWallet(now: string, userId: string): WalletRecord {
     userId,
     tradingWallet: 0,
     withdrawalWallet: 0,
+    gxnTokenBalance: 0,
     totalDeposited: 0,
     buyCount: 0,
     sellCount: 0,
@@ -524,6 +537,9 @@ function toPublicWallet(wallet: WalletRecord, user?: UserRecord) {
   return {
     tradingWallet: wallet.tradingWallet,
     withdrawalWallet: wallet.withdrawalWallet,
+    gxnTokenBalance: wallet.gxnTokenBalance,
+    gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+    gxnTokenUsdValue: roundAmount(wallet.gxnTokenBalance * GXN_TOKEN_VALUE_USD),
     totalDeposited: wallet.totalDeposited,
     buyCount: totalBuyCount,
     sellCount: totalSellCount,
@@ -900,11 +916,16 @@ function priceAfterMarketBuy(state: NftSimState, currentPrice: number) {
   };
 }
 
-function randomAutoSellDelay(state: NftSimState) {
-  return randomIntegerInRange(
-    state.admin_settings.autoSellDelayMinMinutes,
-    state.admin_settings.autoSellDelayMaxMinutes,
-  );
+function randomAutoSellDelay(tradeSource: NftTradeRecord["source"]) {
+  return tradeSource === "bot"
+    ? randomIntegerInRange(
+        BOT_AUTO_SELL_DELAY_MIN_MINUTES,
+        BOT_AUTO_SELL_DELAY_MAX_MINUTES,
+      )
+    : randomIntegerInRange(
+        MANUAL_AUTO_SELL_DELAY_MIN_MINUTES,
+        MANUAL_AUTO_SELL_DELAY_MAX_MINUTES,
+      );
 }
 
 function randomBotProfitPercent(state: NftSimState) {
@@ -1181,7 +1202,7 @@ function listNft(
     debugAutoSellInMinutes >= 0 &&
     debugAutoSellInMinutes <= maxAllowedDebugDelay
       ? debugAutoSellInMinutes
-      : randomAutoSellDelay(state);
+      : randomAutoSellDelay(trade.source);
 
   trade.status = "listed";
   trade.listedAt = now.toISOString();
@@ -2118,21 +2139,28 @@ export async function requestWithdrawal(input: WithdrawInput) {
     }
 
     const feeAmount = roundAmount(amount * (feePercent / 100));
-    const netAmount = roundAmount(amount - feeAmount);
+    const gxnDeductionAmount = roundAmount(amount * (GXN_WITHDRAWAL_DEDUCTION_PERCENT / 100));
+    const gxnTokens = roundAmount(gxnDeductionAmount / GXN_TOKEN_VALUE_USD);
+    const netAmount = roundAmount(amount - feeAmount - gxnDeductionAmount);
     const withdrawal: WithdrawalRecord = {
       id: makeId("withdrawal"),
       userId: user.id,
       grossAmount: amount,
       feeAmount,
+      gxnDeductionAmount,
+      gxnTokens,
       netAmount,
       status: "requested",
       approvedAt: null,
       payoutTxHash: null,
       payoutStatus: "NOT_STARTED",
+      withdrawalTxHash: null,
+      onChainStatus: "PENDING",
       createdAt: nowIso(),
     };
 
     wallet.withdrawalWallet = roundAmount(wallet.withdrawalWallet - amount);
+    wallet.gxnTokenBalance = roundAmount(wallet.gxnTokenBalance + gxnTokens);
     wallet.updatedAt = nowIso();
     state.withdrawals.push(withdrawal);
 
@@ -2143,8 +2171,12 @@ export async function requestWithdrawal(input: WithdrawInput) {
       referenceId: withdrawal.id,
       metadata: {
         grossAmount: amount,
+        feeAmount,
+        gxnDeductionAmount,
+        gxnTokens,
         netAmount,
         withdrawalWalletAfter: wallet.withdrawalWallet,
+        gxnTokenBalanceAfter: wallet.gxnTokenBalance,
       },
     });
 
@@ -2155,6 +2187,30 @@ export async function requestWithdrawal(input: WithdrawInput) {
       referenceId: withdrawal.id,
       metadata: {
         feePercent,
+      },
+    });
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "GXN_TOKEN_DEDUCTION",
+      amount: gxnDeductionAmount,
+      referenceId: withdrawal.id,
+      metadata: {
+        deductionPercent: GXN_WITHDRAWAL_DEDUCTION_PERCENT,
+        gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+        gxnTokens,
+      },
+    });
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "GXN_TOKEN_REWARD",
+      amount: gxnTokens,
+      referenceId: withdrawal.id,
+      metadata: {
+        gxnDeductionAmount,
+        gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+        gxnTokenBalanceAfter: wallet.gxnTokenBalance,
       },
     });
 
@@ -2329,6 +2385,8 @@ const WALLET_HISTORY_TYPES = new Set<WalletLedgerRecord["type"]>([
   "CAPITAL_TRANSFER_TO_WITHDRAWAL",
   "WITHDRAWAL_REQUEST",
   "WITHDRAWAL_FEE",
+  "GXN_TOKEN_REWARD",
+  "GXN_TOKEN_DEDUCTION",
 ]);
 
 function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
@@ -2338,6 +2396,10 @@ function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
     type === "NFT_SELL_PRINCIPAL_RETURN"
   ) {
     return "Trading Wallet";
+  }
+
+  if (type === "GXN_TOKEN_REWARD" || type === "GXN_TOKEN_DEDUCTION") {
+    return "GXN Token";
   }
 
   return "Withdrawal Wallet";
@@ -2982,6 +3044,45 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
 
     return {
       message: "Withdrawal approved and pending on-chain payout transaction.",
+      withdrawal,
+    };
+  });
+}
+
+export async function confirmOnChainWithdrawal(input: ConfirmWithdrawalInput) {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const walletAddress = normalizeWalletAddress(input.walletAddress);
+    const { user } = requireUser(state, { walletAddress });
+    const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
+    if (!withdrawal || withdrawal.userId !== user.id) {
+      throw new ApiError(404, "Withdrawal request not found.");
+    }
+
+    if (withdrawal.onChainStatus === "CONFIRMED" || withdrawal.withdrawalTxHash) {
+      throw new ApiError(409, "Withdrawal transaction is already recorded.");
+    }
+
+    const duplicateTx = state.withdrawals.some(
+      (item) =>
+        item.withdrawalTxHash?.toLowerCase() === input.txHash.toLowerCase() &&
+        item.id !== withdrawal.id,
+    );
+    if (duplicateTx) {
+      throw new ApiError(409, "Withdrawal transaction hash is already used.");
+    }
+
+    withdrawal.withdrawalTxHash = input.txHash.toLowerCase();
+    withdrawal.payoutTxHash = input.txHash.toLowerCase();
+    withdrawal.onChainStatus = "CONFIRMED";
+    withdrawal.status = "approved";
+    withdrawal.approvedAt = nowIso();
+    withdrawal.payoutStatus = "CONFIRMED";
+
+    return {
+      message: "On-chain withdrawal confirmed.",
+      user,
       withdrawal,
     };
   });

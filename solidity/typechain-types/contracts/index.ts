@@ -8,3 +8,4 @@ export type { libraries };
 export type { GainixBotPass } from "./GainixBotPass";
 export type { GainixMarketplace } from "./GainixMarketplace";
 export type { GainixNFT } from "./GainixNFT";
+export type { GainixWithdrawalVault } from "./GainixWithdrawalVault";

@@ -5,6 +5,6 @@ WHERE "status" = 'marketplace'
   AND "name" IN (
     'Gainix Alpha Tiger',
     'Gainix Neon Falcon',
-    'Gainix Solar Panther',
-    'Gainix Prism Wolf'
+    'Gainix Prism Wolf',
+    'Gainix Solar Panther'
   );

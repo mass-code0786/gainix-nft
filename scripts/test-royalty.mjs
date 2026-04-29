@@ -314,8 +314,8 @@ async function run() {
       },
     };
 
-    if (targetWallet.withdrawalWallet !== 20) {
-      throw new Error(`Expected withdrawal wallet to be 20, got ${targetWallet.withdrawalWallet}.`);
+    if (targetWallet.withdrawalWallet !== 30) {
+      throw new Error(`Expected withdrawal wallet to be 30, got ${targetWallet.withdrawalWallet}.`);
     }
 
     if (royaltyLedgerEntries.length !== 1) {
@@ -334,8 +334,8 @@ async function run() {
       throw new Error(`Expected second payout tick to be idempotent, got ${secondTick.royaltyPayouts?.length ?? 0}.`);
     }
 
-    if (incomeOverview.royaltyIncome?.total !== 20) {
-      throw new Error(`Expected /api/income royaltyIncome.total to be 20, got ${incomeOverview.royaltyIncome?.total}.`);
+    if (incomeOverview.royaltyIncome?.total !== 30) {
+      throw new Error(`Expected /api/income royaltyIncome.total to be 30, got ${incomeOverview.royaltyIncome?.total}.`);
     }
 
     console.log(JSON.stringify(report, null, 2));

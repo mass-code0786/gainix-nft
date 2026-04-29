@@ -21,6 +21,8 @@ export type WalletLedgerType =
   | "CAPITAL_TRANSFER"
   | "WITHDRAWAL_REQUEST"
   | "WITHDRAWAL_FEE"
+  | "GXN_TOKEN_REWARD"
+  | "GXN_TOKEN_DEDUCTION"
   | "BOT_PURCHASE_DEBIT";
 
 export interface UserRecord {
@@ -80,6 +82,7 @@ export interface WalletRecord {
   userId: string;
   tradingWallet: number;
   withdrawalWallet: number;
+  gxnTokenBalance: number;
   totalDeposited: number;
   buyCount: number;
   sellCount: number;
@@ -169,11 +172,15 @@ export interface WithdrawalRecord {
   userId: string;
   grossAmount: number;
   feeAmount: number;
+  gxnDeductionAmount: number;
+  gxnTokens: number;
   netAmount: number;
   status: "requested" | "approved" | "approved_pending_tx";
   approvedAt: string | null;
   payoutTxHash: string | null;
   payoutStatus: string;
+  withdrawalTxHash: string | null;
+  onChainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   createdAt: string;
 }
 

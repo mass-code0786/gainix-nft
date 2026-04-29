@@ -16,7 +16,9 @@ export type WalletHistoryType =
   | "CAPITAL_TRANSFER"
   | "CAPITAL_TRANSFER_TO_WITHDRAWAL"
   | "WITHDRAWAL_REQUEST"
-  | "WITHDRAWAL_FEE";
+  | "WITHDRAWAL_FEE"
+  | "GXN_TOKEN_REWARD"
+  | "GXN_TOKEN_DEDUCTION";
 
 export interface WalletHistoryEntry {
   id: string;
@@ -24,7 +26,7 @@ export interface WalletHistoryEntry {
   amount: number;
   createdAt: string;
   status: "Completed" | "Requested" | "Approved" | "Approved Pending TX";
-  walletAffected: "Trading Wallet" | "Withdrawal Wallet";
+  walletAffected: "Trading Wallet" | "Withdrawal Wallet" | "GXN Token";
   referenceId: string | null;
   metadata: Record<string, string | number | boolean | null>;
 }

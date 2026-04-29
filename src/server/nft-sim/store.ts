@@ -39,6 +39,7 @@ function createSeedState(): NftSimState {
     userId: demoUser.id,
     tradingWallet: DEFAULT_TRADING_BALANCE,
     withdrawalWallet: 0,
+    gxnTokenBalance: 0,
     totalDeposited: 0,
     buyCount: 0,
     sellCount: 0,
@@ -123,6 +124,11 @@ function normalizeState(state: NftSimState): NftSimState {
     minimumTradeAmount: state.admin_settings.minimumTradeAmount ?? 10,
   };
 
+  state.wallets = state.wallets.map((wallet) => ({
+    ...wallet,
+    gxnTokenBalance: wallet.gxnTokenBalance ?? 0,
+  }));
+
   state.system_reserve = {
     ...state.system_reserve,
     totalRoyaltyPaid: state.system_reserve.totalRoyaltyPaid ?? 0,
@@ -145,9 +151,13 @@ function normalizeState(state: NftSimState): NftSimState {
 
   state.withdrawals = state.withdrawals.map((withdrawal) => ({
     ...withdrawal,
+    gxnDeductionAmount: withdrawal.gxnDeductionAmount ?? 0,
+    gxnTokens: withdrawal.gxnTokens ?? 0,
     approvedAt: withdrawal.approvedAt ?? null,
     payoutTxHash: withdrawal.payoutTxHash ?? null,
     payoutStatus: withdrawal.payoutStatus ?? "NOT_STARTED",
+    withdrawalTxHash: withdrawal.withdrawalTxHash ?? null,
+    onChainStatus: withdrawal.onChainStatus ?? "PENDING",
   }));
   state.deposits = state.deposits ?? [];
 

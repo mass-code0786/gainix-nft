@@ -172,6 +172,9 @@ export default function DashboardPage() {
         walletAddress={walletAddress}
         tradingWallet={wallet?.tradingWallet ?? 0}
         withdrawalWallet={wallet?.withdrawalWallet ?? 0}
+        gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
+        gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
+        gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
         totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
         totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
         dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}

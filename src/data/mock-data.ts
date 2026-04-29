@@ -608,6 +608,7 @@ export const walletSummary: WalletSummary = {
   totalBalance: 6.94,
   nftValue: 4.11,
   liquidBnb: 2.22,
+  gxnTokenUsdValue: 0,
   pendingProceeds: 1.72,
   floorExposure: 3.7,
   availableToSpend: 2.14,

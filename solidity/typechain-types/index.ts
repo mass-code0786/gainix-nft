@@ -46,6 +46,8 @@ export type { GainixMarketplace } from "./contracts/GainixMarketplace";
 export { GainixMarketplace__factory } from "./factories/contracts/GainixMarketplace__factory";
 export type { GainixNFT } from "./contracts/GainixNFT";
 export { GainixNFT__factory } from "./factories/contracts/GainixNFT__factory";
+export type { GainixWithdrawalVault } from "./contracts/GainixWithdrawalVault";
+export { GainixWithdrawalVault__factory } from "./factories/contracts/GainixWithdrawalVault__factory";
 export type { IGainixNFT } from "./contracts/interfaces/IGainixNFT";
 export { IGainixNFT__factory } from "./factories/contracts/interfaces/IGainixNFT__factory";
 export type { GainixErrors } from "./contracts/libraries/GainixErrors";

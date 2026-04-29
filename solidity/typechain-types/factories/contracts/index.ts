@@ -6,3 +6,4 @@ export * as libraries from "./libraries";
 export { GainixBotPass__factory } from "./GainixBotPass__factory";
 export { GainixMarketplace__factory } from "./GainixMarketplace__factory";
 export { GainixNFT__factory } from "./GainixNFT__factory";
+export { GainixWithdrawalVault__factory } from "./GainixWithdrawalVault__factory";

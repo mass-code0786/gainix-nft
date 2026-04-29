@@ -594,8 +594,6 @@ export default function AdminPage() {
             {[
               ["NFT price increase min", "nftPriceIncreaseMinPercent"],
               ["NFT price increase max", "nftPriceIncreaseMaxPercent"],
-              ["Auto sell delay min", "autoSellDelayMinMinutes"],
-              ["Auto sell delay max", "autoSellDelayMaxMinutes"],
               ["Bot profit min", "botProfitMinPercent"],
               ["Bot profit max", "botProfitMaxPercent"],
               ["Withdrawal minimum", "withdrawalMinimumAmount"],
@@ -630,8 +628,6 @@ export default function AdminPage() {
                 void admin.saveSettings({
                   nftPriceIncreaseMinPercent: parseAmount(settingsForm.nftPriceIncreaseMinPercent),
                   nftPriceIncreaseMaxPercent: parseAmount(settingsForm.nftPriceIncreaseMaxPercent),
-                  autoSellDelayMinMinutes: parseAmount(settingsForm.autoSellDelayMinMinutes),
-                  autoSellDelayMaxMinutes: parseAmount(settingsForm.autoSellDelayMaxMinutes),
                   botProfitMinPercent: parseAmount(settingsForm.botProfitMinPercent),
                   botProfitMaxPercent: parseAmount(settingsForm.botProfitMaxPercent),
                   withdrawalMinimumAmount: parseAmount(settingsForm.withdrawalMinimumAmount),
@@ -835,7 +831,14 @@ export default function AdminPage() {
                       : withdrawal.userId}
                   </p>
                   <p className="mt-1 text-sm text-zinc-400">
-                    Amount {formatUsdt(withdrawal.grossAmount)} | Fee {formatUsdt(withdrawal.feeAmount)}
+                    Amount {formatUsdt(withdrawal.grossAmount)} | Fee {formatUsdt(withdrawal.feeAmount)} | GXN deduction {formatUsdt(withdrawal.gxnDeductionAmount)} | Net {formatUsdt(withdrawal.netAmount)}
+                  </p>
+                  <p className="mt-1 text-xs text-purple-200">
+                    GXN reward {withdrawal.gxnTokens.toLocaleString()} GXN
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    On-chain {withdrawal.onChainStatus}
+                    {withdrawal.withdrawalTxHash ? ` | ${withdrawal.withdrawalTxHash.slice(0, 10)}...${withdrawal.withdrawalTxHash.slice(-8)}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
                     Requested {new Date(withdrawal.createdAt).toLocaleString()}

@@ -23,6 +23,12 @@ import {
 } from "@/server/nft-sim/types";
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
+const GXN_TOKEN_VALUE_USD = 0.05;
+const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
+const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
+const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
+const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
+const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
 
 const BOT_PLANS = {
   bot_10: {
@@ -173,6 +179,7 @@ function createUserWallet(now: string, userId: string): WalletRecord {
     userId,
     tradingWallet: 0,
     withdrawalWallet: 0,
+    gxnTokenBalance: 0,
     totalDeposited: 0,
     buyCount: 0,
     sellCount: 0,
@@ -398,6 +405,9 @@ function toPublicWallet(wallet: WalletRecord, user?: UserRecord) {
   return {
     tradingWallet: wallet.tradingWallet,
     withdrawalWallet: wallet.withdrawalWallet,
+    gxnTokenBalance: wallet.gxnTokenBalance,
+    gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+    gxnTokenUsdValue: roundAmount(wallet.gxnTokenBalance * GXN_TOKEN_VALUE_USD),
     totalDeposited: wallet.totalDeposited,
     buyCount: totalBuyCount,
     sellCount: totalSellCount,
@@ -501,11 +511,16 @@ function priceAfterMarketBuy(state: NftSimState, currentPrice: number) {
   };
 }
 
-function randomAutoSellDelay(state: NftSimState) {
-  return randomIntegerInRange(
-    state.admin_settings.autoSellDelayMinMinutes,
-    state.admin_settings.autoSellDelayMaxMinutes,
-  );
+function randomAutoSellDelay(tradeSource: NftTradeRecord["source"]) {
+  return tradeSource === "bot"
+    ? randomIntegerInRange(
+        BOT_AUTO_SELL_DELAY_MIN_MINUTES,
+        BOT_AUTO_SELL_DELAY_MAX_MINUTES,
+      )
+    : randomIntegerInRange(
+        MANUAL_AUTO_SELL_DELAY_MIN_MINUTES,
+        MANUAL_AUTO_SELL_DELAY_MAX_MINUTES,
+      );
 }
 
 function randomBotProfitPercent(state: NftSimState) {
@@ -687,7 +702,7 @@ function listNft(
     debugAutoSellInMinutes >= 0 &&
     debugAutoSellInMinutes <= maxAllowedDebugDelay
       ? debugAutoSellInMinutes
-      : randomAutoSellDelay(state);
+      : randomAutoSellDelay(trade.source);
 
   trade.status = "listed";
   trade.listedAt = now.toISOString();
@@ -1379,21 +1394,28 @@ export async function requestWithdrawal(input: WithdrawInput) {
     }
 
     const feeAmount = roundAmount(amount * (feePercent / 100));
-    const netAmount = roundAmount(amount - feeAmount);
+    const gxnDeductionAmount = roundAmount(amount * (GXN_WITHDRAWAL_DEDUCTION_PERCENT / 100));
+    const gxnTokens = roundAmount(gxnDeductionAmount / GXN_TOKEN_VALUE_USD);
+    const netAmount = roundAmount(amount - feeAmount - gxnDeductionAmount);
     const withdrawal: WithdrawalRecord = {
       id: makeId("withdrawal"),
       userId: user.id,
       grossAmount: amount,
       feeAmount,
+      gxnDeductionAmount,
+      gxnTokens,
       netAmount,
       status: "requested",
       approvedAt: null,
       payoutTxHash: null,
       payoutStatus: "NOT_STARTED",
+      withdrawalTxHash: null,
+      onChainStatus: "PENDING",
       createdAt: nowIso(),
     };
 
     wallet.withdrawalWallet = roundAmount(wallet.withdrawalWallet - amount);
+    wallet.gxnTokenBalance = roundAmount(wallet.gxnTokenBalance + gxnTokens);
     wallet.updatedAt = nowIso();
     state.withdrawals.push(withdrawal);
 
@@ -1404,8 +1426,12 @@ export async function requestWithdrawal(input: WithdrawInput) {
       referenceId: withdrawal.id,
       metadata: {
         grossAmount: amount,
+        feeAmount,
+        gxnDeductionAmount,
+        gxnTokens,
         netAmount,
         withdrawalWalletAfter: wallet.withdrawalWallet,
+        gxnTokenBalanceAfter: wallet.gxnTokenBalance,
       },
     });
 
@@ -1416,6 +1442,30 @@ export async function requestWithdrawal(input: WithdrawInput) {
       referenceId: withdrawal.id,
       metadata: {
         feePercent,
+      },
+    });
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "GXN_TOKEN_DEDUCTION",
+      amount: gxnDeductionAmount,
+      referenceId: withdrawal.id,
+      metadata: {
+        deductionPercent: GXN_WITHDRAWAL_DEDUCTION_PERCENT,
+        gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+        gxnTokens,
+      },
+    });
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "GXN_TOKEN_REWARD",
+      amount: gxnTokens,
+      referenceId: withdrawal.id,
+      metadata: {
+        gxnDeductionAmount,
+        gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+        gxnTokenBalanceAfter: wallet.gxnTokenBalance,
       },
     });
 

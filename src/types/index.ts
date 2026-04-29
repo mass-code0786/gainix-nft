@@ -192,6 +192,7 @@ export interface WalletSummary {
   totalBalance: number;
   nftValue: number;
   liquidBnb: number;
+  gxnTokenUsdValue: number;
   pendingProceeds: number;
   floorExposure: number;
   availableToSpend: number;
@@ -314,11 +315,15 @@ export interface AdminWithdrawalRecord {
   userId: string;
   grossAmount: number;
   feeAmount: number;
+  gxnDeductionAmount: number;
+  gxnTokens: number;
   netAmount: number;
   status: "requested" | "approved" | "approved_pending_tx";
   approvedAt: string | null;
   payoutTxHash: string | null;
   payoutStatus: string;
+  withdrawalTxHash: string | null;
+  onChainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   createdAt: string;
   user: {
     id: string;

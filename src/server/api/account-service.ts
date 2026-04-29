@@ -11,6 +11,7 @@ function roundAmount(value: number) {
 function toWalletResponse(wallet: {
   tradingWallet: number;
   withdrawalWallet: number;
+  gxnTokenBalance: number;
   buyCount: number;
   sellCount: number;
   isCapitalUnlocked: boolean;
@@ -25,6 +26,9 @@ function toWalletResponse(wallet: {
     walletAddress: wallet.user.walletAddress,
     tradingWallet: wallet.tradingWallet,
     withdrawalWallet: wallet.withdrawalWallet,
+    gxnTokenBalance: wallet.gxnTokenBalance,
+    gxnTokenValueUsd: 0.05,
+    gxnTokenUsdValue: roundAmount(wallet.gxnTokenBalance * 0.05),
     buyCount: wallet.buyCount,
     sellCount: wallet.sellCount,
     isCapitalUnlocked: wallet.isCapitalUnlocked,

@@ -159,6 +159,12 @@ export const approveWithdrawalInputSchema = z.object({
   withdrawalId: z.string().trim().min(1, "withdrawalId is required."),
 });
 
+export const confirmWithdrawalInputSchema = z.object({
+  withdrawalId: z.string().trim().min(1, "withdrawalId is required."),
+  walletAddress: walletAddressSchema,
+  txHash: z.string().trim().regex(/^0x[a-fA-F0-9]{64}$/, "txHash must be a valid transaction hash."),
+});
+
 export const payoutControlInputSchema = z.object({
   paused: z.boolean(),
 });
@@ -177,4 +183,5 @@ export type AdminCreateNftInput = z.infer<typeof adminCreateNftInputSchema>;
 export type AdminUpdateNftInput = z.infer<typeof adminUpdateNftInputSchema>;
 export type AdminDeleteNftInput = z.infer<typeof adminDeleteNftInputSchema>;
 export type ApproveWithdrawalInput = z.infer<typeof approveWithdrawalInputSchema>;
+export type ConfirmWithdrawalInput = z.infer<typeof confirmWithdrawalInputSchema>;
 export type PayoutControlInput = z.infer<typeof payoutControlInputSchema>;

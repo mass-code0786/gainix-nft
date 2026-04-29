@@ -11,6 +11,9 @@ import type { NFTItem, PortfolioHolding } from "@/types";
 interface WalletResponse {
   tradingWallet: number;
   withdrawalWallet: number;
+  gxnTokenBalance: number;
+  gxnTokenValueUsd: number;
+  gxnTokenUsdValue: number;
   buyCount: number;
   sellCount: number;
   totalBuyCount: number;
@@ -154,7 +157,8 @@ export function usePortfolio() {
     .reduce((total, item) => total + item.currentValue, 0);
   const floorExposure = ownedNfts.reduce((total, item) => total + item.floorPrice, 0);
   const liquidBalance = wallet ? wallet.tradingWallet + wallet.withdrawalWallet : 0;
-  const totalPortfolioBalance = liquidBalance + nftValue;
+  const gxnTokenUsdValue = wallet?.gxnTokenUsdValue ?? 0;
+  const totalPortfolioBalance = liquidBalance + gxnTokenUsdValue + nftValue;
 
   return {
     source: marketSource,
@@ -169,6 +173,7 @@ export function usePortfolio() {
       totalBalance: Number(totalPortfolioBalance.toFixed(2)),
       nftValue: Number(nftValue.toFixed(2)),
       liquidBnb: Number(liquidBalance.toFixed(2)),
+      gxnTokenUsdValue: Number(gxnTokenUsdValue.toFixed(2)),
       pendingProceeds: Number(pendingProceeds.toFixed(2)),
       floorExposure: Number(floorExposure.toFixed(2)),
       availableToSpend: Number((wallet?.tradingWallet ?? 0).toFixed(2)),

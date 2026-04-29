@@ -917,6 +917,48 @@
       "artifacts": [
         "IGainixNFT"
       ]
+    },
+    "C:\\Gainix\\Gainix NFT\\solidity\\contracts\\GainixWithdrawalVault.sol": {
+      "lastModificationDate": 1777426794014,
+      "contentHash": "b36ce0e0e2db76d58c3a38e4d3a67a7e",
+      "sourceName": "contracts/GainixWithdrawalVault.sol",
+      "solcConfig": {
+        "version": "0.8.26",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/access/Ownable2Step.sol",
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "@openzeppelin/contracts/utils/Pausable.sol",
+        "./libraries/GainixErrors.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.24"
+      ],
+      "artifacts": [
+        "GainixWithdrawalVault"
+      ]
     }
   }
 }

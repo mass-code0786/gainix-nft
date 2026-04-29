@@ -8,8 +8,9 @@ import {
   LoaderCircle,
   X,
 } from "lucide-react";
-import { isAddress, parseUnits, zeroAddress } from "viem";
+import { formatEther, isAddress, parseUnits, zeroAddress, type Hex } from "viem";
 import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
+import { withdrawalAbi, withdrawalContract } from "@/contracts";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ApiRequestError, fetchJson } from "@/lib/api/client";
 import {
@@ -22,11 +23,26 @@ import {
 import { formatCurrency } from "@/utils/format";
 
 export type WalletAction = "deposit" | "withdraw" | "transfer";
+const GXN_TOKEN_VALUE_USD = 0.05;
+const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
 
 interface WalletMutationResponse {
   wallet: {
     tradingWallet: number;
     withdrawalWallet: number;
+    gxnTokenBalance: number;
+    gxnTokenValueUsd: number;
+    gxnTokenUsdValue: number;
+  };
+  withdrawal?: {
+    id: string;
+    grossAmount: number;
+    feeAmount: number;
+    gxnDeductionAmount: number;
+    gxnTokens: number;
+    netAmount: number;
+    withdrawalTxHash: string | null;
+    onChainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   };
 }
 
@@ -50,6 +66,9 @@ interface WalletActionPanelProps {
   walletAddress: string | null;
   tradingWallet: number;
   withdrawalWallet: number;
+  gxnTokenBalance: number;
+  gxnTokenValueUsd: number;
+  gxnTokenUsdValue: number;
   totalBuyCount?: number;
   totalSellCount?: number;
   dailyBuyCount?: number;
@@ -85,6 +104,10 @@ function hasValidUsdtPaymentConfig() {
     isAddress(usdtPaymentConfig.treasuryAddress) &&
     usdtPaymentConfig.treasuryAddress.toLowerCase() !== zeroAddress
   );
+}
+
+function hasValidWithdrawalContract() {
+  return isAddress(withdrawalContract.address) && withdrawalContract.address.toLowerCase() !== zeroAddress;
 }
 
 function numberFromPayload(payload: Record<string, unknown> | null, key: string) {
@@ -146,18 +169,25 @@ function WalletActionModal({
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient({ chainId: usdtPaymentConfig.chainId });
+  const withdrawalPublicClient = usePublicClient({ chainId: withdrawalContract.chainId });
   const walletAuth = useWalletAuth(walletAddress);
   const [amountInput, setAmountInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<WalletMutationResponse["withdrawal"] | null>(null);
+  const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
   const amount = parseAmount(amountInput);
   const transferAmount = Number(tradingWallet.toFixed(2));
   const feeAmount = action === "withdraw" ? Number((amount * 0.1).toFixed(2)) : 0;
-  const netAmount = action === "withdraw" ? Number((amount - feeAmount).toFixed(2)) : amount;
+  const gxnDeductionAmount =
+    action === "withdraw" ? Number((amount * (GXN_WITHDRAWAL_DEDUCTION_PERCENT / 100)).toFixed(2)) : 0;
+  const gxnTokens = action === "withdraw" ? Number((gxnDeductionAmount / GXN_TOKEN_VALUE_USD).toFixed(2)) : 0;
+  const netAmount = action === "withdraw" ? Number((amount - feeAmount - gxnDeductionAmount).toFixed(2)) : amount;
   const title = action === "deposit" ? "Deposit" : action === "withdraw" ? "Withdraw" : "Transfer capital";
   const depositConfigReady = hasValidUsdtPaymentConfig();
+  const withdrawalConfigReady = hasValidWithdrawalContract();
 
   const validationError = useMemo(() => {
     if (action === "transfer") {
@@ -188,14 +218,102 @@ function WalletActionModal({
       return "USDT deposit settings are not configured.";
     }
 
+    if (action === "withdraw" && !withdrawalConfigReady) {
+      return "Withdrawal contract is not configured.";
+    }
+
     return null;
   }, [
     action,
     amount,
     amountInput,
     depositConfigReady,
+    withdrawalConfigReady,
     withdrawalWallet,
   ]);
+
+  async function prepareOnChainWithdrawal() {
+    if (!walletAddress) {
+      setError("Connect your wallet to continue.");
+      return;
+    }
+
+    if (!withdrawalPublicClient) {
+      setError("Withdrawal RPC client is not available.");
+      return;
+    }
+
+    if (chainId !== withdrawalContract.chainId && switchChainAsync) {
+      await switchChainAsync({ chainId: withdrawalContract.chainId });
+    }
+
+    const result = await fetchJson<WalletMutationResponse>("/api/withdraw", {
+      method: "POST",
+      body: JSON.stringify({
+        walletAddress,
+        amount,
+      }),
+    });
+
+    if (!result.withdrawal) {
+      throw new Error("Withdrawal request was not returned.");
+    }
+
+    const netAmountWei = parseUnits(result.withdrawal.netAmount.toFixed(18), 18);
+    const gas = await withdrawalPublicClient.estimateContractGas({
+      account: walletAddress as `0x${string}`,
+      address: withdrawalContract.address,
+      abi: withdrawalAbi,
+      functionName: "withdraw",
+      args: [walletAddress as `0x${string}`, netAmountWei],
+    });
+    const gasPrice = await withdrawalPublicClient.getGasPrice();
+
+    setPendingWithdrawal(result.withdrawal);
+    setEstimatedGasFee(formatEther(gas * gasPrice));
+  }
+
+  async function executeOnChainWithdrawal() {
+    if (!walletAddress || !pendingWithdrawal || !withdrawalPublicClient) {
+      return;
+    }
+
+    if (chainId !== withdrawalContract.chainId && switchChainAsync) {
+      await switchChainAsync({ chainId: withdrawalContract.chainId });
+    }
+
+    const netAmountWei = parseUnits(pendingWithdrawal.netAmount.toFixed(18), 18);
+    const hash = await writeContractAsync({
+      address: withdrawalContract.address,
+      abi: withdrawalAbi,
+      functionName: "withdraw",
+      args: [walletAddress as `0x${string}`, netAmountWei],
+      chainId: withdrawalContract.chainId,
+    });
+    setTxHash(hash);
+
+    const receipt = await withdrawalPublicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") {
+      await fetchJson("/api/withdraw/confirm", {
+        method: "POST",
+        body: JSON.stringify({
+          withdrawalId: pendingWithdrawal.id,
+          walletAddress,
+          txHash: hash,
+        }),
+      }).catch(() => undefined);
+      throw new Error("Withdrawal transaction failed.");
+    }
+
+    await fetchJson("/api/withdraw/confirm", {
+      method: "POST",
+      body: JSON.stringify({
+        withdrawalId: pendingWithdrawal.id,
+        walletAddress,
+        txHash: hash,
+      }),
+    });
+  }
 
   async function submit() {
     setError(null);
@@ -254,19 +372,21 @@ function WalletActionModal({
           }),
         });
       } else {
-        await fetchJson<WalletMutationResponse>(action === "withdraw" ? "/api/withdraw" : "/api/wallet/transfer-capital", {
+        if (action === "withdraw") {
+          if (!pendingWithdrawal) {
+            await prepareOnChainWithdrawal();
+            return;
+          }
+
+          await executeOnChainWithdrawal();
+        } else {
+          await fetchJson<WalletMutationResponse>("/api/wallet/transfer-capital", {
           method: "POST",
-          body: JSON.stringify(
-            action === "withdraw"
-              ? {
-                  walletAddress,
-                  amount,
-                }
-              : {
-                  walletAddress,
-                },
-          ),
-        });
+            body: JSON.stringify({
+              walletAddress,
+            }),
+          });
+        }
       }
       await onRefresh();
       onRecorded({
@@ -280,10 +400,12 @@ function WalletActionModal({
         action === "deposit"
           ? "USDT deposit verified and credited to trading wallet."
           : action === "withdraw"
-            ? "USDT withdrawal request created for admin approval."
+            ? "Withdrawal transaction confirmed on-chain."
             : "Capital transferred to withdrawal wallet.",
       );
       setAmountInput("");
+      setPendingWithdrawal(null);
+      setEstimatedGasFee(null);
     } catch (submitError) {
       setError(
         action === "transfer"
@@ -339,6 +461,8 @@ function WalletActionModal({
                 setError(null);
                 setSuccess(null);
                 setTxHash(null);
+                setPendingWithdrawal(null);
+                setEstimatedGasFee(null);
               }}
             />
           </label>
@@ -372,13 +496,48 @@ function WalletActionModal({
                   <span className="text-white">Admin approval</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>Fee 10%</span>
+                  <span>Requested amount</span>
+                  <span className="text-white">{formatCurrency(amount)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>10% platform fee</span>
                   <span className="text-rose-200">{formatCurrency(feeAmount)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>Net amount</span>
+                  <span>20% GXN token deduction</span>
+                  <span className="text-purple-200">{formatCurrency(gxnDeductionAmount)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>User will receive</span>
                   <span className="text-emerald-200">{formatCurrency(Math.max(netAmount, 0))}</span>
                 </div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <span>GXN tokens user will get</span>
+                  <span className="text-amber-200">{gxnTokens.toLocaleString()} GXN</span>
+                </div>
+                {pendingWithdrawal ? (
+                  <>
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Estimated gas fee</span>
+                        <span className="text-white">
+                          {estimatedGasFee ? `${estimatedGasFee} BNB` : "Calculating"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <span>Contract</span>
+                        <span className="text-zinc-400">{shortHash(withdrawalContract.address)}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3">
+                        <span>Request</span>
+                        <span className="text-zinc-400">{pendingWithdrawal.id.slice(0, 14)}...</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-100">
+                      Confirm in your wallet to execute the on-chain withdrawal. Gas is paid by your connected wallet.
+                    </div>
+                  </>
+                ) : null}
               </>
             ) : (
               <div className="flex items-center justify-between gap-3">
@@ -416,7 +575,14 @@ function WalletActionModal({
           className="premium-button mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting || walletAuth.isSigning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {walletAuth.signPrompt ?? (action === "deposit" ? `Send ${USDT_SYMBOL}` : title)}
+          {walletAuth.signPrompt ??
+            (action === "deposit"
+              ? `Send ${USDT_SYMBOL}`
+              : action === "withdraw"
+                ? pendingWithdrawal
+                  ? "Confirm On-Chain Withdrawal"
+                  : "Withdraw via Wallet"
+                : title)}
         </button>
       </div>
     </div>
@@ -427,6 +593,9 @@ export function WalletActionPanel({
   walletAddress,
   tradingWallet,
   withdrawalWallet,
+  gxnTokenBalance,
+  gxnTokenValueUsd,
+  gxnTokenUsdValue,
   totalBuyCount = 0,
   totalSellCount = 0,
   dailyBuyCount = 0,
@@ -447,7 +616,7 @@ export function WalletActionPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="muted-label">Wallet Summary</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
               <p className="text-sm text-zinc-400">Trading Wallet</p>
               <p className="mt-1 font-display text-2xl font-semibold text-white">
@@ -459,6 +628,25 @@ export function WalletActionPanel({
               <p className="mt-1 font-display text-2xl font-semibold text-white">
                 {formatCurrency(withdrawalWallet)}
               </p>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-purple-400/20 bg-[radial-gradient(circle_at_top,rgba(168,85,247,0.22),transparent_45%),linear-gradient(145deg,rgba(14,8,20,0.95),rgba(4,4,7,0.98))] p-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/images/gxn-token.png"
+                  alt="GXN TOKEN"
+                  className="h-12 w-12 rounded-full border border-amber-300/30 object-cover shadow-lg shadow-purple-500/20"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-300">GXN TOKEN</p>
+                  <p className="mt-1 font-display text-xl font-semibold text-white">
+                    {gxnTokenBalance.toLocaleString()} GXN
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-zinc-400">
+                <span>Token value {formatCurrency(gxnTokenValueUsd)}</span>
+                <span className="text-amber-100">{formatCurrency(gxnTokenUsdValue)}</span>
+              </div>
             </div>
           </div>
           <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -500,7 +688,7 @@ export function WalletActionPanel({
             className="secondary-button w-full border-rose-500/25 bg-rose-500/10 text-rose-100 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <ArrowUpFromLine className="mr-2 h-4 w-4" />
-            Withdraw
+            Withdraw via Wallet
           </button>
           <button
             type="button"
@@ -538,6 +726,9 @@ export function WalletActionPanel({
           walletAddress={walletAddress}
           tradingWallet={tradingWallet}
           withdrawalWallet={withdrawalWallet}
+          gxnTokenBalance={gxnTokenBalance}
+          gxnTokenValueUsd={gxnTokenValueUsd}
+          gxnTokenUsdValue={gxnTokenUsdValue}
           totalBuyCount={totalBuyCount}
           totalSellCount={totalSellCount}
           dailyBuyCount={dailyBuyCount}

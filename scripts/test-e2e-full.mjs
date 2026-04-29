@@ -496,7 +496,7 @@ async function main() {
       (total, entry) => total + entry.amount,
       0,
     );
-    assert(royaltyTotal >= 20, "Royalty payout did not credit after resuming payouts.");
+    assert(royaltyTotal >= 30, "Royalty payout did not credit after resuming payouts.");
 
     const approvedWithdrawal = report.apiResponses.adminWithdrawals.body.withdrawals.find(
       (item) => item.id === withdrawalId,

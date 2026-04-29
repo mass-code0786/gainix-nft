@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { CircleDollarSign, Clock3, Gem, Layers3, WalletCards } from "lucide-react";
+import { CircleDollarSign, Clock3, Gem, WalletCards } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { StatCard } from "@/components/ui/stat-card";
 import { WalletActionPanel } from "@/components/wallet/wallet-action-panel";
@@ -23,12 +23,15 @@ const historyLabels: Record<WalletHistoryType, string> = {
   CAPITAL_TRANSFER_TO_WITHDRAWAL: "Capital Transfer",
   WITHDRAWAL_REQUEST: "Withdrawal Request",
   WITHDRAWAL_FEE: "Withdrawal Fee",
+  GXN_TOKEN_REWARD: "GXN Token Reward",
+  GXN_TOKEN_DEDUCTION: "GXN Token Deduction",
 };
 
 const debitTypes = new Set<WalletHistoryType>([
   "NFT_BUY_DEBIT",
   "WITHDRAWAL_REQUEST",
   "WITHDRAWAL_FEE",
+  "GXN_TOKEN_DEDUCTION",
 ]);
 
 function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
@@ -87,8 +90,8 @@ export default function WalletPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total balance" value={formatCurrency(summary.totalBalance)} detail="Wallet + collection" icon={WalletCards} />
         <StatCard label="Cash Balance" value={formatCurrency(summary.liquidBnb)} detail="Available now" icon={CircleDollarSign} tone="positive" />
+        <StatCard label="GXN token value" value={formatCurrency(summary.gxnTokenUsdValue)} detail={`${(wallet?.gxnTokenBalance ?? 0).toLocaleString()} GXN`} icon={Gem} />
         <StatCard label="Collection value" value={formatCurrency(summary.nftValue)} detail="Held NFTs" icon={Gem} />
-        <StatCard label="Pending proceeds" value={formatCurrency(summary.pendingProceeds)} detail="Listed for sale" icon={Layers3} />
       </div>
 
       <div className="section-shell space-y-4">
@@ -139,6 +142,9 @@ export default function WalletPage() {
         walletAddress={fullAddress}
         tradingWallet={wallet?.tradingWallet ?? 0}
         withdrawalWallet={wallet?.withdrawalWallet ?? 0}
+        gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
+        gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
+        gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
         totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
         totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
         dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}

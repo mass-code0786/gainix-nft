@@ -94,6 +94,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.GainixNFT__factory>;
     getContractFactory(
+      name: "GainixWithdrawalVault",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.GainixWithdrawalVault__factory>;
+    getContractFactory(
       name: "IGainixNFT",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IGainixNFT__factory>;
@@ -203,6 +207,11 @@ declare module "hardhat/types/runtime" {
       signer?: ethers.Signer
     ): Promise<Contracts.GainixNFT>;
     getContractAt(
+      name: "GainixWithdrawalVault",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.GainixWithdrawalVault>;
+    getContractAt(
       name: "IGainixNFT",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
@@ -294,6 +303,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.GainixNFT>;
     deployContract(
+      name: "GainixWithdrawalVault",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.GainixWithdrawalVault>;
+    deployContract(
       name: "IGainixNFT",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.IGainixNFT>;
@@ -402,6 +415,11 @@ declare module "hardhat/types/runtime" {
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.GainixNFT>;
+    deployContract(
+      name: "GainixWithdrawalVault",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.GainixWithdrawalVault>;
     deployContract(
       name: "IGainixNFT",
       args: any[],
