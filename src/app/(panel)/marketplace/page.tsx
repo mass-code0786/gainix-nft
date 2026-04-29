@@ -33,18 +33,18 @@ export default function MarketplacePage() {
             liveListings.map((nft) => <NFTCard key={nft.id} nft={nft} />)
           )}
         </div>
-        {activity.length === 0 ? (
-          <div className="section-shell text-sm text-zinc-300">No recent activity yet.</div>
-        ) : (
+        {activity.length > 0 ? (
           <ActivityFeed items={activity} limit={6} />
-        )}
+        ) : null}
       </div>
 
-      <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
-        <StatCard label="Listings" value={String(stats.totalListings)} detail="Now live" />
-        <StatCard label="Floor" value={formatCurrency(stats.floorPrice)} detail="Best available" />
-        <StatCard label="Average" value={formatCurrency(stats.avgPrice)} detail="Market average" />
-      </div>
+      {liveListings.length > 0 ? (
+        <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
+          <StatCard label="Listings" value={String(stats.totalListings)} detail="Now live" />
+          <StatCard label="Floor" value={formatCurrency(stats.floorPrice)} detail="Best available" />
+          <StatCard label="Average" value={formatCurrency(stats.avgPrice)} detail="Market average" />
+        </div>
+      ) : null}
     </AnimatedPage>
   );
 }

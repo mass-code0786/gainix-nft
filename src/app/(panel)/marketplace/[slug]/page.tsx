@@ -240,9 +240,7 @@ export default function NFTDetailPage() {
         </div>
       </div>
 
-      {activity.length === 0 ? (
-        <div className="section-shell text-sm text-zinc-300">No recent activity yet.</div>
-      ) : (
+      {activity.length > 0 ? (
         <ActivityFeed
           items={activity.map((entry) => ({
             ...entry,
@@ -252,7 +250,7 @@ export default function NFTDetailPage() {
           }))}
           limit={6}
         />
-      )}
+      ) : null}
 
       <div className="section-shell">
         <SectionHeader title="Related listings" />

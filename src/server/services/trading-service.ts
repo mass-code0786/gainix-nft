@@ -88,6 +88,12 @@ const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
 const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
 const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
 const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
+const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
+  ["1001", 120],
+  ["1002", 175],
+  ["1003", 235],
+  ["1004", 310],
+]);
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -218,6 +224,18 @@ function requireNft(state: NftSimState, nftId: string) {
   }
 
   return nft;
+}
+
+function isLegacyDemoMarketplaceNft(nft: NftRecord) {
+  const seedPrice = LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID.get(nft.tokenId);
+
+  return (
+    typeof seedPrice === "number" &&
+    nft.ownerUserId === null &&
+    nft.totalTrades === 0 &&
+    nft.basePrice === seedPrice &&
+    nft.currentPrice === seedPrice
+  );
 }
 
 function requireWallet(state: NftSimState, userId: string) {
@@ -2228,12 +2246,13 @@ export async function getMarketplaceNfts() {
   await ensureStoreInitialized();
   await processTradingEngineTick();
   const state = await readState();
+  const marketplaceNfts = state.nfts.filter(
+    (item) => item.status === "marketplace" && !isLegacyDemoMarketplaceNft(item),
+  );
 
   return {
-    marketplace: state.nfts
-      .filter((item) => item.status === "marketplace")
-      .map((item) => toPublicNft(state, item)),
-    total: state.nfts.filter((item) => item.status === "marketplace").length,
+    marketplace: marketplaceNfts.map((item) => toPublicNft(state, item)),
+    total: marketplaceNfts.length,
     settings: toPublicSettings(state.admin_settings),
     serverTime: nowIso(),
   };

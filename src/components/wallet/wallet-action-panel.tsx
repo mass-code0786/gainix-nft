@@ -649,26 +649,6 @@ export function WalletActionPanel({
               </div>
             </div>
           </div>
-          <div className="mt-3 rounded-2xl border border-white/10 bg-black/25 p-4">
-            <div className="grid gap-2 text-sm text-zinc-300 sm:grid-cols-2">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                <span>Buy</span>
-                <span className="text-white">{dailyBuyCount} / {dailyBuyLimit}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                <span>Sell</span>
-                <span className="text-white">{dailySellCount} / {dailySellLimit}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                <span>VIP Level</span>
-                <span className="text-white">VIP{currentVipLevel}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                <span>Bonus</span>
-                <span className="text-white">+{bonusTrades} trades</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
