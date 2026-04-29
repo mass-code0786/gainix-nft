@@ -27,15 +27,15 @@ export function StatCard({
   className,
 }: StatCardProps) {
   return (
-    <div className={cn("section-shell lux-card interactive-surface space-y-4", className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">{label}</p>
-          <p className="mt-2 font-display text-2xl font-semibold leading-tight text-white sm:text-[1.75rem]">{value}</p>
+    <div className={cn("section-shell lux-card interactive-surface space-y-3 p-3 sm:space-y-4 sm:p-4", className)}>
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.2em]">{label}</p>
+          <p className="mt-2 truncate font-display text-2xl font-semibold leading-tight text-white sm:text-3xl">{value}</p>
         </div>
         {Icon ? (
-          <div className="rounded-2xl border border-gainix-400/20 bg-gainix-500/10 p-3 text-gainix-200 shadow-glow">
-            <Icon className="h-5 w-5" />
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-gainix-400/20 bg-gainix-500/10 text-gainix-200 shadow-glow">
+            <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
           </div>
         ) : null}
       </div>

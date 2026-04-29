@@ -42,7 +42,7 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Wallet" value={shortAddress} detail={previewMode ? "Disconnected" : "Connected"} icon={WalletCards} />
         <StatCard label="Collection value" value={formatCurrency(summary.nftValue)} detail="Estimated value" icon={Gem} tone="positive" />
         <StatCard label="Available" value={formatCurrency(summary.availableToSpend)} detail="Ready now" icon={LayoutGrid} />

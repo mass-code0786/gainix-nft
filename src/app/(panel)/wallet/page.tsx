@@ -87,7 +87,7 @@ export default function WalletPage() {
 
   return (
     <AnimatedPage>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Total balance" value={formatCurrency(summary.totalBalance)} detail="Wallet + collection" icon={WalletCards} />
         <StatCard label="Cash Balance" value={formatCurrency(summary.liquidBnb)} detail="Available now" icon={CircleDollarSign} tone="positive" />
         <StatCard label="GXN token value" value={formatCurrency(summary.gxnTokenUsdValue)} detail={`${(wallet?.gxnTokenBalance ?? 0).toLocaleString()} GXN`} icon={Gem} />

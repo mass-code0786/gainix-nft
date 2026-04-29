@@ -18,9 +18,9 @@ function TeamMetricCard({
   detail?: string;
 }) {
   return (
-    <div className="h-full rounded-2xl border border-red-400/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.18),transparent_34%),linear-gradient(155deg,rgba(25,8,10,0.92),rgba(8,8,12,0.96))] p-4 shadow-[0_0_28px_rgba(239,68,68,0.12)] backdrop-blur-xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
-      <p className="mt-3 font-display text-2xl font-semibold text-white">{value}</p>
+    <div className="h-full rounded-2xl border border-red-400/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.18),transparent_34%),linear-gradient(155deg,rgba(25,8,10,0.92),rgba(8,8,12,0.96))] p-3 shadow-[0_0_28px_rgba(239,68,68,0.12)] backdrop-blur-xl sm:p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">{label}</p>
+      <p className="mt-3 truncate font-display text-2xl font-semibold text-white sm:text-3xl">{value}</p>
       {detail ? <p className="mt-2 text-xs text-zinc-400">{detail}</p> : null}
     </div>
   );
@@ -72,16 +72,16 @@ export default function TeamPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         {teamSummaryCards.map(({ title, value, icon: Icon }) => (
           <div
             key={title}
-            className="section-shell lux-card interactive-surface rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_34%),linear-gradient(160deg,rgba(22,8,10,0.96),rgba(10,10,14,0.98))] p-4"
+            className="section-shell lux-card interactive-surface rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_34%),linear-gradient(160deg,rgba(22,8,10,0.96),rgba(10,10,14,0.98))] p-3 sm:p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{title}</p>
-                <p className="mt-3 font-display text-[1.85rem] font-semibold leading-none text-white sm:text-[2rem]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">{title}</p>
+                <p className="mt-3 font-display text-2xl font-semibold leading-none text-white sm:text-3xl">
                   {value}
                 </p>
               </div>
@@ -122,32 +122,32 @@ export default function TeamPage() {
         />
 
         {progress ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="glass-card rounded-3xl p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Self package</p>
-              <p className="mt-3 font-display text-2xl font-semibold text-white">
+          <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="glass-card rounded-2xl p-3 sm:p-4">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">Self package</p>
+              <p className="mt-3 truncate font-display text-2xl font-semibold text-white sm:text-3xl">
                 {formatUsdt(progress.selfPackageAmount)}
               </p>
               <p className="mt-2 text-xs text-zinc-400">Required {formatUsdt(progress.selfPackageRequired)}</p>
             </div>
             {royalty?.nextVipLevel === 1 ? (
               <>
-                <div className="glass-card rounded-3xl p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Level 1 qualified</p>
-                  <p className="mt-3 font-display text-2xl font-semibold text-white">{progress.qualifiedLevel1Users ?? 0}</p>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">Level 1 qualified</p>
+                  <p className="mt-3 font-display text-2xl font-semibold text-white sm:text-3xl">{progress.qualifiedLevel1Users ?? 0}</p>
                   <p className="mt-2 text-xs text-zinc-400">Need {progress.qualifiedLevel1Required ?? 5} users</p>
                 </div>
-                <div className="glass-card rounded-3xl p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Level 2 qualified</p>
-                  <p className="mt-3 font-display text-2xl font-semibold text-white">{progress.qualifiedLevel2Users ?? 0}</p>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">Level 2 qualified</p>
+                  <p className="mt-3 font-display text-2xl font-semibold text-white sm:text-3xl">{progress.qualifiedLevel2Users ?? 0}</p>
                   <p className="mt-2 text-xs text-zinc-400">Need {progress.qualifiedLevel2Required ?? 10} users</p>
                 </div>
-                <div className="grid gap-3 sm:col-span-2 lg:grid-cols-2 xl:col-span-4">
-                  <TeamMetricCard
-                    label="Min team package"
-                    value={formatUsdt(progress.minimumTeamPackageAmount ?? 100)}
-                    detail="Only qualified package users count"
-                  />
+                <TeamMetricCard
+                  label="Min team package"
+                  value={formatUsdt(progress.minimumTeamPackageAmount ?? 100)}
+                  detail="Only qualified package users count"
+                />
+                <div className="col-span-2 grid gap-3 lg:grid-cols-2 xl:col-span-4">
                   <TeamMetricCard
                     label="Team sales"
                     value={formatUsdt(progress.teamSalesAmount ?? 0)}
@@ -157,14 +157,14 @@ export default function TeamPage() {
               </>
             ) : (
               <>
-                <div className="glass-card rounded-3xl p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Qualified directs</p>
-                  <p className="mt-3 font-display text-2xl font-semibold text-white">{progress.directQualifiedUsers ?? 0}</p>
+                <div className="glass-card rounded-2xl p-3 sm:p-4">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">Qualified directs</p>
+                  <p className="mt-3 font-display text-2xl font-semibold text-white sm:text-3xl">{progress.directQualifiedUsers ?? 0}</p>
                   <p className="mt-2 text-xs text-zinc-400">Need {progress.directQualifiedRequired ?? 2} directs</p>
                 </div>
-                <div className="glass-card rounded-3xl p-4 sm:col-span-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Previous VIP required</p>
-                  <p className="mt-3 font-display text-2xl font-semibold text-white">
+                <div className="glass-card col-span-2 rounded-2xl p-3 sm:p-4">
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 sm:text-xs sm:tracking-[0.18em]">Previous VIP required</p>
+                  <p className="mt-3 font-display text-2xl font-semibold text-white sm:text-3xl">
                     VIP {progress.previousVipLevelRequired ?? 0}
                   </p>
                   <p className="mt-2 text-xs text-zinc-400">Direct level 1 users must already hold this VIP level</p>
