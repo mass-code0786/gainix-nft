@@ -36,7 +36,7 @@ interface BackendIncomeOverviewResponse {
 
 function toHistoryRecord(entry: BackendIncomeEntry): IncomeHistoryRecord {
   const label =
-    entry.type === "NFT_TRADING_INCOME"
+    entry.type === "NFT_TRADING_INCOME" || entry.type === "BOT_TRADING_INCOME"
       ? "NFT Trading Income"
       : entry.type === "LEVEL_INCOME"
         ? `Level Income${entry.level ? ` L${entry.level}` : ""}`
@@ -97,14 +97,12 @@ export function useIncome() {
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
         const nftHistory = history
-          .filter((entry) => entry.type === "NFT_TRADING_INCOME")
+          .filter((entry) => entry.type === "NFT_TRADING_INCOME" || entry.type === "BOT_TRADING_INCOME")
           .map(toHistoryRecord);
         const referralHistory = history
           .filter((entry) => entry.type === "BOT_PURCHASE_UPLINE_INCOME")
           .map(toHistoryRecord);
-        const botTradingHistory = history
-          .filter((entry) => entry.type === "BOT_TRADING_INCOME")
-          .map(toHistoryRecord);
+        const botTradingHistory: IncomeHistoryRecord[] = [];
         const levelHistory = history
           .filter((entry) => entry.type === "LEVEL_INCOME")
           .map(toHistoryRecord);
@@ -206,8 +204,10 @@ export function useIncome() {
       const history = response.history
         .slice()
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-      const nftHistory = history.filter((entry) => entry.type === "NFT_TRADING_INCOME").map(toHistoryRecord);
-      const botTradingHistory = history.filter((entry) => entry.type === "BOT_TRADING_INCOME").map(toHistoryRecord);
+      const nftHistory = history
+        .filter((entry) => entry.type === "NFT_TRADING_INCOME" || entry.type === "BOT_TRADING_INCOME")
+        .map(toHistoryRecord);
+      const botTradingHistory: IncomeHistoryRecord[] = [];
       const referralHistory = history.filter((entry) => entry.type === "BOT_PURCHASE_UPLINE_INCOME").map(toHistoryRecord);
       const levelHistory = history.filter((entry) => entry.type === "LEVEL_INCOME").map(toHistoryRecord);
       const royaltyHistory = history.filter((entry) => entry.type === "ROYALTY_INCOME").map(toHistoryRecord);

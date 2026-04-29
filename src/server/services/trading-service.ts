@@ -323,29 +323,55 @@ function resetDailyTradeCountsIfDue(user: UserRecord, currentTime = new Date()) 
   }
 }
 
-function dailyTradeSnapshot(user: UserRecord) {
-  resetDailyTradeCountsIfDue(user);
-  const limits = tradeLimitsForUser(user);
+function dailyTradeCountsFromTrades(state: NftSimState, userId: string, currentTime = new Date()) {
+  const todayStart = startOfToday(currentTime);
 
   return {
-    dailyBuyCount: user.dailyBuyCount,
-    dailySellCount: user.dailySellCount,
+    dailyBuyCount: state.nft_trades.filter(
+      (trade) => trade.userId === userId && new Date(trade.createdAt) >= todayStart,
+    ).length,
+    dailySellCount: state.nft_trades.filter(
+      (trade) =>
+        trade.userId === userId &&
+        trade.status === "auto_sold" &&
+        Boolean(trade.soldAt) &&
+        new Date(trade.soldAt as string) >= todayStart,
+    ).length,
+  };
+}
+
+function syncDailyTradeCountsFromTrades(state: NftSimState, user: UserRecord) {
+  const counts = dailyTradeCountsFromTrades(state, user.id);
+  user.dailyBuyCount = counts.dailyBuyCount;
+  user.dailySellCount = counts.dailySellCount;
+  user.lastTradeResetAt = startOfToday(new Date()).toISOString();
+  return counts;
+}
+
+function dailyTradeSnapshot(state: NftSimState, user: UserRecord) {
+  resetDailyTradeCountsIfDue(user);
+  const limits = tradeLimitsForUser(user);
+  const counts = syncDailyTradeCountsFromTrades(state, user);
+
+  return {
+    ...counts,
     ...limits,
     currentVipLevel: user.currentVipLevel,
   };
 }
 
-function canUseDailyTrade(user: UserRecord, side: "buy" | "sell") {
+function canUseDailyTrade(state: NftSimState, user: UserRecord, side: "buy" | "sell") {
   resetDailyTradeCountsIfDue(user);
   const limits = tradeLimitsForUser(user);
-  const currentCount = side === "buy" ? user.dailyBuyCount : user.dailySellCount;
+  const counts = syncDailyTradeCountsFromTrades(state, user);
+  const currentCount = side === "buy" ? counts.dailyBuyCount : counts.dailySellCount;
   const limit = side === "buy" ? limits.dailyBuyLimit : limits.dailySellLimit;
 
   return currentCount < limit;
 }
 
-function assertDailyTradeLimit(user: UserRecord, side: "buy" | "sell") {
-  if (!canUseDailyTrade(user, side)) {
+function assertDailyTradeLimit(state: NftSimState, user: UserRecord, side: "buy" | "sell") {
+  if (!canUseDailyTrade(state, user, side)) {
     throw new ApiError(429, "Daily trading limit reached");
   }
 }
@@ -547,10 +573,11 @@ function toPublicNft(state: NftSimState, nft: NftRecord) {
   };
 }
 
-function toPublicWallet(wallet: WalletRecord, user?: UserRecord) {
+function toPublicWallet(wallet: WalletRecord, user?: UserRecord, state?: NftSimState) {
   const totalBuyCount = user?.totalBuyCount ?? wallet.buyCount;
   const totalSellCount = user?.totalSellCount ?? wallet.sellCount;
   const capitalUnlocked = user?.capitalUnlocked ?? wallet.isCapitalUnlocked;
+  const dailySnapshot = user && state ? dailyTradeSnapshot(state, user) : null;
 
   return {
     tradingWallet: wallet.tradingWallet,
@@ -563,11 +590,11 @@ function toPublicWallet(wallet: WalletRecord, user?: UserRecord) {
     sellCount: totalSellCount,
     totalBuyCount,
     totalSellCount,
-    dailyBuyCount: user?.dailyBuyCount ?? 0,
-    dailySellCount: user?.dailySellCount ?? 0,
+    dailyBuyCount: dailySnapshot?.dailyBuyCount ?? user?.dailyBuyCount ?? 0,
+    dailySellCount: dailySnapshot?.dailySellCount ?? user?.dailySellCount ?? 0,
     lastTradeResetAt: user?.lastTradeResetAt ?? null,
-    tradeLimits: user
-      ? dailyTradeSnapshot(user)
+    tradeLimits: user && dailySnapshot
+      ? dailySnapshot
       : {
           dailyBuyCount: 0,
           dailySellCount: 0,
@@ -668,6 +695,15 @@ function summarizeIncome(records: IncomeLedgerRecord[], todayStart: Date, weekly
     weekly: sumAmounts(records.filter((item) => new Date(item.createdAt) >= weeklyStart)),
     monthly: sumAmounts(records.filter((item) => new Date(item.createdAt) >= monthStart)),
   };
+}
+
+function sourceTradeIsBot(state: NftSimState, entry: IncomeLedgerRecord) {
+  const trade = state.nft_trades.find((item) => item.id === entry.sourceTradeId);
+  return trade?.source === "bot";
+}
+
+function isNftTradingIncomeEntry(entry: IncomeLedgerRecord) {
+  return entry.type === "NFT_TRADING_INCOME" || entry.type === "BOT_TRADING_INCOME";
 }
 
 function vipConfig(level: number) {
@@ -1118,7 +1154,7 @@ function buyNft(
   input: BuyNftInput,
 ) {
   const nft = requireNft(state, input.nftId);
-  assertDailyTradeLimit(user, "buy");
+  assertDailyTradeLimit(state, user, "buy");
 
   if (nft.status !== "marketplace") {
     throw new ApiError(409, "NFT is not available in the marketplace.");
@@ -1188,6 +1224,7 @@ function buyNft(
   nft.updatedAt = now;
 
   state.nft_trades.push(trade);
+  syncDailyTradeCountsFromTrades(state, user);
 
   return {
     nft,
@@ -1206,7 +1243,7 @@ function listNft(
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
-  assertDailyTradeLimit(user, "sell");
+  assertDailyTradeLimit(state, user, "sell");
 
   if (trade.status === "listed") {
     throw new ApiError(409, "NFT is already listed.");
@@ -1337,7 +1374,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
     return null;
   }
 
-  if (!canUseDailyTrade(user, "sell")) {
+  if (!canUseDailyTrade(state, user, "sell")) {
     if (trade.botSubscriptionId) {
       pushBotActivity(state, {
         userId: trade.userId,
@@ -1374,9 +1411,9 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
     : roundAmount(nft.currentPrice);
   const rawProfit = roundAmount(Math.max(sellPrice - trade.buyPrice, 0));
   const profit = isBotTrade
-    ? reserveFundedAmount(state, rawProfit, "totalBotTradingPaid", {
+    ? reserveFundedAmount(state, rawProfit, "totalNftTradingPaid", {
         userId: trade.userId,
-        payoutType: "BOT_TRADING_INCOME",
+        payoutType: "NFT_TRADING_INCOME",
         referenceId: trade.id,
       })
     : reserveFundedAmount(state, rawProfit, "totalNftTradingPaid", {
@@ -1424,7 +1461,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
 
     pushIncomeLedger(state, {
       userId: trade.userId,
-      type: isBotTrade ? "BOT_TRADING_INCOME" : "NFT_TRADING_INCOME",
+      type: "NFT_TRADING_INCOME",
       amount: profit,
       sourceTradeId: trade.id,
       level: null,
@@ -1444,6 +1481,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
   nft.currentPrice = relistUpdate.nextPrice;
   nft.lastPriceIncreasePercent = relistUpdate.percent;
   nft.updatedAt = now;
+  syncDailyTradeCountsFromTrades(state, user);
 
   if (trade.botSubscriptionId) {
     const subscription = state.bot_subscriptions.find(
@@ -1612,7 +1650,7 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
-    if (!canUseDailyTrade(user, "buy") || !canUseDailyTrade(user, "sell")) {
+    if (!canUseDailyTrade(state, user, "buy") || !canUseDailyTrade(state, user, "sell")) {
       pushBotActivity(state, {
         userId: subscription.userId,
         botSubscriptionId: subscription.id,
@@ -1755,7 +1793,7 @@ export async function registerUser(input: RegisterUserInput) {
       message: "User registered successfully.",
       user,
       sponsorUserId,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
     };
   });
 }
@@ -1786,7 +1824,7 @@ export async function depositToTradingWallet(input: DepositInput) {
     return {
       message: "Deposit credited to trading wallet.",
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
     };
   });
 }
@@ -1848,7 +1886,7 @@ export async function verifyDepositAndCredit(input: VerifyDepositInput) {
     return {
       message: "USDT deposit verified and credited.",
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
       deposit: state.deposits[state.deposits.length - 1],
     };
   });
@@ -1864,7 +1902,7 @@ export async function buyMarketplaceNft(input: BuyNftInput) {
     return {
       message: "NFT bought successfully.",
       user,
-      wallet: toPublicWallet(result.wallet, user),
+      wallet: toPublicWallet(result.wallet, user, state),
       nft: toPublicNft(state, result.nft),
       trade: toPublicTrade(state, result.trade),
       settings: toPublicSettings(state.admin_settings),
@@ -1966,7 +2004,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
     return {
       message: "Bot subscription activated.",
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
       subscription: toPublicBotSubscription(subscription),
       uplineIncome,
       settings: toPublicSettings(state.admin_settings),
@@ -2084,7 +2122,7 @@ export async function transferCapitalToWithdrawal(input: TransferCapitalInput) {
     return {
       message: "Capital transferred to withdrawal wallet.",
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
     };
   });
 }
@@ -2235,7 +2273,7 @@ export async function requestWithdrawal(input: WithdrawInput) {
     return {
       message: "Withdrawal request created.",
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
       withdrawal,
       settings: toPublicSettings(state.admin_settings),
     };
@@ -2382,7 +2420,7 @@ export async function getWalletBalances(selector: UserSelector) {
 
     return {
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
       systemReserve: toPublicReserve(state.system_reserve),
       settings: toPublicSettings(state.admin_settings),
       withdrawals,
@@ -2479,9 +2517,9 @@ export async function getIncomeOverview(selector: UserSelector) {
       .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-    const nftTradingEntries = entries.filter((item) => item.type === "NFT_TRADING_INCOME");
+    const nftTradingEntries = entries.filter(isNftTradingIncomeEntry);
     const levelIncomeEntries = entries.filter((item) => item.type === "LEVEL_INCOME");
-    const botTradingEntries = entries.filter((item) => item.type === "BOT_TRADING_INCOME");
+    const botTradingEntries: IncomeLedgerRecord[] = [];
     const botPurchaseEntries = entries.filter(
       (item) => item.type === "BOT_PURCHASE_UPLINE_INCOME",
     );
@@ -2517,7 +2555,7 @@ export async function getNftTradingIncome(selector: UserSelector) {
     const monthStart = startOfMonth(now);
 
     const incomeEntries = state.income_ledger.filter(
-      (item) => item.userId === user.id && item.type === "NFT_TRADING_INCOME",
+      (item) => item.userId === user.id && isNftTradingIncomeEntry(item),
     );
     const pendingListedTrades = state.nft_trades
       .filter((item) => item.userId === user.id && item.status === "listed")
@@ -2575,7 +2613,7 @@ export async function getTradesHistory(selector: UserSelector) {
 
     return {
       user,
-      wallet: toPublicWallet(wallet, user),
+      wallet: toPublicWallet(wallet, user, state),
       total: trades.length,
       pending: trades.filter((item) => item.status === "listed").length,
       completed: trades.filter((item) => item.status === "auto_sold").length,
@@ -2661,7 +2699,10 @@ export async function getBotStatus(selector: UserSelector) {
       .map((item) => toPublicBotSubscription(item));
     const todayStart = startOfToday(new Date());
     const botProfitEntries = state.income_ledger.filter(
-      (item) => item.userId === user.id && item.type === "BOT_TRADING_INCOME",
+      (item) =>
+        item.userId === user.id &&
+        (item.type === "BOT_TRADING_INCOME" ||
+          (item.type === "NFT_TRADING_INCOME" && sourceTradeIsBot(state, item))),
     );
     const latestActivity =
       state.bot_activity

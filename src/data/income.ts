@@ -2,7 +2,6 @@ import type { IncomeCategoryKey, IncomeOverview } from "@/types";
 
 export const incomeCategoryOrder = [
   "nftTradingIncome",
-  "botTradingIncome",
   "referralIncome",
   "levelIncome",
   "royaltyIncome",
@@ -191,6 +190,8 @@ export const incomeOverview: IncomeOverview = {
   },
 };
 
-export function isIncomeCategoryKey(value: string | null): value is IncomeCategoryKey {
-  return Boolean(value && incomeCategoryOrder.includes(value as IncomeCategoryKey));
+export type VisibleIncomeCategoryKey = (typeof incomeCategoryOrder)[number];
+
+export function isIncomeCategoryKey(value: string | null): value is VisibleIncomeCategoryKey {
+  return Boolean(value && incomeCategoryOrder.includes(value as VisibleIncomeCategoryKey));
 }
