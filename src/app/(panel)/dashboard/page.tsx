@@ -118,28 +118,28 @@ function TeamSummaryCard({
 
   return (
     <div
-      className={`h-full rounded-2xl border p-4 shadow-[0_0_28px_rgba(239,68,68,0.12)] ${
+      className={`h-full rounded-2xl border p-3 shadow-[0_0_28px_rgba(239,68,68,0.12)] sm:p-4 ${
         isGreen
           ? "border-green-500/30 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.16),transparent_34%),linear-gradient(155deg,rgba(9,18,12,0.92),rgba(6,8,8,0.96))] shadow-[0_0_28px_rgba(34,197,94,0.12)]"
           : "border-red-500/20 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.16),transparent_34%),linear-gradient(155deg,rgba(25,8,10,0.92),rgba(8,8,12,0.96))]"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">{label}</p>
-          <p className={`mt-2 truncate font-display text-2xl font-semibold ${isGreen ? "text-green-400" : "text-white"}`}>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500 sm:text-xs sm:tracking-[0.16em]">{label}</p>
+          <p className={`mt-2 truncate font-display text-[1.15rem] font-semibold leading-tight sm:text-2xl ${isGreen ? "text-green-400" : "text-white"}`}>
             {value}
           </p>
-          {detail ? <p className="mt-1 truncate text-sm text-zinc-400">{detail}</p> : null}
+          {detail ? <p className="mt-1 truncate text-xs text-zinc-400 sm:text-sm">{detail}</p> : null}
         </div>
         <div
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl border ${
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border sm:h-10 sm:w-10 sm:rounded-2xl ${
             isGreen
               ? "border-green-500/30 bg-green-500/10 text-green-400"
               : "border-red-400/20 bg-red-500/10 text-red-100"
           }`}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
       </div>
     </div>
@@ -318,26 +318,28 @@ export default function DashboardPage() {
         </Link>
       </SectionShell>
 
-      <SectionShell title="Team Summary">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TeamSummaryCard
-            label="Total Team"
-            value={`${totalTeam}`}
-            icon={Users}
-          />
-          <TeamSummaryCard
-            label="Referral Team"
-            value={`${teamData?.directCount ?? 0}`}
-            icon={Network}
-          />
-          <TeamSummaryCard
-            label="VIP/Royalty"
-            value={`VIP ${vipLevel}`}
-            detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
-            icon={Crown}
-          />
-        </div>
-      </SectionShell>
+      <div className="pb-20 sm:pb-0">
+        <SectionShell title="Team Summary">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
+            <TeamSummaryCard
+              label="Total Team"
+              value={`${totalTeam}`}
+              icon={Users}
+            />
+            <TeamSummaryCard
+              label="Referral Team"
+              value={`${teamData?.directCount ?? 0}`}
+              icon={Network}
+            />
+            <TeamSummaryCard
+              label="VIP/Royalty"
+              value={`VIP ${vipLevel}`}
+              detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
+              icon={Crown}
+            />
+          </div>
+        </SectionShell>
+      </div>
     </AnimatedPage>
   );
 }
