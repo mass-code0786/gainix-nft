@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AppLogo } from "@/components/ui/app-logo";
 
 const footerLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -43,8 +44,8 @@ export function GlobalFooter() {
   return (
     <footer className="border-t border-white/10 bg-black/45">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-        <div>
-          <p className="font-display text-base font-semibold text-white">Gainix NFT</p>
+        <div className="min-w-0">
+          <AppLogo />
           <p className="mt-1 text-xs text-zinc-500">Premium NFT marketplace.</p>
         </div>
 

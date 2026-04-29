@@ -112,8 +112,7 @@ export default function WalletPage() {
 
       <section className="section-shell space-y-4">
         <div>
-          <p className="muted-label">My Referral Link</p>
-          <h2 className="mt-2 font-display text-2xl font-semibold text-white">Invite new members</h2>
+          <p className="muted-label">Referral Link</p>
         </div>
 
         {!isConnected || !fullAddress ? (

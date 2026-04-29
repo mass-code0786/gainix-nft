@@ -36,26 +36,50 @@ function SummaryCard({
   value,
   detail,
   icon: Icon,
+  compact = false,
+  detailClassName = "text-zinc-400",
 }: {
   label: string;
   value: string;
   detail?: string;
   icon: LucideIcon;
+  compact?: boolean;
+  detailClassName?: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-black/25 p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className={`rounded-[22px] border border-white/10 bg-black/25 ${compact ? "p-3 sm:p-4" : "p-4"}`}>
+      <div className={`flex items-start justify-between ${compact ? "gap-2 sm:gap-3" : "gap-3"}`}>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+          <p
+            className={
+              compact
+                ? "text-[10px] font-semibold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-xs sm:tracking-[0.16em]"
+                : "text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500"
+            }
+          >
             {label}
           </p>
-          <p className="mt-2 truncate font-display text-2xl font-semibold text-white">
+          <p
+            className={
+              compact
+                ? "mt-2 truncate font-display text-[1.15rem] font-semibold leading-tight text-white sm:text-2xl"
+                : "mt-2 truncate font-display text-2xl font-semibold text-white"
+            }
+          >
             {value}
           </p>
-          {detail ? <p className="mt-1 truncate text-sm text-zinc-400">{detail}</p> : null}
+          {detail ? (
+            <p className={`mt-1 truncate ${compact ? "text-xs sm:text-sm" : "text-sm"} ${detailClassName}`}>
+              {detail}
+            </p>
+          ) : null}
         </div>
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-red-400/20 bg-red-500/10 text-red-100">
-          <Icon className="h-5 w-5" />
+        <div
+          className={`grid shrink-0 place-items-center border border-red-400/20 bg-red-500/10 text-red-100 ${
+            compact ? "h-8 w-8 rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl" : "h-10 w-10 rounded-2xl"
+          }`}
+        >
+          <Icon className={compact ? "h-4 w-4 sm:h-5 sm:w-5" : "h-5 w-5"} />
         </div>
       </div>
     </div>
@@ -195,7 +219,7 @@ export default function DashboardPage() {
       ) : null}
 
       <SectionShell title="Income Overview">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           {incomeCategoryOrder.map((key) => {
             const category = incomeCategories.find((item) => item.key === key);
             const Icon = incomeIcons[key];
@@ -205,8 +229,10 @@ export default function DashboardPage() {
                 key={key}
                 label={incomeCategoryMeta[key].label}
                 value={formatCurrency(category?.total ?? 0)}
-                detail={`${formatCurrency(category?.today ?? 0)} today`}
+                detail={`+${formatCurrency(category?.today ?? 0)} today`}
+                detailClassName="font-semibold text-emerald-400"
                 icon={Icon}
+                compact
               />
             );
           })}
@@ -214,28 +240,32 @@ export default function DashboardPage() {
       </SectionShell>
 
       <SectionShell title="Bot Status">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <SummaryCard
             label="Active Plan"
             value={activeSubscription?.planName ?? "None"}
             detail={botStatus === "active" ? "Running" : "Inactive"}
             icon={Bot}
+            compact
           />
           <SummaryCard
             label="Completed Cycles"
             value={completedCycles}
             icon={Layers3}
+            compact
           />
           <SummaryCard
             label="Today Bot Profit"
             value={formatCurrency(todayBotProfit)}
             icon={CircleDollarSign}
+            compact
           />
           <SummaryCard
             label="Latest Action"
             value={latestActionLabel(latestActivity?.action)}
             detail={latestActivity ? formatCurrency(latestActivity.amount) : undefined}
             icon={Network}
+            compact
           />
         </div>
         <Link href="/bot-subscription" className="secondary-button mt-4 w-full sm:w-fit">

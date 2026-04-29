@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BrandLogo } from "@/components/ui/BrandLogo";
+import { AppLogo } from "@/components/ui/app-logo";
 import { WalletConnectButton } from "@/components/wallet/wallet-connect-button";
 
 export function GlobalHeader() {
@@ -10,7 +10,7 @@ export function GlobalHeader() {
       <div className="mx-auto w-full max-w-7xl">
         <div className="header-shell flex h-[var(--header-height)] items-center justify-between gap-2 sm:gap-3 px-3.5 sm:px-5">
           <Link href="/" prefetch={false} aria-label="Gainix NFT home" className="relative z-10 flex min-w-0 items-center py-1">
-            <BrandLogo />
+            <AppLogo />
           </Link>
 
           <div className="relative z-10 flex shrink-0 items-center justify-end">

@@ -38,7 +38,6 @@ export default function TeamPage() {
     Math.round((teamOverview.currentRankProgress / Math.max(teamOverview.currentRankTarget, 1)) * 100),
   );
   const vipLabel = royalty?.currentVipLevel ? `VIP ${royalty.currentVipLevel}` : "VIP 0";
-  const nextVipLabel = royalty?.nextVipLevel ? `VIP ${royalty.nextVipLevel}` : "VIP Max";
 
   return (
     <AnimatedPage>
@@ -84,9 +83,6 @@ export default function TeamPage() {
               <Crown className="h-4 w-4 text-amber-300" />
               <h2 className="font-display text-2xl font-semibold">{vipLabel}</h2>
             </div>
-            <p className="text-sm text-zinc-400">
-              Next target: {nextVipLabel} | Payout {formatUsdt(royalty?.payoutAmount ?? 0)} on 10th, 20th, and month end
-            </p>
           </div>
 
           <span
