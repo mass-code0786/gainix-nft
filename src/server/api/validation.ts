@@ -131,6 +131,15 @@ export const adminReserveInputSchema = z.object({
   balance: nonNegativeAmountSchema,
 });
 
+export const adminTransferFundInputSchema = z.object({
+  userId: z.string().trim().min(1, "userId is required."),
+  amount: amountSchema,
+});
+
+export const adminActivateBotInputSchema = z.object({
+  userId: z.string().trim().min(1, "userId is required."),
+});
+
 export const adminCreateNftInputSchema = z.object({
   tokenId: tokenIdSchema,
   name: z.string().trim().min(2, "name must be at least 2 characters."),
@@ -179,6 +188,8 @@ export type NftMutationInput = z.infer<typeof nftMutationInputSchema>;
 export type BotBuyInput = z.infer<typeof botBuyInputSchema>;
 export type AdminSettingsInput = z.infer<typeof adminSettingsInputSchema>;
 export type AdminReserveInput = z.infer<typeof adminReserveInputSchema>;
+export type AdminTransferFundInput = z.infer<typeof adminTransferFundInputSchema>;
+export type AdminActivateBotInput = z.infer<typeof adminActivateBotInputSchema>;
 export type AdminCreateNftInput = z.infer<typeof adminCreateNftInputSchema>;
 export type AdminUpdateNftInput = z.infer<typeof adminUpdateNftInputSchema>;
 export type AdminDeleteNftInput = z.infer<typeof adminDeleteNftInputSchema>;

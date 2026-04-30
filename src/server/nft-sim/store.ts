@@ -195,6 +195,7 @@ function normalizeState(state: NftSimState): NftSimState {
       remainingBuyTrades: Math.min(remainingBuyTrades, totalBuyTrades),
       remainingSellTrades: Math.min(remainingSellTrades, totalSellTrades),
       status: isCompleted ? "completed" : subscription.status ?? "active",
+      activatedByAdmin: subscription.activatedByAdmin ?? false,
       completedAt: isCompleted ? subscription.completedAt ?? now : subscription.completedAt ?? null,
       updatedAt: subscription.updatedAt ?? now,
     };

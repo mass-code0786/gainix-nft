@@ -7,7 +7,8 @@ export type IncomeLedgerType =
   | "LEVEL_INCOME"
   | "BOT_PURCHASE_UPLINE_INCOME"
   | "BOT_TRADING_INCOME"
-  | "ROYALTY_INCOME";
+  | "ROYALTY_INCOME"
+  | "ADMIN_CREDIT";
 export type WalletLedgerType =
   | "DEPOSIT_TO_TRADING"
   | "NFT_BUY_DEBIT"
@@ -23,7 +24,8 @@ export type WalletLedgerType =
   | "WITHDRAWAL_FEE"
   | "GXN_TOKEN_REWARD"
   | "GXN_TOKEN_DEDUCTION"
-  | "BOT_PURCHASE_DEBIT";
+  | "BOT_PURCHASE_DEBIT"
+  | "ADMIN_CREDIT";
 
 export interface UserRecord {
   id: string;
@@ -137,6 +139,7 @@ export interface BotSubscriptionRecord {
   status: "active" | "completed";
   lastExecutedAt: string | null;
   uplineIncomePaidAt: string | null;
+  activatedByAdmin: boolean;
   purchasedAt: string;
   completedAt: string | null;
   createdAt: string;

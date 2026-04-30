@@ -163,6 +163,15 @@ interface UpdateReserveInput {
   balance: number;
 }
 
+interface AdminTransferFundInput {
+  userId: string;
+  amount: number;
+}
+
+interface AdminActivateBotInput {
+  userId: string;
+}
+
 interface AdminCreateNftInput {
   tokenId: string;
   name: string;
@@ -1523,6 +1532,12 @@ function processBotPurchaseUplineIncome(
   sourceUserId: string,
   subscription: BotSubscriptionRecord,
 ) {
+  if (subscription.activatedByAdmin) {
+    subscription.uplineIncomePaidAt = nowIso();
+    subscription.updatedAt = nowIso();
+    return null;
+  }
+
   if (subscription.uplineIncomePaidAt) {
     return null;
   }
@@ -1990,6 +2005,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
       status: "active",
       lastExecutedAt: null,
       uplineIncomePaidAt: null,
+      activatedByAdmin: false,
       purchasedAt: nowIso(),
       completedAt: null,
       createdAt: nowIso(),
@@ -3050,6 +3066,102 @@ export async function updateSystemReserve(input: UpdateReserveInput) {
     return {
       message: "System reserve updated.",
       systemReserve: toPublicReserve(state.system_reserve),
+    };
+  });
+}
+
+export async function activateBotByAdmin(input: AdminActivateBotInput) {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const { user } = requireUser(state, { userId: input.userId });
+    const now = nowIso();
+    const existingActiveSubscription = state.bot_subscriptions
+      .filter((item) => item.userId === user.id && item.status === "active")
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+
+    if (existingActiveSubscription) {
+      existingActiveSubscription.activatedByAdmin = true;
+      existingActiveSubscription.uplineIncomePaidAt = existingActiveSubscription.uplineIncomePaidAt ?? now;
+      existingActiveSubscription.updatedAt = now;
+
+      return {
+        message: "Bot activated by admin.",
+        user,
+        subscription: toPublicBotSubscription(existingActiveSubscription),
+      };
+    }
+
+    const plan = BOT_PLANS.bot_10;
+    const subscription: BotSubscriptionRecord = {
+      id: makeId("bot"),
+      userId: user.id,
+      planId: plan.planId,
+      planName: `${plan.planName} (Admin Activated)`,
+      price: 0,
+      totalBuyTrades: plan.buyTrades,
+      totalSellTrades: plan.sellTrades,
+      completedBuyTrades: 0,
+      completedSellTrades: 0,
+      remainingBuyTrades: plan.buyTrades,
+      remainingSellTrades: plan.sellTrades,
+      status: "active",
+      lastExecutedAt: null,
+      uplineIncomePaidAt: now,
+      activatedByAdmin: true,
+      purchasedAt: now,
+      completedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    state.bot_subscriptions.push(subscription);
+
+    return {
+      message: "Bot activated by admin.",
+      user,
+      subscription: toPublicBotSubscription(subscription),
+    };
+  });
+}
+
+export async function transferFundByAdmin(input: AdminTransferFundInput) {
+  await ensureStoreInitialized();
+  validatePositiveAmount(input.amount, "Transfer amount");
+
+  return withStoreTransaction(async (state) => {
+    const { user, wallet } = requireUser(state, { userId: input.userId });
+    const amount = roundAmount(input.amount);
+    const referenceId = makeId("admin_credit");
+
+    wallet.tradingWallet = roundAmount(wallet.tradingWallet + amount);
+    wallet.updatedAt = nowIso();
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "ADMIN_CREDIT",
+      amount,
+      referenceId,
+      metadata: {
+        tradingWalletAfter: wallet.tradingWallet,
+      },
+    });
+
+    pushIncomeLedger(state, {
+      userId: user.id,
+      type: "ADMIN_CREDIT",
+      amount,
+      sourceTradeId: referenceId,
+      level: null,
+      sourceUserId: null,
+    });
+
+    return {
+      message: "Fund transferred by admin.",
+      user,
+      wallet: toPublicWallet(wallet, user, state),
+      incomeLedgerType: "ADMIN_CREDIT",
+      referenceId,
     };
   });
 }

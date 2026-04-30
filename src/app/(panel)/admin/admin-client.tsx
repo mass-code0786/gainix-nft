@@ -74,6 +74,11 @@ export default function AdminPage() {
     description: "",
     status: "live" as "draft" | "live",
   });
+  const [adminBotUserId, setAdminBotUserId] = useState("");
+  const [fundTransferForm, setFundTransferForm] = useState({
+    userId: "",
+    amount: "",
+  });
   const [nftEdits, setNftEdits] = useState<Record<string, { price: string; status: "draft" | "live" }>>({});
 
   useEffect(() => {
@@ -153,6 +158,19 @@ export default function AdminPage() {
       description: "",
       status: "live",
     });
+  }
+
+  async function activateAdminBot() {
+    await admin.activateBot(adminBotUserId);
+    setAdminBotUserId("");
+  }
+
+  async function transferAdminFund() {
+    await admin.transferFund({
+      userId: fundTransferForm.userId,
+      amount: parseAmount(fundTransferForm.amount),
+    });
+    setFundTransferForm({ userId: "", amount: "" });
   }
 
   if (!isConnected) {
@@ -663,6 +681,78 @@ export default function AdminPage() {
             >
               Royalty {settingsForm.vipRecurringEnabled ? "Enabled" : "Disabled"}
             </button>
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+          <p className="muted-label">Admin User Actions</p>
+          <div className="mt-5 grid gap-5">
+            <div>
+              <h2 className="font-display text-xl font-semibold text-white">
+                Activate bot
+              </h2>
+              <label className="mt-4 block">
+                <span className="mb-2 block text-sm text-zinc-400">User ID</span>
+                <input
+                  className="input-shell"
+                  value={adminBotUserId}
+                  onChange={(event) => setAdminBotUserId(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void activateAdminBot()}
+                disabled={admin.isSaving || admin.isSigning}
+                className="premium-button mt-4 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {admin.isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Activate bot
+              </button>
+            </div>
+
+            <div className="border-t border-white/10 pt-5">
+              <h2 className="font-display text-xl font-semibold text-white">
+                Transfer fund
+              </h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm text-zinc-400">User ID</span>
+                  <input
+                    className="input-shell"
+                    value={fundTransferForm.userId}
+                    onChange={(event) =>
+                      setFundTransferForm((current) => ({
+                        ...current,
+                        userId: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm text-zinc-400">Amount</span>
+                  <input
+                    className="input-shell"
+                    inputMode="decimal"
+                    value={fundTransferForm.amount}
+                    onChange={(event) =>
+                      setFundTransferForm((current) => ({
+                        ...current,
+                        amount: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={() => void transferAdminFund()}
+                disabled={admin.isSaving || admin.isSigning}
+                className="premium-button mt-4 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {admin.isSaving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Transfer fund
+              </button>
+            </div>
           </div>
         </section>
 

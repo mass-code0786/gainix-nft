@@ -23,6 +23,7 @@ enum WalletLedgerType {
   GXN_TOKEN_REWARD
   GXN_TOKEN_DEDUCTION
   BOT_PURCHASE_DEBIT
+  ADMIN_CREDIT
 }
 
 enum TradeStatus {
@@ -42,6 +43,7 @@ enum IncomeLedgerType {
   BOT_PURCHASE_UPLINE_INCOME
   BOT_TRADING_INCOME
   ROYALTY_INCOME
+  ADMIN_CREDIT
 }
 
 enum BotSubscriptionStatus {
@@ -249,6 +251,7 @@ model BotSubscription {
   status              BotSubscriptionStatus @default(ACTIVE)
   lastExecutedAt      DateTime?
   uplineIncomePaidAt  DateTime?
+  activatedByAdmin    Boolean               @default(false)
   purchasedAt         DateTime              @default(now())
   completedAt         DateTime?
   createdAt           DateTime              @default(now())

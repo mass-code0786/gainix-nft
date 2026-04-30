@@ -165,6 +165,7 @@ export interface BotAutomationSubscription {
   status: "active" | "completed";
   lastExecutedAt: string | null;
   uplineIncomePaidAt: string | null;
+  activatedByAdmin: boolean;
   purchasedAt: string;
   completedAt: string | null;
   createdAt: string;

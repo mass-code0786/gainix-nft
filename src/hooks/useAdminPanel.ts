@@ -246,6 +246,46 @@ export function useAdminPanel(enabled: boolean) {
     }
   }, [ensureVerifiedSession]);
 
+  const activateBot = useCallback(async (userId: string) => {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await ensureVerifiedSession();
+      const response = await fetchJson<{ message: string }>("/api/admin/bot/activate", {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+      });
+      setNotice(response.message);
+      await refresh();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to activate bot.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [ensureVerifiedSession, refresh]);
+
+  const transferFund = useCallback(async (payload: { userId: string; amount: number }) => {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await ensureVerifiedSession();
+      const response = await fetchJson<{ message: string }>("/api/admin/transfer-fund", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setNotice(response.message);
+      await refresh();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to transfer fund.");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [ensureVerifiedSession, refresh]);
+
   return {
     data,
     analytics,
@@ -264,5 +304,7 @@ export function useAdminPanel(enabled: boolean) {
     createNft,
     updateNft,
     deleteNft,
+    activateBot,
+    transferFund,
   };
 }

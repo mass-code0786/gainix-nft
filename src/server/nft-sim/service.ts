@@ -971,6 +971,12 @@ function processBotPurchaseUplineIncome(
   sourceUserId: string,
   subscription: BotSubscriptionRecord,
 ) {
+  if (subscription.activatedByAdmin) {
+    subscription.uplineIncomePaidAt = nowIso();
+    subscription.updatedAt = nowIso();
+    return null;
+  }
+
   if (subscription.uplineIncomePaidAt) {
     return null;
   }
@@ -1303,6 +1309,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
       status: "active",
       lastExecutedAt: null,
       uplineIncomePaidAt: null,
+      activatedByAdmin: false,
       purchasedAt: nowIso(),
       completedAt: null,
       createdAt: nowIso(),
