@@ -5,7 +5,10 @@ import { contractActiveChainId } from "@/contracts/config/chain";
 
 const addresses = getGainixAddresses(contractActiveChainId);
 
-export const nftContract: ContractDefinition<typeof nftAbi> & { metadataBaseUri: string } = {
+export const nftContract: Omit<ContractDefinition<typeof nftAbi>, "address"> & {
+  address: (typeof addresses)["nft"];
+  metadataBaseUri: string;
+} = {
   name: "GainixGenesisNFT",
   chainId: contractActiveChainId,
   address: addresses.nft,

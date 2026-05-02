@@ -2,7 +2,7 @@
 
 import type { Address } from "viem";
 import { nftAbi } from "@/contracts";
-import { getGainixAddresses } from "@/contracts/config/addresses";
+import { getGainixAddresses, isValidNonZeroAddress } from "@/contracts/config/addresses";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { useContractWriteFlow } from "@/hooks/actions/useContractWriteFlow";
 import { buildGainixWriteRequest } from "@/lib/web3/write/contract-write";
@@ -13,8 +13,14 @@ export function useApproveMarketplace() {
   const addresses = getGainixAddresses(activeChainId);
 
   const approveMarketplace = async (nftAddress?: Address) => {
+    const targetNftAddress = nftAddress ?? addresses.nft;
+
+    if (!isValidNonZeroAddress(targetNftAddress)) {
+      throw new Error("NFT contract address is not configured with a valid non-zero address.");
+    }
+
     const request = buildGainixWriteRequest({
-      address: nftAddress ?? addresses.nft,
+      address: targetNftAddress,
       abi: nftAbi,
       functionName: "setApprovalForAll",
       args: [addresses.marketplace, true],

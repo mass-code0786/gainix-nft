@@ -2,9 +2,10 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http, verifyMessage, type Address } from "viem";
 import { nftAbi } from "@/contracts/abis/nft.abi";
-import { getGainixAddresses } from "@/contracts/config/addresses";
+import { getGainixAddresses, isValidNonZeroAddress } from "@/contracts/config/addresses";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import {
+  getServerConfiguredAdminWallets,
   getServerConfiguredWalletRole,
   isPrivilegedRole,
   normalizeWalletAddress,
@@ -176,25 +177,47 @@ export function assertAuthenticatedWallet(session: WalletSession, walletAddress:
 export async function isAdminWallet(walletAddress: string) {
   const wallet = normalizeWalletAddress(walletAddress);
   const configuredRole = getServerConfiguredWalletRole(wallet);
+  const nftAddress = getGainixAddresses(contractActiveChainId).nft;
+
+  const logAdminAccess = (result: { hasAccess: boolean; role: WalletRole; source: string; error?: string }) => {
+    if (process.env.NODE_ENV !== "development") {
+      return;
+    }
+
+    console.info("[gainix:admin-wallet]", {
+      connectedWallet: walletAddress,
+      normalizedWallet: wallet,
+      adminWalletsFromEnv: getServerConfiguredAdminWallets(),
+      ownerWalletFromEnv: normalizeWalletAddress(
+        process.env.OWNER_WALLET_ADDRESS ?? process.env.NEXT_PUBLIC_OWNER_WALLET_ADDRESS,
+      ) || null,
+      nftContractAddress: nftAddress,
+      isAdmin: result.hasAccess,
+      role: result.role,
+      source: result.source,
+      error: result.error,
+    });
+  };
 
   if (isPrivilegedRole(configuredRole)) {
-    if (process.env.NODE_ENV === "development") {
-      console.info("[gainix:admin-wallet]", {
-        connectedWallet: walletAddress,
-        normalizedWallet: wallet,
-        isAdmin: true,
-        role: configuredRole,
-        source: "env",
-      });
-    }
+    logAdminAccess({ hasAccess: true, role: configuredRole, source: "env" });
     return true;
+  }
+
+  if (!isValidNonZeroAddress(nftAddress)) {
+    logAdminAccess({
+      hasAccess: false,
+      role: "user",
+      source: "config",
+      error: "NEXT_PUBLIC_GAINIX_NFT_ADDRESS is not configured with a valid non-zero address.",
+    });
+    return false;
   }
 
   const network = getGainixNetwork(contractActiveChainId);
   const client = createPublicClient({
     transport: http(process.env.BSC_RPC_URL || network.rpcUrl),
   });
-  const nftAddress = getGainixAddresses(contractActiveChainId).nft;
 
   try {
     const [owner, isAdmin] = await Promise.all([
@@ -214,19 +237,17 @@ export async function isAdminWallet(walletAddress: string) {
     const role: WalletRole = String(owner).toLowerCase() === wallet ? "super_admin" : Boolean(isAdmin) ? "admin" : "user";
     const hasAccess = isPrivilegedRole(role);
 
-    if (process.env.NODE_ENV === "development") {
-      console.info("[gainix:admin-wallet]", {
-        connectedWallet: walletAddress,
-        normalizedWallet: wallet,
-        isAdmin: hasAccess,
-        role,
-        source: "chain",
-      });
-    }
+    logAdminAccess({ hasAccess, role, source: "chain" });
 
     return hasAccess;
-  } catch {
-    throw new ApiError(403, "Unable to verify admin wallet on-chain.");
+  } catch (error) {
+    logAdminAccess({
+      hasAccess: false,
+      role: "user",
+      source: "chain-error",
+      error: error instanceof Error ? error.message : "Unable to verify admin wallet on-chain.",
+    });
+    return false;
   }
 }
 

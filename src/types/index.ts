@@ -53,7 +53,7 @@ export interface NFTItem {
   chart?: ChartPoint[];
   activity: NFTActivity[];
   relatedSlugs: string[];
-  contractAddress: Address;
+  contractAddress: Address | null;
   listingId?: string;
   tokenUri: string;
   ipfsMetadataUri: string;
@@ -72,7 +72,7 @@ export interface PortfolioHolding {
   profit: number;
   status: "Held" | "Listed" | "Recently Sold";
   lastTrade: string;
-  contractAddress: Address;
+  contractAddress: Address | null;
 }
 
 export type TransactionType =

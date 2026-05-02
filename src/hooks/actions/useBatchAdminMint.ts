@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Address } from "viem";
 import { usePublicClient, useWriteContract } from "wagmi";
 import { nftAbi } from "@/contracts";
-import { getGainixAddresses } from "@/contracts/config/addresses";
+import { getGainixAddresses, isValidNonZeroAddress } from "@/contracts/config/addresses";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { triggerContractDataRefresh } from "@/lib/web3/contract-data-refresh";
 import { getExplorerTxUrl } from "@/lib/web3/network-config";
@@ -50,6 +50,15 @@ export function useBatchAdminMint() {
         status: "error",
         results: [],
         summary: "Public client unavailable for the configured Gainix chain.",
+      });
+      return;
+    }
+
+    if (!isValidNonZeroAddress(addresses.nft)) {
+      setState({
+        status: "error",
+        results: [],
+        summary: "NEXT_PUBLIC_GAINIX_NFT_ADDRESS is not configured with a valid non-zero address.",
       });
       return;
     }

@@ -9,7 +9,7 @@ import {
 } from "@/lib/data-sources/mock-source";
 import { gainixUseMockFallback } from "@/lib/web3/network-config";
 import { nftAbi } from "@/contracts";
-import { getGainixAddresses } from "@/contracts/config/addresses";
+import { getGainixAddresses, isValidNonZeroAddress } from "@/contracts/config/addresses";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { readGainixContractOrNull } from "@/lib/web3/read/contract-read";
 import { useContractDataRefreshVersion } from "@/lib/web3/contract-data-refresh";
@@ -56,7 +56,9 @@ export function useNFTs() {
   const refreshVersion = useContractDataRefreshVersion();
 
   const refresh = useCallback(async () => {
-    if (gainixUseMockFallback || !client) {
+    const nftAddress = addresses.nft;
+
+    if (gainixUseMockFallback || !client || !isValidNonZeroAddress(nftAddress)) {
       setItems(mockItems);
       setSource("mock");
       return;
@@ -68,7 +70,7 @@ export function useNFTs() {
       await Promise.race([
         (async () => {
           const nextTokenId = await readGainixContractOrNull({
-            address: addresses.nft,
+            address: nftAddress,
             abi: nftAbi,
             functionName: "nextTokenId",
             client,
@@ -91,14 +93,14 @@ export function useNFTs() {
             read: async (tokenId) => {
               const [owner, tokenUri] = await Promise.all([
                 readGainixContractOrNull({
-                  address: addresses.nft,
+                  address: nftAddress,
                   abi: nftAbi,
                   functionName: "ownerOf",
                   args: [BigInt(tokenId)],
                   client,
                 }),
                 readGainixContractOrNull({
-                  address: addresses.nft,
+                  address: nftAddress,
                   abi: nftAbi,
                   functionName: "tokenURI",
                   args: [BigInt(tokenId)],
@@ -138,7 +140,7 @@ export function useNFTs() {
               return {
                 ...item,
                 owner: chainItem.owner,
-                contractAddress: addresses.nft,
+                contractAddress: nftAddress,
                 tokenUri: metadata.metadataUri,
                 ipfsMetadataUri: metadata.metadataUri,
                 imageUri: metadata.imageHttpUrl ?? metadata.imageUri ?? item.imageUri,
@@ -168,7 +170,7 @@ export function useNFTs() {
                 return buildLiveNftItem({
                   tokenId: item.tokenId,
                   owner: item.owner,
-                  contractAddress: addresses.nft,
+                  contractAddress: nftAddress,
                   tokenUri: metadata.metadataUri,
                   imageUri: metadata.imageHttpUrl ?? metadata.imageUri,
                   name: metadata.name,

@@ -2,7 +2,7 @@ import type { Address } from "viem";
 import { contractActiveChain, contractDefaultChain } from "@/contracts/config/chain";
 
 interface GainixAddresses {
-  nft: Address;
+  nft: Address | null;
   marketplace: Address;
   botPass: Address;
   withdrawal: Address;
@@ -15,7 +15,21 @@ function envAddress(name: string, fallback?: string) {
   return (process.env[name]?.trim() ?? fallback ?? zeroAddress) as Address;
 }
 
-function assertProductionAddress(name: string, rawAddress: string | undefined, address: Address) {
+function envOptionalNonZeroAddress(name: string) {
+  const rawAddress = process.env[name]?.trim();
+
+  if (!rawAddress || rawAddress.toLowerCase() === zeroAddress || !evmAddressPattern.test(rawAddress)) {
+    return null;
+  }
+
+  return rawAddress as Address;
+}
+
+export function isValidNonZeroAddress(address: string | null | undefined): address is Address {
+  return Boolean(address && evmAddressPattern.test(address) && address.toLowerCase() !== zeroAddress);
+}
+
+function assertProductionAddress(name: string, rawAddress: string | undefined, address: Address | null) {
   const trimmedAddress = rawAddress?.trim();
 
   if (!trimmedAddress) {
@@ -33,7 +47,7 @@ function assertProductionAddress(name: string, rawAddress: string | undefined, a
 
 export const gainixContractAddresses: Record<number, GainixAddresses> = {
   [contractDefaultChain.id]: {
-    nft: envAddress("NEXT_PUBLIC_GAINIX_NFT_ADDRESS"),
+    nft: envOptionalNonZeroAddress("NEXT_PUBLIC_GAINIX_NFT_ADDRESS"),
     marketplace: envAddress("NEXT_PUBLIC_GAINIX_MARKETPLACE_ADDRESS"),
     botPass: envAddress("NEXT_PUBLIC_GAINIX_BOTPASS_ADDRESS"),
     withdrawal: envAddress("NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS"),

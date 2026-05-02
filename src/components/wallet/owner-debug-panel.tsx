@@ -1,7 +1,7 @@
 "use client";
 
 interface OwnerDebugPanelProps {
-  contractAddress: string;
+  contractAddress?: string | null;
   connectedWallet?: string | null;
   connectedWalletComparison?: string | null;
   owner?: string | null;
@@ -36,7 +36,7 @@ export function OwnerDebugPanel({
     { label: "Connected wallet (lowercase)", value: connectedWalletComparison ?? "n/a" },
     { label: "Contract owner", value: owner ?? "Unavailable" },
     { label: "Contract owner (lowercase)", value: ownerComparison ?? "n/a" },
-    { label: "Contract address", value: contractAddress },
+    { label: "Contract address", value: contractAddress ?? "Not configured" },
     { label: "isOwner", value: isOwnerCheckReady ? String(isOwner) : "checking" },
     { label: "Wallet status", value: walletStatus },
     { label: "Current chain id", value: currentChainId !== null && currentChainId !== undefined ? String(currentChainId) : "none" },
