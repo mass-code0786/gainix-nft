@@ -68,6 +68,12 @@ npm run compile
 npm run deploy:bscTestnet
 ```
 
+Deploy to BSC mainnet only after filling secure env values:
+
+```bash
+npm run deploy:bscMainnet
+```
+
 ## Deployment Order
 
 1. Deploy `GainixNFT`
@@ -77,6 +83,7 @@ npm run deploy:bscTestnet
    - `NEXT_PUBLIC_BSC_TESTNET_NFT_CONTRACT`
    - `NEXT_PUBLIC_BSC_TESTNET_MARKETPLACE_CONTRACT`
    - `NEXT_PUBLIC_BSC_TESTNET_BOTPASS_CONTRACT`
+   - Mainnet uses `NEXT_PUBLIC_GAINIX_NFT_ADDRESS`, `NEXT_PUBLIC_GAINIX_MARKETPLACE_ADDRESS`, `NEXT_PUBLIC_GAINIX_BOTPASS_ADDRESS`, and `NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS`.
 
 ## Frontend Integration Points
 

@@ -6,7 +6,9 @@
     "compile": "hardhat compile",
     "clean": "hardhat clean",
     "test": "hardhat test",
-    "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet"
+    "deploy:bscTestnet": "hardhat run scripts/deploy.ts --network bscTestnet",
+    "deploy:bscMainnet": "hardhat run scripts/deploy-mainnet.ts --network bscMainnet",
+    "verify:deployer:bscMainnet": "hardhat run scripts/verify-deployer.ts --network bscMainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
