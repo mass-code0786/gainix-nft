@@ -3,7 +3,7 @@
 import type { Address } from "viem";
 import { nftAbi } from "@/contracts";
 import { getGainixAddresses } from "@/contracts/config/addresses";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { useContractWriteFlow } from "@/hooks/actions/useContractWriteFlow";
 import { buildGainixWriteRequest } from "@/lib/web3/write/contract-write";
 
@@ -14,7 +14,7 @@ interface AdminMintInput {
 
 export function useAdminMint() {
   const { executeWrite, feedback } = useContractWriteFlow();
-  const addresses = getGainixAddresses(contractTestChain.id);
+  const addresses = getGainixAddresses(contractActiveChainId);
 
   const adminMint = async ({ recipient, tokenUri }: AdminMintInput) => {
     const request = buildGainixWriteRequest({
@@ -22,7 +22,7 @@ export function useAdminMint() {
       abi: nftAbi,
       functionName: "adminMint",
       args: [recipient, tokenUri],
-      chainId: contractTestChain.id,
+      chainId: contractActiveChainId,
     });
 
     await executeWrite(request);

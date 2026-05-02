@@ -14,7 +14,7 @@ import { useBatchAdminMint } from "@/hooks/actions/useBatchAdminMint";
 import { useSetNftBaseUri } from "@/hooks/actions/useSetNftBaseUri";
 import { useNftAdminAccess } from "@/hooks/useNftAdminAccess";
 import { useWallet } from "@/hooks/useWallet";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { buildLiveNftSlug } from "@/lib/web3/live-nft";
 import { buildMarketplaceHref } from "@/lib/marketplace/routing";
 import { isSameAddress, shortenAddress } from "@/lib/web3/wallet-utils";
@@ -115,14 +115,14 @@ export default function DevAdminMintPage() {
     setTokenUri(uriMode === "relative" ? selected.metadataFilename : selected.metadataUri);
   }, [selectedMetadataId, uriMode]);
 
-  const isOnTestnet = !isConnected || chainId === contractTestChain.id;
+  const isOnConfiguredChain = !isConnected || chainId === contractActiveChainId;
   const isBusy = feedback.status === "awaiting_wallet" || feedback.status === "pending_chain";
   const isBatchBusy = batchStatus === "running";
   const isBaseUriBusy = baseUriFeedback.status === "awaiting_wallet" || baseUriFeedback.status === "pending_chain";
   const isCheckingOwner = isLoading || (isConnected && !isOwnerCheckReady);
-  const canMint = isConnected && isOnTestnet && isOwner && !isBusy && !isBatchBusy;
-  const canBatchMint = isConnected && isOnTestnet && isOwner && !isBusy && !isBatchBusy;
-  const canSetBaseUri = isConnected && isOnTestnet && isOwner && !isBaseUriBusy;
+  const canMint = isConnected && isOnConfiguredChain && isOwner && !isBusy && !isBatchBusy;
+  const canBatchMint = isConnected && isOnConfiguredChain && isOwner && !isBusy && !isBatchBusy;
+  const canSetBaseUri = isConnected && isOnConfiguredChain && isOwner && !isBaseUriBusy;
   const mintedSlug = pendingTokenId !== null ? buildLiveNftSlug(pendingTokenId) : null;
   const mintedToConnectedWallet = isSameAddress(recipient, address);
   const accessLabel = isCheckingOwner ? "Checking" : isOwner ? "Owner" : "No access";
@@ -145,8 +145,8 @@ export default function DevAdminMintPage() {
       return;
     }
 
-    if (!isOnTestnet) {
-      setFormError("Switch to BNB Smart Chain Testnet before minting.");
+    if (!isOnConfiguredChain) {
+      setFormError("Switch to BNB Smart Chain Mainnet before minting.");
       return;
     }
 
@@ -173,8 +173,8 @@ export default function DevAdminMintPage() {
       return;
     }
 
-    if (!isOnTestnet) {
-      setFormError("Switch to BNB Smart Chain Testnet before updating base URI.");
+    if (!isOnConfiguredChain) {
+      setFormError("Switch to BNB Smart Chain Mainnet before updating base URI.");
       return;
     }
 
@@ -194,8 +194,8 @@ export default function DevAdminMintPage() {
       return;
     }
 
-    if (!isOnTestnet) {
-      setFormError("Switch to BNB Smart Chain Testnet before batch minting.");
+    if (!isOnConfiguredChain) {
+      setFormError("Switch to BNB Smart Chain Mainnet before batch minting.");
       return;
     }
 
@@ -427,9 +427,9 @@ export default function DevAdminMintPage() {
               </div>
             ) : null}
 
-            {!isOnTestnet ? (
+            {!isOnConfiguredChain ? (
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100/90">
-                Switch to BNB Smart Chain Testnet before minting.
+                Switch to BNB Smart Chain Mainnet before minting.
               </div>
             ) : null}
 

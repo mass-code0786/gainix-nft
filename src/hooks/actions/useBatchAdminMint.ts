@@ -5,7 +5,7 @@ import type { Address } from "viem";
 import { usePublicClient, useWriteContract } from "wagmi";
 import { nftAbi } from "@/contracts";
 import { getGainixAddresses } from "@/contracts/config/addresses";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { triggerContractDataRefresh } from "@/lib/web3/contract-data-refresh";
 import { getExplorerTxUrl } from "@/lib/web3/network-config";
 import { buildGainixWriteRequest } from "@/lib/web3/write/contract-write";
@@ -40,8 +40,8 @@ const initialState: BatchMintState = {
 
 export function useBatchAdminMint() {
   const { writeContractAsync } = useWriteContract();
-  const client = usePublicClient({ chainId: contractTestChain.id });
-  const addresses = getGainixAddresses(contractTestChain.id);
+  const client = usePublicClient({ chainId: contractActiveChainId });
+  const addresses = getGainixAddresses(contractActiveChainId);
   const [state, setState] = useState<BatchMintState>(initialState);
 
   const mintBatch = async ({ recipient, items }: { recipient: Address; items: BatchMintItem[] }) => {
@@ -49,7 +49,7 @@ export function useBatchAdminMint() {
       setState({
         status: "error",
         results: [],
-        summary: "Public client unavailable for BNB testnet.",
+        summary: "Public client unavailable for the configured Gainix chain.",
       });
       return;
     }
@@ -67,7 +67,7 @@ export function useBatchAdminMint() {
         abi: nftAbi,
         functionName: "adminMint",
         args: [recipient, item.tokenUri],
-        chainId: contractTestChain.id,
+        chainId: contractActiveChainId,
       });
 
       const pendingWallet: BatchMintResult = {
@@ -89,7 +89,7 @@ export function useBatchAdminMint() {
         const pendingChain: BatchMintResult = {
           ...pendingWallet,
           txHash,
-          explorerUrl: getExplorerTxUrl(txHash, contractTestChain.id),
+          explorerUrl: getExplorerTxUrl(txHash, contractActiveChainId),
           status: "pending_chain",
         };
         results[results.length - 1] = pendingChain;

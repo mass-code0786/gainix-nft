@@ -51,7 +51,7 @@ export function useContractWriteFlow() {
       case "awaiting_wallet":
         return "Confirm the transaction in your wallet to continue.";
       case "pending_chain":
-        return "Transaction submitted. Waiting for BNB testnet confirmation.";
+        return "Transaction submitted. Waiting for chain confirmation.";
       case "success":
         return "Transaction confirmed on-chain.";
       case "error":

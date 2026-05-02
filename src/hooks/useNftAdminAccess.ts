@@ -5,8 +5,9 @@ import type { Address } from "viem";
 import { usePublicClient } from "wagmi";
 import { nftAbi } from "@/contracts";
 import { getGainixAddresses } from "@/contracts/config/addresses";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { useWallet } from "@/hooks/useWallet";
+import { getClientConfiguredWalletRole, isPrivilegedRole, type WalletRole } from "@/lib/auth/wallet-role";
 import { useContractDataRefreshVersion } from "@/lib/web3/contract-data-refresh";
 import { readGainixContract } from "@/lib/web3/read/contract-read";
 import { isSameAddress, normalizeAddress, normalizeAddressForComparison } from "@/lib/web3/wallet-utils";
@@ -24,13 +25,14 @@ interface NftAdminAccessState {
   adminCheckResult: boolean | null;
   isOwner: boolean;
   isAdmin: boolean;
+  role: WalletRole;
   hasAccess: boolean;
   walletStatus: string;
   isLoading: boolean;
   error?: string;
 }
 
-const contractChainId = contractTestChain.id;
+const contractChainId = contractActiveChainId;
 
 const initialState = (contractAddress: Address): NftAdminAccessState => ({
   contractAddress,
@@ -45,6 +47,7 @@ const initialState = (contractAddress: Address): NftAdminAccessState => ({
   adminCheckResult: null,
   isOwner: false,
   isAdmin: false,
+  role: "user",
   hasAccess: false,
   walletStatus: "disconnected",
   isLoading: true,
@@ -59,12 +62,14 @@ export function useNftAdminAccess() {
   const requestVersionRef = useRef(0);
   const connectedWallet = normalizeAddress(address);
   const connectedWalletComparison = normalizeAddressForComparison(address);
+  const envRole = getClientConfiguredWalletRole(address);
 
   const refresh = useCallback(async () => {
     const requestVersion = requestVersionRef.current + 1;
     requestVersionRef.current = requestVersion;
 
     if (!client) {
+      const hasEnvAccess = isPrivilegedRole(envRole);
       setState((current) => ({
         ...current,
         contractAddress: addresses.nft,
@@ -74,8 +79,12 @@ export function useNftAdminAccess() {
         connectedWalletComparison,
         checkedWalletComparison: connectedWalletComparison,
         walletStatus: status,
+        role: envRole,
+        hasAccess: hasEnvAccess,
+        isOwner: envRole === "super_admin",
+        isAdmin: envRole === "admin",
         isLoading: false,
-        error: "Public client is not available for BNB testnet.",
+        error: hasEnvAccess ? undefined : "Public client is not available for the configured Gainix chain.",
       }));
       return;
     }
@@ -92,6 +101,7 @@ export function useNftAdminAccess() {
       adminCheckResult: null,
       isOwner: false,
       isAdmin: false,
+      role: envRole,
       hasAccess: false,
       isLoading: true,
       error: undefined,
@@ -149,6 +159,22 @@ export function useNftAdminAccess() {
 
       const ownerMatch = isSameAddress(normalizedOwner, connectedWallet);
       const adminMatch = adminCheckResult === true;
+      const role: WalletRole =
+        ownerMatch || envRole === "super_admin"
+          ? "super_admin"
+          : adminMatch || envRole === "admin"
+            ? "admin"
+            : "user";
+      const hasAccess = isPrivilegedRole(role);
+
+      if (process.env.NODE_ENV === "development") {
+        console.info("[gainix:admin-wallet]", {
+          connectedWallet: address ?? null,
+          normalizedWallet: connectedWalletComparison,
+          isAdmin: hasAccess,
+          role,
+        });
+      }
 
       setState({
         contractAddress: addresses.nft,
@@ -162,8 +188,9 @@ export function useNftAdminAccess() {
         nextTokenId: Number(nextTokenId),
         adminCheckResult,
         isOwner: ownerMatch,
-        isAdmin: adminMatch,
-        hasAccess: ownerMatch,
+        isAdmin: adminMatch || role === "admin",
+        role,
+        hasAccess,
         walletStatus: status,
         isLoading: false,
         error: !ownerMatch && adminReadError ? adminReadError : undefined,
@@ -172,6 +199,7 @@ export function useNftAdminAccess() {
       if (requestVersionRef.current !== requestVersion) {
         return;
       }
+      const hasEnvAccess = isPrivilegedRole(envRole);
 
       setState({
         contractAddress: addresses.nft,
@@ -184,12 +212,13 @@ export function useNftAdminAccess() {
         ownerComparison: null,
         nextTokenId: null,
         adminCheckResult: null,
-        isOwner: false,
-        isAdmin: false,
-        hasAccess: false,
+        isOwner: envRole === "super_admin",
+        isAdmin: envRole === "admin",
+        role: envRole,
+        hasAccess: hasEnvAccess,
         walletStatus: status,
         isLoading: false,
-        error: error instanceof Error ? error.message : "Unable to read NFT admin state.",
+        error: hasEnvAccess ? undefined : error instanceof Error ? error.message : "Unable to read NFT admin state.",
       });
     }
   }, [
@@ -198,6 +227,7 @@ export function useNftAdminAccess() {
     client,
     connectedWallet,
     connectedWalletComparison,
+    envRole,
     isWalletHydrating,
     status,
   ]);

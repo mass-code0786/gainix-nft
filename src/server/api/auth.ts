@@ -2,6 +2,15 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, http, verifyMessage, type Address } from "viem";
 import { nftAbi } from "@/contracts/abis/nft.abi";
+import { getGainixAddresses } from "@/contracts/config/addresses";
+import { contractActiveChainId } from "@/contracts/config/chain";
+import {
+  getServerConfiguredWalletRole,
+  isPrivilegedRole,
+  normalizeWalletAddress,
+  type WalletRole,
+} from "@/lib/auth/wallet-role";
+import { getGainixNetwork } from "@/lib/web3/network-config";
 import { ApiError } from "@/server/api/errors";
 
 export const AUTH_COOKIE = "gainix_wallet_session";
@@ -17,6 +26,7 @@ interface StoredNonce {
 
 export interface WalletSession {
   walletAddress: string;
+  role: WalletRole;
   exp: number;
 }
 
@@ -100,9 +110,10 @@ export async function verifyWalletSignature(walletAddress: string, signature: st
   nonces.delete(normalizedWallet);
 }
 
-export function createSessionToken(walletAddress: string) {
+export function createSessionToken(walletAddress: string, role: WalletRole = getServerConfiguredWalletRole(walletAddress)) {
   const payload: WalletSession = {
     walletAddress: walletAddress.toLowerCase(),
+    role,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
   const encodedPayload = base64Url(JSON.stringify(payload));
@@ -147,6 +158,7 @@ export function parseSessionToken(token: string | undefined) {
   if (!payload.walletAddress || payload.exp <= Math.floor(Date.now() / 1000)) {
     throw new ApiError(401, "Wallet session expired. Please sign again.");
   }
+  payload.role = payload.role ?? getServerConfiguredWalletRole(payload.walletAddress);
 
   return payload;
 }
@@ -162,26 +174,27 @@ export function assertAuthenticatedWallet(session: WalletSession, walletAddress:
 }
 
 export async function isAdminWallet(walletAddress: string) {
-  const wallet = walletAddress.toLowerCase();
-  const configuredAdmins = (process.env.ADMIN_WALLET_ADDRESSES ?? process.env.NEXT_PUBLIC_ADMIN_WALLET_ADDRESSES ?? "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
+  const wallet = normalizeWalletAddress(walletAddress);
+  const configuredRole = getServerConfiguredWalletRole(wallet);
 
-  if (configuredAdmins.includes(wallet)) {
+  if (isPrivilegedRole(configuredRole)) {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[gainix:admin-wallet]", {
+        connectedWallet: walletAddress,
+        normalizedWallet: wallet,
+        isAdmin: true,
+        role: configuredRole,
+        source: "env",
+      });
+    }
     return true;
   }
 
+  const network = getGainixNetwork(contractActiveChainId);
   const client = createPublicClient({
-    transport: http(
-      process.env.BSC_RPC_URL ||
-        process.env.NEXT_PUBLIC_BSC_RPC_URL ||
-        process.env.BSC_TESTNET_RPC_URL ||
-        process.env.NEXT_PUBLIC_BSC_TESTNET_RPC_URL,
-    ),
+    transport: http(process.env.BSC_RPC_URL || network.rpcUrl),
   });
-  const nftAddress = (process.env.NEXT_PUBLIC_BSC_TESTNET_NFT_CONTRACT ??
-    "0x1111111111111111111111111111111111111157") as Address;
+  const nftAddress = getGainixAddresses(contractActiveChainId).nft;
 
   try {
     const [owner, isAdmin] = await Promise.all([
@@ -198,7 +211,20 @@ export async function isAdminWallet(walletAddress: string) {
       }),
     ]);
 
-    return String(owner).toLowerCase() === wallet || Boolean(isAdmin);
+    const role: WalletRole = String(owner).toLowerCase() === wallet ? "super_admin" : Boolean(isAdmin) ? "admin" : "user";
+    const hasAccess = isPrivilegedRole(role);
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("[gainix:admin-wallet]", {
+        connectedWallet: walletAddress,
+        normalizedWallet: wallet,
+        isAdmin: hasAccess,
+        role,
+        source: "chain",
+      });
+    }
+
+    return hasAccess;
   } catch {
     throw new ApiError(403, "Unable to verify admin wallet on-chain.");
   }

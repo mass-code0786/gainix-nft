@@ -5,14 +5,14 @@ import type { Address } from "viem";
 import { usePublicClient } from "wagmi";
 import { nftAbi } from "@/contracts";
 import { getGainixAddresses } from "@/contracts/config/addresses";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { useWallet } from "@/hooks/useWallet";
 import { useContractDataRefreshVersion } from "@/lib/web3/contract-data-refresh";
 import { readGainixContractOrNull } from "@/lib/web3/read/contract-read";
 
 export function useMarketplaceApproval(nftAddress?: Address) {
-  const { address, chainId } = useWallet();
-  const activeChainId = chainId ?? contractTestChain.id;
+  const { address } = useWallet();
+  const activeChainId = contractActiveChainId;
   const addresses = getGainixAddresses(activeChainId);
   const client = usePublicClient({ chainId: activeChainId });
   const refreshVersion = useContractDataRefreshVersion();

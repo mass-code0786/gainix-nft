@@ -1,10 +1,10 @@
 {
   "name": "Gainix NFT",
-  "network": "bscTestnet",
+  "network": "bscMainnet",
   "contracts": {
-    "nft": "0x1c5C376FfCD55A5aF975B0Ca25Da0A8336464F70",
-    "marketplace": "0x8eE364d178f1ecafC0187E77c5a1B04428131942",
-    "botPass": "0xA1C5d81561a1238527Dc2fc7f4322f2D9bABc454"
+    "nft": "0x1111111111111111111111111111111111111156",
+    "marketplace": "0x2222222222222222222222222222222222222256",
+    "botPass": "0x3333333333333333333333333333333333333356"
   },
   "ipfs": {
     "imageCid": "bafybeiayunsjyqar6kdykbwz2wadptfq3c3wpj7cy33oh6srjbzeckmphq",

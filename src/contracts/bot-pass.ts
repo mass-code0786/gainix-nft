@@ -1,13 +1,13 @@
 import { botPassAbi } from "@/contracts/abis/bot-pass.abi";
 import { getGainixAddresses } from "@/contracts/config/addresses";
 import type { ContractDefinition } from "@/contracts/config/types";
-import { contractTestChain } from "@/contracts/config/chain";
+import { contractActiveChainId } from "@/contracts/config/chain";
 
-const addresses = getGainixAddresses(contractTestChain.id);
+const addresses = getGainixAddresses(contractActiveChainId);
 
 export const botPassContract: ContractDefinition<typeof botPassAbi> = {
   name: "GainixBotPass",
-  chainId: contractTestChain.id,
+  chainId: contractActiveChainId,
   address: addresses.botPass,
   abi: botPassAbi,
 };

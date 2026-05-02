@@ -10,8 +10,7 @@ import {
 import { gainixUseMockFallback } from "@/lib/web3/network-config";
 import { nftAbi } from "@/contracts";
 import { getGainixAddresses } from "@/contracts/config/addresses";
-import { contractTestChain } from "@/contracts/config/chain";
-import { useWallet } from "@/hooks/useWallet";
+import { contractActiveChainId } from "@/contracts/config/chain";
 import { readGainixContractOrNull } from "@/lib/web3/read/contract-read";
 import { useContractDataRefreshVersion } from "@/lib/web3/contract-data-refresh";
 import {
@@ -51,8 +50,7 @@ export function useNFTs() {
   const [items, setItems] = useState<NFTItem[]>(mockItems);
   const [source, setSource] = useState<"mock" | "chain">("mock");
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { chainId } = useWallet();
-  const activeChainId = chainId ?? contractTestChain.id;
+  const activeChainId = contractActiveChainId;
   const addresses = getGainixAddresses(activeChainId);
   const client = usePublicClient({ chainId: activeChainId });
   const refreshVersion = useContractDataRefreshVersion();
