@@ -227,7 +227,7 @@ export function HeroActionButtons() {
       </button>
 
       <div
-        className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
+        className={`w-full max-w-full overflow-hidden rounded-2xl border px-4 py-3 text-sm leading-6 ${
           statusTone === "success"
             ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-100"
             : statusTone === "warning"
@@ -235,7 +235,7 @@ export function HeroActionButtons() {
               : "border-white/10 bg-white/5 text-zinc-300"
         }`}
       >
-        <p className="font-medium text-white">
+        <p className="max-w-full overflow-hidden break-all text-sm font-medium leading-relaxed text-white">
           Wallet: {walletAddress ?? "--"}
         </p>
         <p className="mt-1">Status: {walletStatusLabel}</p>
