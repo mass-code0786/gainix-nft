@@ -39,10 +39,10 @@ export default function MarketplacePage() {
       </div>
 
       {liveListings.length > 0 ? (
-        <div className="grid gap-3 sm:gap-4 md:grid-cols-3">
-          <StatCard label="Listings" value={String(stats.totalListings)} detail="Now live" />
-          <StatCard label="Floor" value={formatCurrency(stats.floorPrice)} detail="Best available" />
-          <StatCard label="Average" value={formatCurrency(stats.avgPrice)} detail="Market average" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <StatCard className="h-full" label="Listings" value={String(stats.totalListings)} detail="Now live" />
+          <StatCard className="h-full" label="Floor" value={formatCurrency(stats.floorPrice)} detail="Best available" />
+          <StatCard className="h-full" label="Average" value={formatCurrency(stats.avgPrice)} detail="Market average" />
         </div>
       ) : null}
     </AnimatedPage>
