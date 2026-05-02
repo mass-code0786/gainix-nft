@@ -214,6 +214,10 @@ function normalizeWalletAddress(walletAddress: string) {
   return walletAddress.trim().toLowerCase();
 }
 
+function isWalletAddressLike(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
 function validatePositiveAmount(amount: number, label: string) {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new ApiError(400, `${label} must be greater than 0.`);
@@ -3130,7 +3134,10 @@ export async function transferFundByAdmin(input: AdminTransferFundInput) {
   validatePositiveAmount(input.amount, "Transfer amount");
 
   return withStoreTransaction(async (state) => {
-    const { user, wallet } = requireUser(state, { userId: input.userId });
+    const selector = isWalletAddressLike(input.userId)
+      ? { walletAddress: input.userId }
+      : { userId: input.userId };
+    const { user, wallet } = requireUser(state, selector);
     const amount = roundAmount(input.amount);
     const referenceId = makeId("admin_credit");
 
