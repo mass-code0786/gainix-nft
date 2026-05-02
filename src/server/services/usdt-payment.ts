@@ -1,7 +1,18 @@
-import { createPublicClient, decodeEventLog, formatUnits, http, isAddressEqual, parseAbiItem, type Address, type Hex } from "viem";
+import {
+  createPublicClient,
+  decodeEventLog,
+  formatUnits,
+  http,
+  isAddress,
+  isAddressEqual,
+  parseAbiItem,
+  type Address,
+  type Hex,
+} from "viem";
 import { ApiError } from "@/server/api/errors";
 
 const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
+const bscMainnetUsdtAddress = "0x55d398326f99059fF775485246999027B3197955";
 const zeroAddress = "0x0000000000000000000000000000000000000000";
 const blockedProductionAddresses = new Set([
   zeroAddress,
@@ -9,21 +20,80 @@ const blockedProductionAddresses = new Set([
   "0x4444444444444444444444444444444444444457",
 ]);
 
-function requiredEnv(name: string) {
-  const value = process.env[name];
+function envValue(...names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function logMissingConfig(missingKeys: string[]) {
+  if (missingKeys.length === 0) {
+    return;
+  }
+
+  console.error("[gainix:deposit-config] Missing or invalid USDT deposit config:", {
+    missingKeys,
+    expected: {
+      usdtToken: "USDT_TOKEN_ADDRESS",
+      withdrawalVault: "WITHDRAWAL_VAULT_ADDRESS or NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+      rpcUrl: "BSC_RPC_URL",
+      chainId: "BSC_CHAIN_ID",
+    },
+  });
+}
+
+function requireConfigAddress(value: string, key: string) {
+  if (!isAddress(value) || value.toLowerCase() === zeroAddress) {
+    logMissingConfig([key]);
+    throw new ApiError(500, `${key} is not configured.`);
+  }
+
+  return value as Address;
+}
+
+function requireConfigValue(value: string, key: string) {
   if (!value) {
-    throw new ApiError(500, `${name} is not configured.`);
+    logMissingConfig([key]);
+    throw new ApiError(500, `${key} is not configured.`);
   }
 
   return value;
 }
 
 export function getServerUsdtConfig() {
+  const tokenAddress = envValue("USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS") || bscMainnetUsdtAddress;
+  const treasuryAddress = envValue(
+    "WITHDRAWAL_VAULT_ADDRESS",
+    "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+    "PLATFORM_TREASURY_ADDRESS",
+    "PLATFORM_TREASURY_WALLET",
+    "NEXT_PUBLIC_PLATFORM_TREASURY_ADDRESS",
+  );
+  const rpcUrl = envValue("BSC_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_RPC_URL");
+  const rawChainId = envValue("BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID", "NEXT_PUBLIC_USDT_CHAIN_ID") || "56";
+  const chainId = Number(rawChainId);
+  const missingKeys = [
+    isAddress(tokenAddress) && tokenAddress.toLowerCase() !== zeroAddress ? null : "USDT_TOKEN_ADDRESS",
+    isAddress(treasuryAddress) && treasuryAddress.toLowerCase() !== zeroAddress ? null : "WITHDRAWAL_VAULT_ADDRESS",
+    rpcUrl ? null : "BSC_RPC_URL",
+    Number.isFinite(chainId) && chainId > 0 ? null : "BSC_CHAIN_ID",
+  ].filter((key): key is string => Boolean(key));
+
+  logMissingConfig(missingKeys);
+  if (missingKeys.length > 0) {
+    throw new ApiError(500, `USDT deposit configuration is incomplete: ${missingKeys.join(", ")}.`);
+  }
+
   const config = {
-    tokenAddress: requiredEnv("USDT_TOKEN_ADDRESS") as Address,
-    treasuryAddress: (process.env.PLATFORM_TREASURY_ADDRESS ?? process.env.PLATFORM_TREASURY_WALLET ?? requiredEnv("PLATFORM_TREASURY_ADDRESS")) as Address,
-    rpcUrl: requiredEnv("BSC_RPC_URL"),
-    chainId: Number(requiredEnv("BSC_CHAIN_ID")),
+    tokenAddress: requireConfigAddress(tokenAddress, "USDT_TOKEN_ADDRESS"),
+    treasuryAddress: requireConfigAddress(treasuryAddress, "WITHDRAWAL_VAULT_ADDRESS"),
+    rpcUrl: requireConfigValue(rpcUrl, "BSC_RPC_URL"),
+    chainId,
     decimals: 18,
     confirmations: Number(process.env.BSC_DEPOSIT_CONFIRMATIONS ?? 1),
   };
