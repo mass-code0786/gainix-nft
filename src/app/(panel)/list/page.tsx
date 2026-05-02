@@ -172,9 +172,6 @@ export default function ListPage() {
               Listings are submitted to the Gainix backend using your connected wallet address.
             </div>
             <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-              Auto-sell in 1-2 hours after listing.
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
               Submit the listing and refresh your portfolio to see the updated status.
             </div>
           </div>
