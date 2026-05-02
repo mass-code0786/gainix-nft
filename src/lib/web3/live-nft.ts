@@ -11,7 +11,7 @@ const livePalette = [
   { accent: "#8b5cf6", secondaryAccent: "#312e81", category: "Pulse" },
 ] as const;
 
-export const GAINIX_TESTNET_SCAN_START_TOKEN_ID = 1000;
+export const GAINIX_CHAIN_SCAN_START_TOKEN_ID = 1000;
 export const GAINIX_CHAIN_SCAN_WINDOW = 48;
 
 function getPalette(tokenId: number) {
@@ -19,7 +19,7 @@ function getPalette(tokenId: number) {
 }
 
 export function buildLiveNftSlug(tokenId: number) {
-  return `gainix-testnet-${tokenId}`;
+  return `gainix-mainnet-${tokenId}`;
 }
 
 export function buildLiveNftItem({
@@ -56,9 +56,9 @@ export function buildLiveNftItem({
     id: `live-${tokenId}`,
     tokenId,
     slug: buildLiveNftSlug(tokenId),
-    name: name?.trim() || `Gainix Testnet #${tokenId}`,
+    name: name?.trim() || `Gainix Mainnet #${tokenId}`,
     animalType: animalType?.trim() || palette.category,
-    collection: "Gainix Testnet Collection",
+    collection: "Gainix Mainnet Collection",
     currentPrice,
     listedPrice,
     changePercent: Number((((tokenId % 9) - 4) * 1.35).toFixed(2)),
@@ -73,7 +73,10 @@ export function buildLiveNftItem({
     previewSymbol: `G${String(tokenId).slice(-2).padStart(2, "0")}`,
     supply: 1,
     rank: tokenId,
-    tags: listedPrice !== null ? ["Live", "Listed", "BNB Testnet"] : ["Live", "Wallet Owned", "BNB Testnet"],
+    tags:
+      listedPrice !== null
+        ? ["Live", "Listed", "BNB Smart Chain Mainnet"]
+        : ["Live", "Wallet Owned", "BNB Smart Chain Mainnet"],
     activity: [],
     relatedSlugs: [],
     contractAddress,

@@ -439,53 +439,56 @@ function WalletActionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/75 px-3 py-4 backdrop-blur-sm sm:items-center sm:justify-center">
-      <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(25,8,10,0.98),rgba(8,8,12,0.99))] p-4 shadow-2xl shadow-red-950/30 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="muted-label">Wallet action</p>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-white">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-start overflow-y-auto bg-black/75 px-3 pb-[calc(7rem_+_env(safe-area-inset-bottom))] pt-4 backdrop-blur-sm sm:items-center sm:justify-center sm:py-6">
+      <div className="flex max-h-[calc(100dvh_-_8rem_-_env(safe-area-inset-bottom))] w-full max-w-md flex-col overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(25,8,10,0.98),rgba(8,8,12,0.99))] shadow-2xl shadow-red-950/30 sm:max-h-[calc(100dvh_-_3rem)]">
+        <div className="shrink-0 border-b border-white/10 bg-black/10 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="muted-label">Wallet action</p>
+              <h2 className="mt-2 font-display text-2xl font-semibold text-white">{title}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+              aria-label="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
-            aria-label="Close modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
-        {action === "transfer" ? (
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
-            <div className="flex items-center justify-between gap-3">
-              <span>Capital transfer</span>
-              <span className="text-white">Full principal</span>
+        <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 sm:px-5 sm:pb-5">
+          {action === "transfer" ? (
+            <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
+              <div className="flex items-center justify-between gap-3">
+                <span>Capital transfer</span>
+                <span className="text-white">Full principal</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span>Amount</span>
+                <span className="text-emerald-200">{formatCurrency(transferAmount)}</span>
+              </div>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <span>Amount</span>
-              <span className="text-emerald-200">{formatCurrency(transferAmount)}</span>
-            </div>
-          </div>
-        ) : (
-          <label className="mt-5 block">
-            <span className="mb-2 block text-sm text-zinc-400">Amount</span>
-            <input
-              className="input-shell"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amountInput}
-              onChange={(event) => {
-                setAmountInput(event.target.value);
-                setError(null);
-                setSuccess(null);
-                setTxHash(null);
-                setPendingWithdrawal(null);
-                setEstimatedGasFee(null);
-              }}
-            />
-          </label>
-        )}
+          ) : (
+            <label className="block">
+              <span className="mb-2 block text-sm text-zinc-400">Amount</span>
+              <input
+                className="input-shell"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amountInput}
+                onChange={(event) => {
+                  setAmountInput(event.target.value);
+                  setError(null);
+                  setSuccess(null);
+                  setTxHash(null);
+                  setPendingWithdrawal(null);
+                  setEstimatedGasFee(null);
+                }}
+              />
+            </label>
+          )}
 
         {action === "deposit" ? (
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
@@ -586,23 +589,26 @@ function WalletActionModal({
             {success}
           </div>
         ) : null}
+        </div>
 
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={isSubmitting || walletAuth.isSigning || Boolean(validationError)}
-          className="premium-button mt-5 w-full disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting || walletAuth.isSigning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {walletAuth.signPrompt ??
-            (action === "deposit"
-              ? `Send ${USDT_SYMBOL}`
-              : action === "withdraw"
-                ? pendingWithdrawal
-                  ? "Confirm On-Chain Withdrawal"
-                  : "Withdraw via Wallet"
-                : title)}
-        </button>
+        <div className="sticky bottom-0 shrink-0 border-t border-white/10 bg-[linear-gradient(180deg,rgba(12,8,10,0.92),rgba(8,8,12,0.99))] p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] sm:p-5">
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={isSubmitting || walletAuth.isSigning || Boolean(validationError)}
+            className="premium-button w-full disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting || walletAuth.isSigning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {walletAuth.signPrompt ??
+              (action === "deposit"
+                ? `Send ${USDT_SYMBOL}`
+                : action === "withdraw"
+                  ? pendingWithdrawal
+                    ? "Confirm On-Chain Withdrawal"
+                    : "Withdraw via Wallet"
+                  : title)}
+          </button>
+        </div>
       </div>
     </div>
   );

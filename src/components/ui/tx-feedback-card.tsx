@@ -15,7 +15,7 @@ export function TxFeedbackCard({ feedback }: TxFeedbackCardProps) {
   if (feedback.status === "idle") {
     return (
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-        Ready to submit transaction. Confirm in wallet, then wait for testnet confirmation.
+        Ready to submit transaction. Confirm in wallet, then wait for mainnet confirmation.
       </div>
     );
   }

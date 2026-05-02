@@ -191,7 +191,7 @@ function buildCollectionMetadataFallback(tokenUri: string): Partial<ResolvedToke
 
   return {
     name: asset.name,
-    description: `${asset.name} from the ${collectionConfig.name} collection on BNB testnet.`,
+    description: `${asset.name} from the ${collectionConfig.name} collection on BNB Smart Chain Mainnet.`,
     imageUri,
     imageHttpUrl: ipfsToHttp(imageUri),
     attributes: Object.entries(asset.attributes ?? {}).map(([trait_type, value]) => ({

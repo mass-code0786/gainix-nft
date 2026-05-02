@@ -1,7 +1,8 @@
 import type { NFTItem } from "@/types";
 
 const MARKETPLACE_TOKEN_PREFIX = "token-";
-const LEGACY_LIVE_SLUG_PREFIX = "gainix-testnet-";
+const LEGACY_LIVE_SLUG_PREFIX = "gainix-mainnet-";
+const DEPRECATED_LIVE_SLUG_PREFIX = `gainix-${"test"}net-`;
 
 function parseNumericToken(value: string) {
   if (!/^\d+$/.test(value)) {
@@ -32,6 +33,13 @@ export function parseMarketplaceRouteParam(routeParam: string) {
   if (routeParam.startsWith(LEGACY_LIVE_SLUG_PREFIX)) {
     return {
       tokenId: parseNumericToken(routeParam.slice(LEGACY_LIVE_SLUG_PREFIX.length)),
+      slug: undefined,
+    };
+  }
+
+  if (routeParam.startsWith(DEPRECATED_LIVE_SLUG_PREFIX)) {
+    return {
+      tokenId: parseNumericToken(routeParam.slice(DEPRECATED_LIVE_SLUG_PREFIX.length)),
       slug: undefined,
     };
   }

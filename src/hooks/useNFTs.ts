@@ -16,7 +16,7 @@ import { useContractDataRefreshVersion } from "@/lib/web3/contract-data-refresh"
 import {
   GAINIX_CHAIN_SCAN_WINDOW,
   buildLiveNftItem,
-  GAINIX_TESTNET_SCAN_START_TOKEN_ID,
+  GAINIX_CHAIN_SCAN_START_TOKEN_ID,
 } from "@/lib/web3/live-nft";
 import { buildCappedScanIds, GAINIX_RPC_SCAN_CAP, scanWithBatchCap } from "@/lib/web3/rpc-resilience";
 import { resolveTokenMetadata } from "@/lib/web3/token-metadata";
@@ -85,7 +85,7 @@ export function useNFTs() {
           const lastTokenId = Number(nextTokenId) - 1;
           const chainTokenIds = buildCappedScanIds({
             lastId: lastTokenId,
-            minId: GAINIX_TESTNET_SCAN_START_TOKEN_ID,
+            minId: GAINIX_CHAIN_SCAN_START_TOKEN_ID,
             scanCap: Math.min(GAINIX_CHAIN_SCAN_WINDOW, GAINIX_RPC_SCAN_CAP),
           });
           const { items: chainTokens, aborted } = await scanWithBatchCap({
