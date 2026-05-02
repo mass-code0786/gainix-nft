@@ -3078,21 +3078,35 @@ export async function activateBotByAdmin(input: AdminActivateBotInput) {
   await ensureStoreInitialized();
 
   return withStoreTransaction(async (state) => {
-    const { user } = requireUser(state, { userId: input.userId });
+    const selector = isWalletAddressLike(input.userId)
+      ? { walletAddress: input.userId }
+      : { userId: input.userId };
+    const { user } = requireUser(state, selector);
     const now = nowIso();
-    const existingActiveSubscription = state.bot_subscriptions
-      .filter((item) => item.userId === user.id && item.status === "active")
+    const existingSubscription = state.bot_subscriptions
+      .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 
-    if (existingActiveSubscription) {
-      existingActiveSubscription.activatedByAdmin = true;
-      existingActiveSubscription.uplineIncomePaidAt = existingActiveSubscription.uplineIncomePaidAt ?? now;
-      existingActiveSubscription.updatedAt = now;
+    if (existingSubscription) {
+      const plan = BOT_PLANS[existingSubscription.planId as BotPlanId] ?? BOT_PLANS.bot_10;
+      existingSubscription.status = "active";
+      existingSubscription.activatedByAdmin = true;
+      existingSubscription.completedAt = null;
+      existingSubscription.uplineIncomePaidAt = existingSubscription.uplineIncomePaidAt ?? now;
+      existingSubscription.updatedAt = now;
+
+      if (
+        existingSubscription.remainingBuyTrades <= 0 &&
+        existingSubscription.remainingSellTrades <= 0
+      ) {
+        existingSubscription.remainingBuyTrades = plan.buyTrades;
+        existingSubscription.remainingSellTrades = plan.sellTrades;
+      }
 
       return {
         message: "Bot activated by admin.",
         user,
-        subscription: toPublicBotSubscription(existingActiveSubscription),
+        subscription: toPublicBotSubscription(existingSubscription),
       };
     }
 

@@ -260,7 +260,13 @@ export function useAdminPanel(enabled: boolean) {
       setNotice(response.message);
       await refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to activate bot.");
+      if (saveError instanceof ApiRequestError && saveError.status === 401) {
+        setError("Please connect and sign again");
+      } else if (saveError instanceof ApiRequestError && saveError.status === 403) {
+        setError("Admin access required");
+      } else {
+        setError(saveError instanceof Error ? saveError.message : "Unable to activate bot.");
+      }
     } finally {
       setIsSaving(false);
     }
