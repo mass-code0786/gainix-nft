@@ -75,7 +75,7 @@ export function useWalletAuth(walletAddress: string | null | undefined) {
     hasVerifiedSession,
     isSigning,
     authError,
-    signPrompt: hasVerifiedSession ? null : "Sign to continue",
+    signPrompt: hasVerifiedSession ? null : "Connect to Continue",
     ensureVerifiedSession,
   };
 }

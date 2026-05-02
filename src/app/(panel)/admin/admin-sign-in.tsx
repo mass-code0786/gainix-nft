@@ -14,7 +14,7 @@ export function AdminSignIn() {
     <AnimatedPage>
       <PageHeader title="Admin" />
       <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 text-sm text-zinc-300">
-        {!isConnected ? "Wallet connection required." : "Sign to continue with admin access."}
+        {!isConnected ? "Wallet connection required." : "Connect to Continue"}
       </div>
       {isConnected ? (
         <button
@@ -28,7 +28,7 @@ export function AdminSignIn() {
           ) : (
             <ShieldCheck className="mr-2 h-4 w-4" />
           )}
-          Sign to continue
+          Connect to Continue
         </button>
       ) : null}
       {walletAuth.authError ? (

@@ -135,7 +135,7 @@ export function setSessionCookie(response: NextResponse, token: string) {
 
 export function parseSessionToken(token: string | undefined) {
   if (!token) {
-    throw new ApiError(401, "Sign to continue.");
+    throw new ApiError(401, "Connect to Continue");
   }
 
   const [version, encodedPayload, signature] = token.split(".");
