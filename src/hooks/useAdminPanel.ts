@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
-import { fetchJson } from "@/lib/api/client";
+import { ApiRequestError, fetchJson } from "@/lib/api/client";
 import type { AdminAnalytics, AdminNftRecord, AdminOverview } from "@/types";
 
 type AdminSettingsPayload = Partial<AdminOverview["settings"]>;
@@ -280,7 +280,11 @@ export function useAdminPanel(enabled: boolean) {
       setNotice(response.message);
       await refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to transfer fund.");
+      if (saveError instanceof ApiRequestError && saveError.status === 401) {
+        setError("Please sign again");
+      } else {
+        setError(saveError instanceof Error ? saveError.message : "Unable to transfer fund.");
+      }
     } finally {
       setIsSaving(false);
     }

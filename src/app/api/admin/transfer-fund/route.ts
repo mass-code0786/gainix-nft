@@ -8,11 +8,13 @@ import { ensureTradingRuntime } from "@/server/services/runtime";
 import { transferFundByAdmin } from "@/server/services/trading-service";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   let walletAddress: string | null = null;
 
   try {
+    console.info("[admin.transfer-fund] route hit");
     rateLimit(request, "admin:transfer-fund", rateLimitRules.admin);
     const session = await requireAdminSession(request);
     walletAddress = session.walletAddress;
