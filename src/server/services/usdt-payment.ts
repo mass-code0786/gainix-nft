@@ -20,36 +20,63 @@ const blockedProductionAddresses = new Set([
   "0x4444444444444444444444444444444444444457",
 ]);
 
-function envValue(...names: string[]) {
+const tokenEnvNames = ["NEXT_PUBLIC_USDT_TOKEN_ADDRESS", "USDT_TOKEN_ADDRESS"] as const;
+const treasuryEnvNames = [
+  "NEXT_PUBLIC_PLATFORM_TREASURY_ADDRESS",
+  "PLATFORM_TREASURY_ADDRESS",
+  "PLATFORM_TREASURY_WALLET",
+  "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+  "WITHDRAWAL_VAULT_ADDRESS",
+] as const;
+const chainIdEnvNames = ["NEXT_PUBLIC_USDT_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID", "BSC_CHAIN_ID"] as const;
+const rpcEnvNames = ["BSC_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_RPC_URL"] as const;
+
+function envValue(names: readonly string[]) {
   for (const name of names) {
     const value = process.env[name]?.trim();
     if (value) {
-      return value;
+      return { key: name, value };
     }
   }
 
-  return "";
+  return { key: null, value: "" };
 }
 
-function logMissingConfig(missingKeys: string[]) {
-  if (missingKeys.length === 0) {
+function logDepositConfigState(input: {
+  missingKeys: string[];
+  resolvedKeys: Record<string, string | null>;
+  chainId: number;
+  hasTreasuryAddress: boolean;
+  hasUsdtAddress: boolean;
+}) {
+  const payload = {
+    missingKeys: input.missingKeys,
+    resolvedKeys: input.resolvedKeys,
+    chainId: input.chainId,
+    hasTreasuryAddress: input.hasTreasuryAddress,
+    hasUsdtAddress: input.hasUsdtAddress,
+  };
+
+  if (input.missingKeys.length > 0) {
+    console.error("[gainix:deposit-config] Missing or invalid USDT deposit config:", {
+      ...payload,
+      expected: {
+        usdtToken: tokenEnvNames.join(" or "),
+        treasury: treasuryEnvNames.join(" or "),
+        chainId: chainIdEnvNames.join(" or "),
+        rpcUrl: rpcEnvNames.join(" or "),
+      },
+    });
     return;
   }
 
-  console.error("[gainix:deposit-config] Missing or invalid USDT deposit config:", {
-    missingKeys,
-    expected: {
-      usdtToken: "USDT_TOKEN_ADDRESS",
-      withdrawalVault: "WITHDRAWAL_VAULT_ADDRESS or NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-      rpcUrl: "BSC_RPC_URL",
-      chainId: "BSC_CHAIN_ID",
-    },
-  });
+  if (process.env.NODE_ENV === "development") {
+    console.info("[gainix:deposit-config] Resolved USDT deposit config:", payload);
+  }
 }
 
 function requireConfigAddress(value: string, key: string) {
   if (!isAddress(value) || value.toLowerCase() === zeroAddress) {
-    logMissingConfig([key]);
     throw new ApiError(500, `${key} is not configured.`);
   }
 
@@ -58,7 +85,6 @@ function requireConfigAddress(value: string, key: string) {
 
 function requireConfigValue(value: string, key: string) {
   if (!value) {
-    logMissingConfig([key]);
     throw new ApiError(500, `${key} is not configured.`);
   }
 
@@ -66,32 +92,42 @@ function requireConfigValue(value: string, key: string) {
 }
 
 export function getServerUsdtConfig() {
-  const tokenAddress = envValue("USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS") || bscMainnetUsdtAddress;
-  const treasuryAddress = envValue(
-    "WITHDRAWAL_VAULT_ADDRESS",
-    "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-    "PLATFORM_TREASURY_ADDRESS",
-    "PLATFORM_TREASURY_WALLET",
-    "NEXT_PUBLIC_PLATFORM_TREASURY_ADDRESS",
-  );
-  const rpcUrl = envValue("BSC_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_RPC_URL");
-  const rawChainId = envValue("BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID", "NEXT_PUBLIC_USDT_CHAIN_ID") || "56";
-  const chainId = Number(rawChainId);
+  const token = envValue(tokenEnvNames);
+  const treasury = envValue(treasuryEnvNames);
+  const rpc = envValue(rpcEnvNames);
+  const rawChainId = envValue(chainIdEnvNames);
+  const tokenAddress = token.value || bscMainnetUsdtAddress;
+  const treasuryAddress = treasury.value;
+  const rpcUrl = rpc.value;
+  const rawChainIdValue = rawChainId.value || "56";
+  const chainId = Number(rawChainIdValue);
   const missingKeys = [
     isAddress(tokenAddress) && tokenAddress.toLowerCase() !== zeroAddress ? null : "USDT_TOKEN_ADDRESS",
-    isAddress(treasuryAddress) && treasuryAddress.toLowerCase() !== zeroAddress ? null : "WITHDRAWAL_VAULT_ADDRESS",
+    isAddress(treasuryAddress) && treasuryAddress.toLowerCase() !== zeroAddress ? null : "TREASURY_ADDRESS",
     rpcUrl ? null : "BSC_RPC_URL",
     Number.isFinite(chainId) && chainId > 0 ? null : "BSC_CHAIN_ID",
   ].filter((key): key is string => Boolean(key));
 
-  logMissingConfig(missingKeys);
+  logDepositConfigState({
+    missingKeys,
+    resolvedKeys: {
+      usdtToken: token.key ?? "BSC_MAINNET_USDT_DEFAULT",
+      treasury: treasury.key,
+      chainId: rawChainId.key ?? "BSC_MAINNET_CHAIN_ID_DEFAULT",
+      rpcUrl: rpc.key,
+    },
+    chainId,
+    hasTreasuryAddress: Boolean(treasuryAddress),
+    hasUsdtAddress: Boolean(tokenAddress),
+  });
+
   if (missingKeys.length > 0) {
     throw new ApiError(500, `USDT deposit configuration is incomplete: ${missingKeys.join(", ")}.`);
   }
 
   const config = {
     tokenAddress: requireConfigAddress(tokenAddress, "USDT_TOKEN_ADDRESS"),
-    treasuryAddress: requireConfigAddress(treasuryAddress, "WITHDRAWAL_VAULT_ADDRESS"),
+    treasuryAddress: requireConfigAddress(treasuryAddress, "TREASURY_ADDRESS"),
     rpcUrl: requireConfigValue(rpcUrl, "BSC_RPC_URL"),
     chainId,
     decimals: 18,
@@ -106,6 +142,18 @@ export function getServerUsdtConfig() {
   }
 
   return config;
+}
+
+export function getPublicUsdtConfig() {
+  const config = getServerUsdtConfig();
+
+  return {
+    tokenAddress: config.tokenAddress,
+    treasuryAddress: config.treasuryAddress,
+    chainId: config.chainId,
+    decimals: config.decimals,
+    symbol: "USDT",
+  };
 }
 
 function roundAmount(amount: number) {

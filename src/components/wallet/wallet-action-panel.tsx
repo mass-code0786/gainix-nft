@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowRightLeft,
@@ -15,9 +15,9 @@ import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ApiRequestError, fetchJson } from "@/lib/api/client";
 import {
   erc20TransferAbi,
-  hasUsdtPaymentConfig,
   USDT_DECIMALS,
   USDT_SYMBOL,
+  type UsdtPaymentConfig,
   usdtPaymentConfig,
 } from "@/lib/web3/usdt";
 import { formatCurrency } from "@/utils/format";
@@ -53,6 +53,8 @@ interface DepositVerifyResponse extends WalletMutationResponse {
     status: "confirmed";
   };
 }
+
+type DepositConfigResponse = UsdtPaymentConfig;
 
 interface RecentWalletAction {
   id: string;
@@ -116,12 +118,14 @@ function shortHash(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
-function hasValidUsdtPaymentConfig() {
+function isValidUsdtPaymentConfig(config: UsdtPaymentConfig) {
   return (
-    hasUsdtPaymentConfig() &&
-    isAddress(usdtPaymentConfig.tokenAddress) &&
-    isAddress(usdtPaymentConfig.treasuryAddress) &&
-    usdtPaymentConfig.treasuryAddress.toLowerCase() !== zeroAddress
+    isAddress(config.tokenAddress) &&
+    config.tokenAddress.toLowerCase() !== zeroAddress &&
+    isAddress(config.treasuryAddress) &&
+    config.treasuryAddress.toLowerCase() !== zeroAddress &&
+    Number.isFinite(config.chainId) &&
+    config.chainId > 0
   );
 }
 
@@ -187,7 +191,10 @@ function WalletActionModal({
   const { chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient({ chainId: usdtPaymentConfig.chainId });
+  const [depositConfig, setDepositConfig] = useState<UsdtPaymentConfig>(usdtPaymentConfig);
+  const [isDepositConfigLoading, setIsDepositConfigLoading] = useState(action === "deposit");
+  const [depositConfigError, setDepositConfigError] = useState<string | null>(null);
+  const publicClient = usePublicClient({ chainId: depositConfig.chainId });
   const withdrawalPublicClient = usePublicClient({ chainId: withdrawalContract.chainId });
   const walletAuth = useWalletAuth(walletAddress);
   const [amountInput, setAmountInput] = useState("");
@@ -205,8 +212,58 @@ function WalletActionModal({
   const gxnTokens = action === "withdraw" ? Number((gxnDeductionAmount / GXN_TOKEN_VALUE_USD).toFixed(2)) : 0;
   const netAmount = action === "withdraw" ? Number((amount - feeAmount - gxnDeductionAmount).toFixed(2)) : amount;
   const title = action === "deposit" ? "Deposit" : action === "withdraw" ? "Withdraw" : "Transfer capital";
-  const depositConfigReady = hasValidUsdtPaymentConfig();
+  const depositConfigReady = isValidUsdtPaymentConfig(depositConfig);
   const withdrawalConfigReady = hasValidWithdrawalContract();
+
+  useEffect(() => {
+    if (action !== "deposit") {
+      return;
+    }
+
+    let isMounted = true;
+    setIsDepositConfigLoading(true);
+    setDepositConfigError(null);
+
+    fetchJson<DepositConfigResponse>("/api/deposit/config")
+      .then((config) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDepositConfig(config);
+        if (process.env.NODE_ENV === "development") {
+          console.info("[gainix:deposit-config] Resolved API deposit config:", {
+            chainId: config.chainId,
+            hasTreasuryAddress: Boolean(config.treasuryAddress),
+            hasUsdtAddress: Boolean(config.tokenAddress),
+          });
+        }
+      })
+      .catch((configError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDepositConfigError(configError instanceof Error ? configError.message : "USDT deposit settings are not configured.");
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[gainix:deposit-config] Unable to load API deposit config:", {
+            error: configError instanceof Error ? configError.message : "unknown",
+            fallbackChainId: usdtPaymentConfig.chainId,
+            fallbackHasTreasuryAddress: Boolean(usdtPaymentConfig.treasuryAddress),
+            fallbackHasUsdtAddress: Boolean(usdtPaymentConfig.tokenAddress),
+          });
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsDepositConfigLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [action]);
 
   const validationError = useMemo(() => {
     if (action === "transfer") {
@@ -233,8 +290,16 @@ function WalletActionModal({
       return "Amount exceeds your withdrawal wallet balance.";
     }
 
-    if (action === "deposit" && !depositConfigReady) {
-      return "USDT deposit settings are not configured.";
+    if (action === "deposit" && !walletAddress) {
+      return null;
+    }
+
+    if (action === "deposit" && isDepositConfigLoading) {
+      return null;
+    }
+
+    if (action === "deposit" && (!depositConfigReady || depositConfigError)) {
+      return depositConfigError ?? "USDT deposit settings are not configured.";
     }
 
     if (action === "withdraw" && !withdrawalConfigReady) {
@@ -247,8 +312,11 @@ function WalletActionModal({
     amount,
     amountInput,
     depositConfigReady,
+    depositConfigError,
+    isDepositConfigLoading,
     withdrawalConfigReady,
     withdrawalWallet,
+    walletAddress,
   ]);
 
   async function prepareOnChainWithdrawal() {
@@ -358,23 +426,27 @@ function WalletActionModal({
       await walletAuth.ensureVerifiedSession();
 
       if (action === "deposit") {
+        if (!depositConfigReady) {
+          throw new Error(depositConfigError ?? "USDT deposit settings are not configured.");
+        }
+
         if (!publicClient) {
           throw new Error("BSC RPC client is not available.");
         }
 
-        if (chainId !== usdtPaymentConfig.chainId && switchChainAsync) {
-          await switchChainAsync({ chainId: usdtPaymentConfig.chainId });
+        if (chainId !== depositConfig.chainId && switchChainAsync) {
+          await switchChainAsync({ chainId: depositConfig.chainId });
         }
 
         const hash = await writeContractAsync({
-          address: usdtPaymentConfig.tokenAddress,
+          address: depositConfig.tokenAddress,
           abi: erc20TransferAbi,
           functionName: "transfer",
           args: [
-            usdtPaymentConfig.treasuryAddress,
+            depositConfig.treasuryAddress,
             parseUnits(amountInput.trim(), USDT_DECIMALS),
           ],
-          chainId: usdtPaymentConfig.chainId,
+          chainId: depositConfig.chainId,
         });
         setTxHash(hash);
 
