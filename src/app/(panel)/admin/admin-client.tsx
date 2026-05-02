@@ -39,13 +39,13 @@ function parseAmount(value: string) {
 export default function AdminPage() {
   const { isConnected, address, chainName } = useWallet();
   const {
-    isOwner,
+    hasAccess,
     isOwnerCheckReady,
     isLoading: isCheckingOwner,
     owner,
     error: ownerError,
   } = useNftAdminAccess();
-  const admin = useAdminPanel(isConnected && isOwnerCheckReady && isOwner);
+  const admin = useAdminPanel(isConnected && isOwnerCheckReady && hasAccess);
   const [settingsForm, setSettingsForm] = useState({
     nftPriceIncreaseMinPercent: "0",
     nftPriceIncreaseMaxPercent: "0",
@@ -191,19 +191,19 @@ export default function AdminPage() {
       <AnimatedPage>
         <PageHeader title="Admin" />
         <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 text-sm text-zinc-300">
-          Verifying the connected wallet against the NFT owner wallet.
+          Verifying the connected wallet against admin access rules.
         </div>
       </AnimatedPage>
     );
   }
 
-  if (!isOwner) {
+  if (!hasAccess) {
     return (
       <AnimatedPage>
         <PageHeader title="Admin" />
         <div className="rounded-[28px] border border-white/10 bg-black/20 p-5 text-sm text-zinc-300">
-          Connected wallet {address ? shortenAddress(address) : "Unavailable"} does not match
-          contract owner {owner ? shortenAddress(owner) : "Unavailable"}.
+          Connected wallet {address ? shortenAddress(address) : "Unavailable"} is not authorized
+          for admin access{owner ? ` or contract owner ${shortenAddress(owner)}` : ""}.
         </div>
         {ownerError ? (
           <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">

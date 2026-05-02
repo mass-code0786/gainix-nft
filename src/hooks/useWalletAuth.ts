@@ -13,6 +13,7 @@ interface NonceResponse {
 interface VerifyResponse {
   walletAddress: string;
   verified: boolean;
+  role: "user" | "admin" | "super_admin";
 }
 
 export function useWalletAuth(walletAddress: string | null | undefined) {
@@ -54,6 +55,13 @@ export function useWalletAuth(walletAddress: string | null | undefined) {
       }
 
       setVerifiedWallet(verified.walletAddress.toLowerCase());
+      if (
+        typeof window !== "undefined" &&
+        (verified.role === "admin" || verified.role === "super_admin") &&
+        !window.location.pathname.startsWith("/admin")
+      ) {
+        window.location.assign("/admin");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Wallet signature failed.";
       setAuthError(message);

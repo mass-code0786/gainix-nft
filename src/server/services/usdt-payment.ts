@@ -2,6 +2,12 @@ import { createPublicClient, decodeEventLog, formatUnits, http, isAddressEqual, 
 import { ApiError } from "@/server/api/errors";
 
 const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
+const zeroAddress = "0x0000000000000000000000000000000000000000";
+const blockedProductionAddresses = new Set([
+  zeroAddress,
+  "0x4444444444444444444444444444444444444456",
+  "0x4444444444444444444444444444444444444457",
+]);
 
 function requiredEnv(name: string) {
   const value = process.env[name];
@@ -13,14 +19,23 @@ function requiredEnv(name: string) {
 }
 
 export function getServerUsdtConfig() {
-  return {
+  const config = {
     tokenAddress: requiredEnv("USDT_TOKEN_ADDRESS") as Address,
-    treasuryAddress: requiredEnv("PLATFORM_TREASURY_ADDRESS") as Address,
+    treasuryAddress: (process.env.PLATFORM_TREASURY_ADDRESS ?? process.env.PLATFORM_TREASURY_WALLET ?? requiredEnv("PLATFORM_TREASURY_ADDRESS")) as Address,
     rpcUrl: requiredEnv("BSC_RPC_URL"),
     chainId: Number(requiredEnv("BSC_CHAIN_ID")),
     decimals: 18,
     confirmations: Number(process.env.BSC_DEPOSIT_CONFIRMATIONS ?? 1),
   };
+
+  if (process.env.NODE_ENV === "production" && config.chainId === 56) {
+    const treasury = config.treasuryAddress.toLowerCase();
+    if (blockedProductionAddresses.has(treasury)) {
+      throw new ApiError(500, "Production treasury address must be a real non-placeholder address.");
+    }
+  }
+
+  return config;
 }
 
 function roundAmount(amount: number) {

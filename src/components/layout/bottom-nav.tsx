@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gem, Grid2X2, House, Users, WalletCards } from "lucide-react";
+import { Gem, Grid2X2, House, ShieldCheck, Users, WalletCards } from "lucide-react";
 import { motion } from "framer-motion";
 import { bottomNavItems } from "@/data/navigation";
+import { useWallet } from "@/hooks/useWallet";
+import { useWalletRole } from "@/hooks/useWalletRole";
 import { cn } from "@/utils/cn";
 
 const iconMap = {
@@ -13,6 +15,7 @@ const iconMap = {
   Team: Users,
   Portfolio: Grid2X2,
   Wallet: WalletCards,
+  Admin: ShieldCheck,
 } as const;
 
 function getRouteGroup(pathname: string) {
@@ -32,18 +35,27 @@ function getRouteGroup(pathname: string) {
     return "/wallet";
   }
 
+  if (pathname.startsWith("/admin")) {
+    return "/admin";
+  }
+
   return "/dashboard";
 }
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { fullAddress } = useWallet();
+  const { isAdmin } = useWalletRole(fullAddress);
   const activeHref = getRouteGroup(pathname);
+  const items = isAdmin
+    ? [...bottomNavItems.slice(0, 4), { href: "/admin", label: "Admin" } as const]
+    : bottomNavItems;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-2 z-50 flex justify-center px-3 sm:bottom-3 sm:px-4">
       <nav className="pointer-events-auto w-full max-w-md rounded-[28px] border border-white/10 bg-black/80 p-1.5 pb-[calc(0.35rem+env(safe-area-inset-bottom))] shadow-glow backdrop-blur-2xl sm:max-w-lg">
         <div className="grid grid-cols-5 gap-1">
-          {bottomNavItems.map(({ href, label }) => {
+          {items.map(({ href, label }) => {
             const Icon = iconMap[label];
             const active = activeHref === href;
 

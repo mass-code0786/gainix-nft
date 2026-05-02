@@ -17,7 +17,9 @@
     "gainix:metadata": "node scripts/gainix/prepare-metadata.mjs",
     "gainix:status": "node scripts/gainix/owner-ops.mjs status",
     "gainix:set-base-uri": "node scripts/gainix/owner-ops.mjs set-base-uri",
-    "gainix:mint-batch": "node scripts/gainix/owner-ops.mjs mint-batch"
+    "gainix:mint-batch": "node scripts/gainix/owner-ops.mjs mint-batch",
+    "deploy:bscMainnet": "npm --prefix solidity run deploy:bscMainnet",
+    "verify:deployer:bscMainnet": "npm --prefix solidity run verify:deployer:bscMainnet"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
