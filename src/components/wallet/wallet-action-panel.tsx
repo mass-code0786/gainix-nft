@@ -587,10 +587,9 @@ function WalletActionModal({
               <>
                 <div className="flex items-center justify-between gap-3">
                   <span>USDT withdrawal</span>
-                  <span className="text-white">Admin approval</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span>Requested amount</span>
+                  <span>Withdrawal Amount</span>
                   <span className="text-white">{formatCurrency(amount)}</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
