@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import { getAddress, isAddress, type Address } from "viem";
 import { contractActiveChain, contractDefaultChain } from "@/contracts/config/chain";
 
 interface GainixAddresses {
@@ -24,17 +24,23 @@ const placeholderAddresses = new Set(
 );
 
 function envAddress(name: string, fallback?: string) {
-  return (process.env[name] ?? fallback ?? zeroAddress) as Address;
+  return (process.env[name]?.trim() ?? fallback ?? zeroAddress) as Address;
 }
 
 function assertProductionAddress(name: string, rawAddress: string | undefined, address: Address) {
-  if (!rawAddress) {
+  const trimmedAddress = rawAddress?.trim();
+
+  if (!trimmedAddress) {
     throw new Error(`${name} is required when NEXT_PUBLIC_CHAIN_ID=56 in production.`);
   }
 
-  const normalized = address.toLowerCase();
+  if (!isAddress(trimmedAddress)) {
+    throw new Error(`${name} must be a valid EVM address when NEXT_PUBLIC_CHAIN_ID=56 in production.`);
+  }
+
+  const normalized = getAddress(trimmedAddress).toLowerCase();
   if (placeholderAddresses.has(normalized)) {
-    throw new Error(`${name} must be a deployed mainnet contract address in production.`);
+    throw new Error(`${name} must not be empty, zero, or a placeholder address in production.`);
   }
 }
 
