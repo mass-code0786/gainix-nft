@@ -1,4 +1,4 @@
-import { getAddress, isAddress, type Address } from "viem";
+import type { Address } from "viem";
 import { contractActiveChain, contractDefaultChain } from "@/contracts/config/chain";
 
 interface GainixAddresses {
@@ -9,19 +9,7 @@ interface GainixAddresses {
 }
 
 const zeroAddress = "0x0000000000000000000000000000000000000000";
-const placeholderAddresses = new Set(
-  [
-    zeroAddress,
-    "0x1111111111111111111111111111111111111156",
-    "0x1111111111111111111111111111111111111157",
-    "0x2222222222222222222222222222222222222256",
-    "0x2222222222222222222222222222222222222257",
-    "0x3333333333333333333333333333333333333356",
-    "0x3333333333333333333333333333333333333357",
-    "0x4444444444444444444444444444444444444456",
-    "0x4444444444444444444444444444444444444457",
-  ].map((address) => address.toLowerCase()),
-);
+const evmAddressPattern = /^0x[a-fA-F0-9]{40}$/;
 
 function envAddress(name: string, fallback?: string) {
   return (process.env[name]?.trim() ?? fallback ?? zeroAddress) as Address;
@@ -34,13 +22,12 @@ function assertProductionAddress(name: string, rawAddress: string | undefined, a
     throw new Error(`${name} is required when NEXT_PUBLIC_CHAIN_ID=56 in production.`);
   }
 
-  if (!isAddress(trimmedAddress)) {
-    throw new Error(`${name} must be a valid EVM address when NEXT_PUBLIC_CHAIN_ID=56 in production.`);
+  if (!evmAddressPattern.test(trimmedAddress)) {
+    throw new Error(`${name} must use 0x followed by 40 hex characters when NEXT_PUBLIC_CHAIN_ID=56 in production.`);
   }
 
-  const normalized = getAddress(trimmedAddress).toLowerCase();
-  if (placeholderAddresses.has(normalized)) {
-    throw new Error(`${name} must not be empty, zero, or a placeholder address in production.`);
+  if (trimmedAddress.toLowerCase() === zeroAddress) {
+    throw new Error(`${name} must not be the zero address in production.`);
   }
 }
 
