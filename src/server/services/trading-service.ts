@@ -1299,7 +1299,34 @@ function botCanStartNextCycle(
     return false;
   }
 
-  return wallet.tradingWallet > 0;
+  return combinedWalletBalance(wallet) > 0;
+}
+
+function combinedWalletBalance(wallet: WalletRecord) {
+  return roundAmount(Math.max(wallet.tradingWallet, 0) + Math.max(wallet.withdrawalWallet, 0));
+}
+
+function calculateNftPaymentSplit(wallet: WalletRecord, price: number) {
+  const purchaseTotal = roundAmount(price);
+  const tradingBalance = roundAmount(Math.max(wallet.tradingWallet, 0));
+  const incomeBalance = roundAmount(Math.max(wallet.withdrawalWallet, 0));
+  const combinedBalance = roundAmount(tradingBalance + incomeBalance);
+  const tradingDebit = roundAmount(Math.min(tradingBalance, purchaseTotal));
+  const incomeDebit = roundAmount(Math.max(purchaseTotal - tradingDebit, 0));
+
+  return {
+    purchaseTotal,
+    tradingDebit,
+    incomeDebit,
+    combinedBalance,
+  };
+}
+
+function logNftPaymentSplit(split: ReturnType<typeof calculateNftPaymentSplit>) {
+  console.info(`[payment.split] price=${split.purchaseTotal}`);
+  console.info(`[payment.split] tradingDebit=${split.tradingDebit}`);
+  console.info(`[payment.split] incomeDebit=${split.incomeDebit}`);
+  console.info(`[payment.split] combinedBalance=${split.combinedBalance}`);
 }
 
 function buyNft(
@@ -1315,8 +1342,11 @@ function buyNft(
     throw new ApiError(409, "NFT is not available in the marketplace.");
   }
 
-  if (wallet.tradingWallet < nft.currentPrice) {
-    throw new ApiError(409, "Insufficient trading wallet balance.");
+  const paymentSplit = calculateNftPaymentSplit(wallet, nft.currentPrice);
+  logNftPaymentSplit(paymentSplit);
+
+  if (paymentSplit.combinedBalance < paymentSplit.purchaseTotal) {
+    throw new ApiError(409, "Insufficient balance");
   }
 
   if (input.source === "bot" && input.botSubscriptionId) {
@@ -1329,29 +1359,64 @@ function buyNft(
   }
 
   const now = nowIso();
-  const buyPrice = roundAmount(nft.currentPrice);
+  const buyPrice = paymentSplit.purchaseTotal;
   const priceUpdate = priceAfterMarketBuy(state, buyPrice);
 
-  wallet.tradingWallet = roundAmount(wallet.tradingWallet - buyPrice);
+  wallet.tradingWallet = roundAmount(wallet.tradingWallet - paymentSplit.tradingDebit);
+  wallet.withdrawalWallet = roundAmount(wallet.withdrawalWallet - paymentSplit.incomeDebit);
+  if (wallet.tradingWallet < 0 || wallet.withdrawalWallet < 0) {
+    throw new ApiError(409, "Insufficient balance");
+  }
   user.totalBuyCount += 1;
   user.dailyBuyCount += 1;
   wallet.updatedAt = now;
   refreshCapitalUnlock(user, wallet);
 
-  pushWalletLedger(state, {
-    userId: user.id,
-    type: "NFT_BUY_DEBIT",
-    amount: buyPrice,
-    referenceId: nft.id,
-    metadata: {
-      nftId: nft.id,
-      tradeSource: input.source ?? "manual",
-      buyCount: user.totalBuyCount,
-      dailyBuyCount: user.dailyBuyCount,
-      dailyBuyLimit: tradeLimitsForUser(user).dailyBuyLimit,
-      tradingWalletAfter: wallet.tradingWallet,
-    },
-  });
+  const sharedDebitMetadata = {
+    nftId: nft.id,
+    tradeSource: input.source ?? "manual",
+    nftPurchaseTotal: buyPrice,
+    tradingDebit: paymentSplit.tradingDebit,
+    incomeDebit: paymentSplit.incomeDebit,
+    combinedBalanceBefore: paymentSplit.combinedBalance,
+    buyCount: user.totalBuyCount,
+    dailyBuyCount: user.dailyBuyCount,
+    dailyBuyLimit: tradeLimitsForUser(user).dailyBuyLimit,
+    tradingWalletAfter: wallet.tradingWallet,
+    incomeWalletAfter: wallet.withdrawalWallet,
+  };
+
+  if (paymentSplit.tradingDebit > 0) {
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "NFT_BUY_DEBIT",
+      amount: paymentSplit.tradingDebit,
+      referenceId: nft.id,
+      metadata: {
+        ...sharedDebitMetadata,
+        title: "NFT Purchase Trading Wallet Debit",
+        description: `Trading Wallet debit $${paymentSplit.tradingDebit} of $${buyPrice} NFT purchase`,
+        sourceWallet: "TRADING",
+        walletAffected: "Trading Wallet",
+      },
+    });
+  }
+
+  if (paymentSplit.incomeDebit > 0) {
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "NFT_BUY_DEBIT",
+      amount: paymentSplit.incomeDebit,
+      referenceId: nft.id,
+      metadata: {
+        ...sharedDebitMetadata,
+        title: "NFT Purchase Income Wallet Debit",
+        description: `Income Wallet debit $${paymentSplit.incomeDebit} of $${buyPrice} NFT purchase`,
+        sourceWallet: "INCOME",
+        walletAffected: "Income Wallet",
+      },
+    });
+  }
 
   const trade: NftTradeRecord = {
     id: makeId("trade"),
@@ -1832,11 +1897,14 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
-    if (wallet.tradingWallet < state.admin_settings.minimumTradeAmount) {
-      logBotSchedulerSkip("Trading wallet is below minimum trade amount.", {
+    const combinedBalance = combinedWalletBalance(wallet);
+    if (combinedBalance < state.admin_settings.minimumTradeAmount) {
+      logBotSchedulerSkip("Combined wallet balance is below minimum trade amount.", {
         userId: subscription.userId,
         subscriptionId: subscription.id,
         tradingWallet: wallet.tradingWallet,
+        incomeWallet: wallet.withdrawalWallet,
+        combinedBalance,
         minimumTradeAmount: state.admin_settings.minimumTradeAmount,
       });
       continue;
@@ -1869,7 +1937,7 @@ function executeBotCycleInternal(state: NftSimState) {
         (item) =>
           item.status === "marketplace" &&
           !isLegacyDemoMarketplaceNft(item) &&
-          item.currentPrice <= wallet.tradingWallet,
+          item.currentPrice <= combinedBalance,
       )
       .sort((a, b) => b.currentPrice - a.currentPrice)[0];
 
@@ -1879,11 +1947,13 @@ function executeBotCycleInternal(state: NftSimState) {
         userId: subscription.userId,
         subscriptionId: subscription.id,
         tradingWallet: wallet.tradingWallet,
+        incomeWallet: wallet.withdrawalWallet,
+        combinedBalance,
       });
       continue;
     }
 
-    console.info(`[bot.buy] balance=${wallet.tradingWallet} selected=${nft.currentPrice} nftId=${nft.id}`);
+    console.info(`[bot.buy] balance=${combinedBalance} selected=${nft.currentPrice} nftId=${nft.id}`);
     const buyResult = buyNft(state, user, wallet, {
       nftId: nft.id,
       userId: user.id,
@@ -2711,6 +2781,14 @@ function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
   return "Withdrawal Wallet";
 }
 
+function walletAffectedForLedgerEntry(entry: WalletLedgerRecord) {
+  if (typeof entry.metadata.walletAffected === "string") {
+    return entry.metadata.walletAffected;
+  }
+
+  return walletAffectedForLedgerType(entry.type);
+}
+
 function statusForLedgerEntry(state: NftSimState, entry: WalletLedgerRecord) {
   if (entry.type === "BOT_PURCHASE_DEBIT") {
     return "Active";
@@ -2787,7 +2865,7 @@ export async function getWalletHistory(selector: UserSelector) {
           amount: entry.amount,
           createdAt: entry.createdAt,
           status: statusForLedgerEntry(state, entry),
-          walletAffected: walletAffectedForLedgerType(entry.type),
+          walletAffected: walletAffectedForLedgerEntry(entry),
           referenceId: entry.referenceId,
           metadata: entry.metadata,
         };
