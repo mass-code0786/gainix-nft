@@ -98,15 +98,6 @@ export default function WalletPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-zinc-200">{shortAddress}</span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-zinc-300">{chainName}</span>
-          <span
-            className={`rounded-full border px-3 py-1 text-sm ${
-              isConnected
-                ? "border-gainix-400/20 bg-gainix-500/10 text-gainix-100"
-                : "border-white/10 bg-white/5 text-zinc-400"
-            }`}
-          >
-            {isConnected ? "Connected session" : "Disconnected"}
-          </span>
         </div>
       </div>
 
