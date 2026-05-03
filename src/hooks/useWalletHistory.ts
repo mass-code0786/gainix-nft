@@ -8,6 +8,7 @@ export type WalletHistoryType =
   | "DEPOSIT_TO_TRADING"
   | "NFT_BUY_DEBIT"
   | "NFT_SELL_PRINCIPAL_RETURN"
+  | "BOT_PURCHASE"
   | "NFT_TRADING_PROFIT"
   | "BOT_PURCHASE_UPLINE_INCOME"
   | "BOT_TRADING_PROFIT"
@@ -23,9 +24,11 @@ export type WalletHistoryType =
 export interface WalletHistoryEntry {
   id: string;
   type: WalletHistoryType;
+  title: string | null;
+  description: string | null;
   amount: number;
   createdAt: string;
-  status: "Completed" | "Requested" | "Approved" | "Approved Pending TX";
+  status: "Completed" | "Requested" | "Approved" | "Approved Pending TX" | "Active";
   walletAffected: "Trading Wallet" | "Withdrawal Wallet" | "GXN Token";
   referenceId: string | null;
   metadata: Record<string, string | number | boolean | null>;

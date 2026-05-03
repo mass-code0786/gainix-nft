@@ -14,6 +14,7 @@ const historyLabels: Record<WalletHistoryType, string> = {
   DEPOSIT_TO_TRADING: "Deposit",
   NFT_BUY_DEBIT: "NFT Buy Debit",
   NFT_SELL_PRINCIPAL_RETURN: "Principal Return",
+  BOT_PURCHASE: "Bot Subscription Purchased",
   NFT_TRADING_PROFIT: "Trading Profit",
   BOT_PURCHASE_UPLINE_INCOME: "Bot Income",
   BOT_TRADING_PROFIT: "Bot Income",
@@ -29,6 +30,7 @@ const historyLabels: Record<WalletHistoryType, string> = {
 
 const debitTypes = new Set<WalletHistoryType>([
   "NFT_BUY_DEBIT",
+  "BOT_PURCHASE",
   "WITHDRAWAL_REQUEST",
   "WITHDRAWAL_FEE",
   "GXN_TOKEN_DEDUCTION",
@@ -36,12 +38,15 @@ const debitTypes = new Set<WalletHistoryType>([
 
 function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
   const isDebit = debitTypes.has(entry.type);
+  const title = entry.title ?? (typeof entry.metadata.title === "string" ? entry.metadata.title : historyLabels[entry.type]);
+  const description = entry.description ?? (typeof entry.metadata.description === "string" ? entry.metadata.description : null);
 
   return (
     <div className="rounded-[22px] border border-white/10 bg-[linear-gradient(160deg,rgba(22,9,11,0.9),rgba(8,8,12,0.96))] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-white">{historyLabels[entry.type]}</p>
+          <p className="font-medium text-white">{title}</p>
+          {description ? <p className="mt-1 text-sm text-zinc-300">{description}</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
             <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
               {entry.walletAffected}

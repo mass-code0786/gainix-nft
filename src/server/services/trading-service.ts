@@ -227,6 +227,11 @@ function normalizeWalletAddress(walletAddress: string) {
   return walletAddress.trim().toLowerCase();
 }
 
+function formatShortWalletAddress(walletAddress: string) {
+  const normalized = normalizeWalletAddress(walletAddress);
+  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
+}
+
 function isWalletAddressLike(value: string) {
   return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
 }
@@ -2170,6 +2175,11 @@ export async function buyBotSubscription(input: BuyBotInput) {
       amount: plan.price,
       referenceId: plan.planId,
       metadata: {
+        historyType: "BOT_PURCHASE",
+        title: "Bot Subscription Purchased",
+        description: `${formatShortWalletAddress(user.walletAddress)} bought ${plan.planName} for $${plan.price}`,
+        displayStatus: "Active",
+        walletShortAddress: formatShortWalletAddress(user.walletAddress),
         planName: plan.planName,
         buyLimit: plan.buyTrades,
         sellLimit: plan.sellTrades,
@@ -2681,13 +2691,15 @@ const WALLET_HISTORY_TYPES = new Set<WalletLedgerRecord["type"]>([
   "WITHDRAWAL_FEE",
   "GXN_TOKEN_REWARD",
   "GXN_TOKEN_DEDUCTION",
+  "BOT_PURCHASE_DEBIT",
 ]);
 
 function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
   if (
     type === "DEPOSIT_TO_TRADING" ||
     type === "NFT_BUY_DEBIT" ||
-    type === "NFT_SELL_PRINCIPAL_RETURN"
+    type === "NFT_SELL_PRINCIPAL_RETURN" ||
+    type === "BOT_PURCHASE_DEBIT"
   ) {
     return "Trading Wallet";
   }
@@ -2700,6 +2712,10 @@ function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
 }
 
 function statusForLedgerEntry(state: NftSimState, entry: WalletLedgerRecord) {
+  if (entry.type === "BOT_PURCHASE_DEBIT") {
+    return "Active";
+  }
+
   if (entry.type !== "WITHDRAWAL_REQUEST") {
     return "Completed";
   }
@@ -2721,16 +2737,23 @@ export async function getWalletHistory(selector: UserSelector) {
     const entries = state.wallet_ledger
       .filter((item) => item.userId === user.id && WALLET_HISTORY_TYPES.has(item.type))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((entry) => ({
-        id: entry.id,
-        type: entry.type,
-        amount: entry.amount,
-        createdAt: entry.createdAt,
-        status: statusForLedgerEntry(state, entry),
-        walletAffected: walletAffectedForLedgerType(entry.type),
-        referenceId: entry.referenceId,
-        metadata: entry.metadata,
-      }));
+      .map((entry) => {
+        const title = typeof entry.metadata.title === "string" ? entry.metadata.title : null;
+        const description = typeof entry.metadata.description === "string" ? entry.metadata.description : null;
+
+        return {
+          id: entry.id,
+          type: entry.type === "BOT_PURCHASE_DEBIT" ? "BOT_PURCHASE" : entry.type,
+          title,
+          description,
+          amount: entry.amount,
+          createdAt: entry.createdAt,
+          status: statusForLedgerEntry(state, entry),
+          walletAffected: walletAffectedForLedgerType(entry.type),
+          referenceId: entry.referenceId,
+          metadata: entry.metadata,
+        };
+      });
 
     return {
       user,
