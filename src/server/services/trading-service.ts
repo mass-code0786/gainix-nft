@@ -88,13 +88,17 @@ const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
 const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
 const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
 const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
-const NO_AFFORDABLE_NFT_MESSAGE = "No affordable NFT available for your wallet balance.";
+const BOT_LIST_DELAY_MS = 300_000;
+const NO_SUITABLE_NFT_MESSAGE = "No suitable NFT available";
 const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
   ["1001", 120],
   ["1002", 175],
   ["1003", 235],
   ["1004", 310],
 ]);
+
+let botExecutionRunning = false;
+const scheduledBotListTradeIds = new Set<string>();
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -1302,6 +1306,72 @@ function recordBotListActivity(
   });
 }
 
+function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
+  if (trade.source !== "bot" || !trade.botSubscriptionId || trade.status !== "bought") {
+    return false;
+  }
+
+  const nft = state.nfts.find((item) => item.id === trade.nftId);
+  if (!nft || nft.status !== "owned" || nft.ownerUserId !== trade.userId) {
+    return false;
+  }
+
+  listNft(state, nft, trade);
+  recordBotListActivity(
+    state,
+    trade.userId,
+    trade.botSubscriptionId,
+    nft.id,
+    nft.currentPrice,
+  );
+  console.info(`[bot.sell] nftId=${nft.id} triggered after 5min`);
+  return true;
+}
+
+function processDueBotListings(state: NftSimState, currentTime: Date) {
+  const listedTradeIds: string[] = [];
+
+  for (const trade of state.nft_trades) {
+    if (trade.source !== "bot" || trade.status !== "bought") {
+      continue;
+    }
+
+    if (currentTime.getTime() - new Date(trade.createdAt).getTime() < BOT_LIST_DELAY_MS) {
+      continue;
+    }
+
+    if (triggerDelayedBotList(state, trade)) {
+      listedTradeIds.push(trade.id);
+      scheduledBotListTradeIds.delete(trade.id);
+    }
+  }
+
+  return listedTradeIds;
+}
+
+function scheduleBotListAfterDelay(tradeId: string) {
+  if (scheduledBotListTradeIds.has(tradeId)) {
+    return;
+  }
+
+  scheduledBotListTradeIds.add(tradeId);
+  setTimeout(() => {
+    withStoreTransaction((state) => {
+      const trade = state.nft_trades.find((item) => item.id === tradeId);
+      if (!trade) {
+        scheduledBotListTradeIds.delete(tradeId);
+        return { listed: false };
+      }
+
+      const listed = triggerDelayedBotList(state, trade);
+      scheduledBotListTradeIds.delete(tradeId);
+      return { listed };
+    }).catch(() => {
+      scheduledBotListTradeIds.delete(tradeId);
+    });
+  }, BOT_LIST_DELAY_MS);
+}
+
 function distributeLevelIncome(
   state: NftSimState,
   sourceUserId: string,
@@ -1705,19 +1775,13 @@ function executeBotCycleInternal(state: NftSimState) {
       )
       .sort((a, b) => b.currentPrice - a.currentPrice)[0];
 
-    console.info("[bot.selection]", {
-      balance: wallet.tradingWallet,
-      selectedPrice: nft?.currentPrice ?? null,
-      selectedNftId: nft?.id ?? null,
-    });
-
     if (!nft) {
-      selectionMessages.push(NO_AFFORDABLE_NFT_MESSAGE);
+      selectionMessages.push(NO_SUITABLE_NFT_MESSAGE);
       pushSafetyLog(state, {
         eventType: "BOT_CYCLE_SKIPPED",
         userId: subscription.userId,
         amount: wallet.tradingWallet,
-        reason: NO_AFFORDABLE_NFT_MESSAGE,
+        reason: NO_SUITABLE_NFT_MESSAGE,
         metadata: {
           subscriptionId: subscription.id,
           tradingWallet: wallet.tradingWallet,
@@ -1726,6 +1790,7 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
+    console.info(`[bot.buy] balance=${wallet.tradingWallet} selected=${nft.currentPrice} nftId=${nft.id}`);
     const buyResult = buyNft(state, user, wallet, {
       nftId: nft.id,
       userId: user.id,
@@ -1737,7 +1802,6 @@ function executeBotCycleInternal(state: NftSimState) {
     subscription.lastExecutedAt = nowIso();
     subscription.updatedAt = nowIso();
     markBotSubscriptionCompleteIfDone(state, subscription);
-    listNft(state, buyResult.nft, buyResult.trade);
 
     pushBotActivity(state, {
       userId: user.id,
@@ -1749,19 +1813,13 @@ function executeBotCycleInternal(state: NftSimState) {
       status: "SUCCESS",
     });
 
-    recordBotListActivity(
-      state,
-      user.id,
-      subscription.id,
-      buyResult.nft.id,
-      buyResult.nft.currentPrice,
-    );
-
     executions.push({
       subscriptionId: subscription.id,
       tradeId: buyResult.trade.id,
       nftId: buyResult.nft.id,
     });
+    scheduleBotListAfterDelay(buyResult.trade.id);
+    return { executions, selectionMessages };
   }
 
   return { executions, selectionMessages };
@@ -2047,63 +2105,83 @@ export async function buyBotSubscription(input: BuyBotInput) {
 }
 
 export async function processTradingEngineTick() {
+  if (botExecutionRunning) {
+    return {
+      serverTime: nowIso(),
+      settledSales: [],
+      botExecutions: [],
+      botSelectionMessages: ["Bot execution already running."],
+      dueBotListTradeIds: [],
+      royaltyPayouts: [],
+    };
+  }
+
+  botExecutionRunning = true;
   await ensureStoreInitialized();
 
-  return withStoreTransaction(async (state) => {
-    const currentTime = new Date();
-    if (state.admin_settings.systemStopped) {
-      pushSafetyLog(state, {
-        eventType: "ENGINE_BLOCKED",
-        userId: null,
-        amount: null,
-        reason: "System emergency stop is active.",
-        metadata: {},
-      });
+  try {
+    return await withStoreTransaction(async (state) => {
+      const currentTime = new Date();
+      if (state.admin_settings.systemStopped) {
+        pushSafetyLog(state, {
+          eventType: "ENGINE_BLOCKED",
+          userId: null,
+          amount: null,
+          reason: "System emergency stop is active.",
+          metadata: {},
+        });
+
+        return {
+          serverTime: currentTime.toISOString(),
+          settledSales: [],
+          botExecutions: [],
+          botSelectionMessages: [],
+          dueBotListTradeIds: [],
+          royaltyPayouts: [],
+        };
+      }
+
+      const settledSales: Array<{
+        tradeId: string;
+        saleJobId: string | null;
+        principalReturn: number;
+        profit: number;
+        levelDistributions: Array<{ level: number; userId: string; amount: number }>;
+        tradeSource: string;
+      }> = [];
+
+      for (const trade of state.nft_trades) {
+        if (trade.status !== "listed" || !trade.autoSellAt || trade.soldAt) {
+          continue;
+        }
+
+        if (new Date(trade.autoSellAt) > currentTime) {
+          continue;
+        }
+
+        const settlement = settleAutoSell(state, trade);
+        if (settlement) {
+          settledSales.push(settlement);
+        }
+      }
+
+      const dueBotListTradeIds = processDueBotListings(state, currentTime);
+      const botCycle = executeBotCycleInternal(state);
+      refreshVipLevels(state);
+      const royaltyPayouts = processRoyaltyPayouts(state, currentTime);
 
       return {
         serverTime: currentTime.toISOString(),
-        settledSales: [],
-        botExecutions: [],
-        royaltyPayouts: [],
+        settledSales,
+        botExecutions: botCycle.executions,
+        botSelectionMessages: botCycle.selectionMessages,
+        dueBotListTradeIds,
+        royaltyPayouts,
       };
-    }
-
-    const settledSales: Array<{
-      tradeId: string;
-      saleJobId: string | null;
-      principalReturn: number;
-      profit: number;
-      levelDistributions: Array<{ level: number; userId: string; amount: number }>;
-      tradeSource: string;
-    }> = [];
-
-    for (const trade of state.nft_trades) {
-      if (trade.status !== "listed" || !trade.autoSellAt || trade.soldAt) {
-        continue;
-      }
-
-      if (new Date(trade.autoSellAt) > currentTime) {
-        continue;
-      }
-
-      const settlement = settleAutoSell(state, trade);
-      if (settlement) {
-        settledSales.push(settlement);
-      }
-    }
-
-    const botCycle = executeBotCycleInternal(state);
-    refreshVipLevels(state);
-    const royaltyPayouts = processRoyaltyPayouts(state, currentTime);
-
-    return {
-      serverTime: currentTime.toISOString(),
-      settledSales,
-      botExecutions: botCycle.executions,
-      botSelectionMessages: botCycle.selectionMessages,
-      royaltyPayouts,
-    };
-  });
+    });
+  } finally {
+    botExecutionRunning = false;
+  }
 }
 
 export async function processDueAutoSales() {
