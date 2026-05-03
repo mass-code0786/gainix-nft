@@ -146,6 +146,7 @@ async function buildState(db: DbClient) {
       capitalUnlocked: item.capitalUnlocked,
       capitalUnlockedAt: toIso(item.capitalUnlockedAt),
       capitalTransferredAt: toIso(item.capitalTransferredAt),
+      registrationBonusGiven: item.registrationBonusGiven,
       createdAt: item.createdAt.toISOString(),
     })),
     nfts: nfts.map<NftRecord>((item) => ({
@@ -361,6 +362,7 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         capitalUnlocked: item.capitalUnlocked,
         capitalUnlockedAt: item.capitalUnlockedAt ? new Date(item.capitalUnlockedAt) : null,
         capitalTransferredAt: item.capitalTransferredAt ? new Date(item.capitalTransferredAt) : null,
+        registrationBonusGiven: item.registrationBonusGiven,
         createdAt: new Date(item.createdAt),
         updatedAt: new Date(item.createdAt),
       })),

@@ -1,6 +1,12 @@
 import { ApiError } from "@/server/api/errors";
 import { prisma } from "@/server/api/prisma";
 import type { DepositInput, RegisterInput, WalletQueryInput } from "@/server/api/validation";
+import {
+  calculateRegistrationBonusTokens,
+  getCurrentGxnTokenPriceUsd,
+  GXN_TOKEN_VALUE_USD,
+  REGISTRATION_BONUS_USD,
+} from "@/server/services/gxn-token";
 
 type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -27,8 +33,8 @@ function toWalletResponse(wallet: {
     tradingWallet: wallet.tradingWallet,
     withdrawalWallet: wallet.withdrawalWallet,
     gxnTokenBalance: wallet.gxnTokenBalance,
-    gxnTokenValueUsd: 0.05,
-    gxnTokenUsdValue: roundAmount(wallet.gxnTokenBalance * 0.05),
+    gxnTokenValueUsd: GXN_TOKEN_VALUE_USD,
+    gxnTokenUsdValue: roundAmount(wallet.gxnTokenBalance * GXN_TOKEN_VALUE_USD),
     buyCount: wallet.buyCount,
     sellCount: wallet.sellCount,
     isCapitalUnlocked: wallet.isCapitalUnlocked,
@@ -127,11 +133,20 @@ export async function registerUser(input: RegisterInput) {
       sponsorUserId = sponsor.id;
     }
 
+    const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
+    const registrationBonusTokens = calculateRegistrationBonusTokens(tokenPriceUsd);
+    if (!registrationBonusTokens) {
+      console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
+    }
+
     const user = await tx.user.create({
       data: {
         walletAddress: input.walletAddress,
+        registrationBonusGiven: Boolean(registrationBonusTokens),
         wallet: {
-          create: {},
+          create: {
+            gxnTokenBalance: registrationBonusTokens ?? 0,
+          },
         },
       },
       include: {
@@ -140,6 +155,27 @@ export async function registerUser(input: RegisterInput) {
     });
 
     await createMlmRelations(tx, user.id, sponsorUserId);
+
+    if (registrationBonusTokens) {
+      await tx.walletLedger.create({
+        data: {
+          userId: user.id,
+          type: "GXN_TOKEN_REWARD",
+          amount: registrationBonusTokens,
+          referenceId: "registration_bonus",
+          metadata: {
+            type: "bonus",
+            subtype: "registration",
+            usd_value: REGISTRATION_BONUS_USD,
+            tokenPriceUsd,
+            gxnTokenBalanceAfter: registrationBonusTokens,
+            registration_bonus_given: true,
+          },
+        },
+      });
+
+      console.log("[bonus] registration bonus given", user.id, registrationBonusTokens);
+    }
 
     return {
       message: "User registered successfully.",

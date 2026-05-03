@@ -90,6 +90,7 @@ model User {
   capitalUnlocked   Boolean           @default(false)
   capitalUnlockedAt DateTime?
   capitalTransferredAt DateTime?
+  registrationBonusGiven Boolean      @default(false) @map("registration_bonus_given")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   wallet            Wallet?

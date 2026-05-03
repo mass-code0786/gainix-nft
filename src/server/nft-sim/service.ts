@@ -7,6 +7,12 @@ import {
 } from "@/server/nft-sim/math";
 import { ensureStoreInitialized, readState, withStoreTransaction } from "@/server/nft-sim/store";
 import {
+  calculateRegistrationBonusTokens,
+  getCurrentGxnTokenPriceUsd,
+  GXN_TOKEN_VALUE_USD,
+  REGISTRATION_BONUS_USD,
+} from "@/server/services/gxn-token";
+import {
   AdminSettingsRecord,
   BotActivityRecord,
   BotSubscriptionRecord,
@@ -23,7 +29,6 @@ import {
 } from "@/server/nft-sim/types";
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
-const GXN_TOKEN_VALUE_USD = 0.05;
 const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
 const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
 const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
@@ -1230,6 +1235,7 @@ export async function registerUser(input: RegisterUserInput) {
       capitalUnlocked: false,
       capitalUnlockedAt: null,
       capitalTransferredAt: null,
+      registrationBonusGiven: false,
       createdAt: now,
     };
     const wallet = createUserWallet(now, user.id);
@@ -1237,6 +1243,7 @@ export async function registerUser(input: RegisterUserInput) {
     state.users.push(user);
     state.wallets.push(wallet);
     createMlmRelations(state, user.id, sponsorUserId, now);
+    applyRegistrationBonus(state, user, wallet);
 
     return {
       message: "User registered successfully.",
@@ -1245,6 +1252,40 @@ export async function registerUser(input: RegisterUserInput) {
       wallet: toPublicWallet(wallet),
     };
   });
+}
+
+function applyRegistrationBonus(state: NftSimState, user: UserRecord, wallet: WalletRecord) {
+  if (user.registrationBonusGiven) {
+    return;
+  }
+
+  const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
+  const tokensToGive = calculateRegistrationBonusTokens(tokenPriceUsd);
+  if (!tokensToGive) {
+    console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
+    return;
+  }
+
+  wallet.gxnTokenBalance = roundAmount(wallet.gxnTokenBalance + tokensToGive);
+  wallet.updatedAt = nowIso();
+  user.registrationBonusGiven = true;
+
+  pushWalletLedger(state, {
+    userId: user.id,
+    type: "GXN_TOKEN_REWARD",
+    amount: tokensToGive,
+    referenceId: "registration_bonus",
+    metadata: {
+      type: "bonus",
+      subtype: "registration",
+      usd_value: REGISTRATION_BONUS_USD,
+      tokenPriceUsd,
+      gxnTokenBalanceAfter: wallet.gxnTokenBalance,
+      registration_bonus_given: true,
+    },
+  });
+
+  console.log("[bonus] registration bonus given", user.id, tokensToGive);
 }
 
 export async function depositToTradingWallet(input: DepositInput) {

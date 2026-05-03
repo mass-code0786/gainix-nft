@@ -32,6 +32,7 @@ function createSeedState(): NftSimState {
     capitalUnlocked: false,
     capitalUnlockedAt: null,
     capitalTransferredAt: null,
+    registrationBonusGiven: false,
     createdAt: now,
   };
   const demoWallet: WalletRecord = {
@@ -107,6 +108,7 @@ function normalizeState(state: NftSimState): NftSimState {
     dailyBuyCount: user.dailyBuyCount ?? 0,
     dailySellCount: user.dailySellCount ?? 0,
     lastTradeResetAt: user.lastTradeResetAt ?? now,
+    registrationBonusGiven: user.registrationBonusGiven ?? false,
   }));
 
   state.admin_settings = {

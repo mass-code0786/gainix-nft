@@ -41,6 +41,7 @@ export interface UserRecord {
   capitalUnlocked: boolean;
   capitalUnlockedAt: string | null;
   capitalTransferredAt: string | null;
+  registrationBonusGiven: boolean;
   createdAt: string;
 }
 
