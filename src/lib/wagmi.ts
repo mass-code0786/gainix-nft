@@ -5,7 +5,7 @@ import { gainixChains, gainixDefaultChain } from "@/lib/web3/chains";
 import { GAINIX_RPC_READ_TIMEOUT_MS, GAINIX_RPC_RETRY_LIMIT } from "@/lib/web3/rpc-resilience";
 
 export const supportedChains = gainixChains;
-export const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+export const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
 
 const transports = {
   [gainixDefaultChain.id]: http(

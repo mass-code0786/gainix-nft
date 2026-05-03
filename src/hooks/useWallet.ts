@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { formatUnits } from "viem";
-import { useAccount, useBalance, useDisconnect } from "wagmi";
+import { useAccount, useBalance } from "wagmi";
+import { useWalletSessionReset } from "@/hooks/useWalletSessionReset";
 import { getChainMetadata, shortenAddress } from "@/lib/web3/wallet-utils";
 
 export function useWallet() {
   const [isMounted, setIsMounted] = useState(false);
   const { address, chainId, isConnected, isConnecting, isDisconnected, status } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { resetWalletSession } = useWalletSessionReset();
 
   useEffect(() => {
     setIsMounted(true);
@@ -45,6 +46,6 @@ export function useWallet() {
     hasResolvedWalletSession,
     previewMode: !isConnected,
     walletBalance: nativeBalance ? Number(formatUnits(nativeBalance.value, nativeBalance.decimals)) : 0,
-    disconnect,
+    disconnect: resetWalletSession,
   };
 }

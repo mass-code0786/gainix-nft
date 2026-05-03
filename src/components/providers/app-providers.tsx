@@ -2,9 +2,10 @@
 
 import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type PropsWithChildren } from "react";
-import { WagmiProvider } from "wagmi";
+import { useEffect, useRef, useState, type PropsWithChildren } from "react";
+import { useAccount, WagmiProvider } from "wagmi";
 import { contractActiveChain } from "@/contracts/config/chain";
+import { useWalletSessionReset } from "@/hooks/useWalletSessionReset";
 import { supportedChains, wagmiConfig } from "@/lib/wagmi";
 
 const rainbowTheme = darkTheme({
@@ -30,12 +31,43 @@ export function AppProviders({ children }: PropsWithChildren) {
   );
 
   return (
-    <WagmiProvider config={wagmiConfig}>
+    <WagmiProvider config={wagmiConfig} reconnectOnMount>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider initialChain={contractActiveChain} theme={rainbowTheme} modalSize="compact">
+          <WalletSessionGuard />
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
+}
+
+function WalletSessionGuard() {
+  const { address, isConnected, status } = useAccount();
+  const { resetWalletSession } = useWalletSessionReset();
+  const wasConnectedRef = useRef(false);
+  const isCleaningRef = useRef(false);
+
+  useEffect(() => {
+    const wasConnected = wasConnectedRef.current;
+    wasConnectedRef.current = isConnected;
+
+    if (isCleaningRef.current) {
+      return;
+    }
+
+    const isBrokenConnectedState = status === "connected" && !address;
+    const disconnectedAfterConnection = wasConnected && status === "disconnected";
+
+    if (!isBrokenConnectedState && !disconnectedAfterConnection) {
+      return;
+    }
+
+    isCleaningRef.current = true;
+    resetWalletSession({ reconnectAfter: true }).finally(() => {
+      isCleaningRef.current = false;
+    });
+  }, [address, isConnected, resetWalletSession, status]);
+
+  return null;
 }
