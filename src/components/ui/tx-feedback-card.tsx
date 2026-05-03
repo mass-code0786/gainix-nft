@@ -1,4 +1,5 @@
 import type { ContractWriteFeedback } from "@/hooks/actions/useContractWriteFlow";
+import { formatHash, maskAddressesInText } from "@/utils/format";
 
 interface TxFeedbackCardProps {
   feedback: ContractWriteFeedback;
@@ -23,12 +24,12 @@ export function TxFeedbackCard({ feedback }: TxFeedbackCardProps) {
   return (
     <div className={`rounded-2xl border p-4 text-sm ${tone}`}>
       <p className="font-medium capitalize">{feedback.status.replace("_", " ")}</p>
-      <p className="mt-2">{feedback.guidance}</p>
-      {feedback.error ? <p className="mt-2 text-xs opacity-90">{feedback.error}</p> : null}
+      <p className="mt-2">{maskAddressesInText(feedback.guidance)}</p>
+      {feedback.error ? <p className="mt-2 text-xs opacity-90">{maskAddressesInText(feedback.error)}</p> : null}
       {feedback.txHash ? (
         <div className="mt-3 space-y-1 text-xs">
           <p>Transaction hash</p>
-          <p className="break-all">{feedback.txHash}</p>
+          <p>{formatHash(feedback.txHash)}</p>
           {feedback.explorerUrl ? (
             <a href={feedback.explorerUrl} target="_blank" rel="noreferrer" className="underline">
               View on explorer

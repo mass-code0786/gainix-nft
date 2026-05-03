@@ -20,7 +20,7 @@ import {
   type UsdtPaymentConfig,
   usdtPaymentConfig,
 } from "@/lib/web3/usdt";
-import { formatCurrency } from "@/utils/format";
+import { formatCurrency, maskAddress, maskAddressesInText } from "@/utils/format";
 
 export type WalletAction = "deposit" | "withdraw" | "transfer";
 const GXN_TOKEN_VALUE_USD = 0.05;
@@ -112,10 +112,6 @@ function WalletBalanceCard({
 function parseAmount(value: string) {
   const amount = Number(value);
   return Number.isFinite(amount) ? amount : 0;
-}
-
-function shortHash(value: string) {
-  return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
 function isValidUsdtPaymentConfig(config: UsdtPaymentConfig) {
@@ -244,7 +240,9 @@ function WalletActionModal({
           return;
         }
 
-        setDepositConfigError(configError instanceof Error ? configError.message : "USDT deposit settings are not configured.");
+        setDepositConfigError(
+          maskAddressesInText(configError instanceof Error ? configError.message : "USDT deposit settings are not configured."),
+        );
         if (process.env.NODE_ENV === "development") {
           console.warn("[gainix:deposit-config] Unable to load API deposit config:", {
             error: configError instanceof Error ? configError.message : "unknown",
@@ -499,11 +497,13 @@ function WalletActionModal({
       setEstimatedGasFee(null);
     } catch (submitError) {
       setError(
-        action === "transfer"
-          ? transferErrorMessage(submitError, totalBuyCount, totalSellCount)
-          : submitError instanceof Error
-            ? submitError.message
-            : `${title} failed.`,
+        maskAddressesInText(
+          action === "transfer"
+            ? transferErrorMessage(submitError, totalBuyCount, totalSellCount)
+            : submitError instanceof Error
+              ? submitError.message
+              : `${title} failed.`,
+        ),
       );
     } finally {
       setIsSubmitting(false);
@@ -575,7 +575,7 @@ function WalletActionModal({
             {txHash ? (
               <div className="mt-2 flex items-center justify-between gap-3 text-zinc-500">
                 <span>Tx hash</span>
-                <span className="text-zinc-300">{shortHash(txHash)}</span>
+                <span className="text-zinc-300">{maskAddress(txHash)}</span>
               </div>
             ) : null}
           </div>
@@ -619,7 +619,7 @@ function WalletActionModal({
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span>Contract</span>
-                        <span className="text-zinc-400">{shortHash(withdrawalContract.address)}</span>
+                        <span className="text-zinc-400">{maskAddress(withdrawalContract.address)}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span>Request</span>

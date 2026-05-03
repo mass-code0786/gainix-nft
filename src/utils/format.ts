@@ -42,6 +42,22 @@ export function formatWallet(value: string) {
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }
 
+export function maskAddress(address?: string | null) {
+  if (!address) {
+    return "";
+  }
+
+  return `${address.slice(0, 6)}....${address.slice(-4)}`;
+}
+
+export function maskAddressesInText(value?: string | null) {
+  if (!value) {
+    return value ?? "";
+  }
+
+  return value.replace(/0x[a-fA-F0-9]{40}/g, (match) => maskAddress(match));
+}
+
 export function formatHash(value: string) {
   return `${value.slice(0, 10)}...${value.slice(-6)}`;
 }

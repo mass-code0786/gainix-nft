@@ -1,5 +1,7 @@
 "use client";
 
+import { maskAddress, maskAddressesInText } from "@/utils/format";
+
 interface OwnerDebugPanelProps {
   contractAddress?: string | null;
   connectedWallet?: string | null;
@@ -14,6 +16,15 @@ interface OwnerDebugPanelProps {
   walletStatus: string;
   adminCheckResult?: boolean | null;
   error?: string;
+  revealFullAddresses?: boolean;
+}
+
+function displayDebugAddress(value?: string | null, fallback = "Unavailable", revealFullAddresses = false) {
+  if (!value) {
+    return fallback;
+  }
+
+  return revealFullAddresses ? value : maskAddress(value);
 }
 
 export function OwnerDebugPanel({
@@ -30,13 +41,14 @@ export function OwnerDebugPanel({
   walletStatus,
   adminCheckResult,
   error,
+  revealFullAddresses = false,
 }: OwnerDebugPanelProps) {
   const rows = [
-    { label: "Connected wallet", value: connectedWallet ?? "Not connected" },
-    { label: "Connected wallet (lowercase)", value: connectedWalletComparison ?? "n/a" },
-    { label: "Contract owner", value: owner ?? "Unavailable" },
-    { label: "Contract owner (lowercase)", value: ownerComparison ?? "n/a" },
-    { label: "Contract address", value: contractAddress ?? "Not configured" },
+    { label: "Connected wallet", value: displayDebugAddress(connectedWallet, "Not connected", revealFullAddresses) },
+    { label: "Connected wallet (lowercase)", value: displayDebugAddress(connectedWalletComparison, "n/a", revealFullAddresses) },
+    { label: "Contract owner", value: displayDebugAddress(owner, "Unavailable", revealFullAddresses) },
+    { label: "Contract owner (lowercase)", value: displayDebugAddress(ownerComparison, "n/a", revealFullAddresses) },
+    { label: "Contract address", value: displayDebugAddress(contractAddress, "Not configured", revealFullAddresses) },
     { label: "isOwner", value: isOwnerCheckReady ? String(isOwner) : "checking" },
     { label: "Wallet status", value: walletStatus },
     { label: "Current chain id", value: currentChainId !== null && currentChainId !== undefined ? String(currentChainId) : "none" },
@@ -66,7 +78,7 @@ export function OwnerDebugPanel({
 
       {error ? (
         <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-100">
-          {error}
+          {revealFullAddresses ? error : maskAddressesInText(error)}
         </div>
       ) : null}
     </div>

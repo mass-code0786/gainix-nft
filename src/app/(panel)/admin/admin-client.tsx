@@ -27,7 +27,7 @@ import { useAdminPanel } from "@/hooks/useAdminPanel";
 import { useNftAdminAccess } from "@/hooks/useNftAdminAccess";
 import { useWallet } from "@/hooks/useWallet";
 import { shortenAddress } from "@/lib/web3/wallet-utils";
-import { formatUsdt } from "@/utils/format";
+import { formatUsdt, maskAddressesInText } from "@/utils/format";
 
 type ReserveMode = "add" | "deduct";
 
@@ -207,7 +207,7 @@ export default function AdminPage() {
         </div>
         {ownerError ? (
           <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
-            {ownerError}
+            {maskAddressesInText(ownerError)}
           </div>
         ) : null}
       </AnimatedPage>
@@ -399,7 +399,7 @@ export default function AdminPage() {
 
         {admin.error ? (
           <div className="mt-4 rounded-3xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
-            {admin.error}
+            {maskAddressesInText(admin.error)}
           </div>
         ) : null}
         {admin.notice ? (

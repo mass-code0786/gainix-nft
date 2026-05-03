@@ -5,6 +5,7 @@ import { AnimatedPage } from "@/components/ui/animated-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import { maskAddressesInText } from "@/utils/format";
 
 export function AdminSignIn() {
   const { fullAddress, isConnected } = useWallet();
@@ -33,7 +34,7 @@ export function AdminSignIn() {
       ) : null}
       {walletAuth.authError ? (
         <div className="rounded-[28px] border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
-          {walletAuth.authError}
+          {maskAddressesInText(walletAuth.authError)}
         </div>
       ) : null}
     </AnimatedPage>

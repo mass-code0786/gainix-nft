@@ -18,6 +18,7 @@ import { contractActiveChainId } from "@/contracts/config/chain";
 import { buildLiveNftSlug } from "@/lib/web3/live-nft";
 import { buildMarketplaceHref } from "@/lib/marketplace/routing";
 import { isSameAddress, shortenAddress } from "@/lib/web3/wallet-utils";
+import { maskAddress, maskAddressesInText } from "@/utils/format";
 import collectionConfig from "../../../../../config/gainix-nft-collection.json";
 
 const metadataBaseUri = `ipfs://${collectionConfig.ipfs.metadataCid}/`;
@@ -270,8 +271,8 @@ export default function DevAdminMintPage() {
         </div>
 
         <div className="section-shell max-w-xl text-sm text-zinc-200">
-          <p>Connected Wallet: {connectedWallet ?? "Unavailable"}</p>
-          <p className="mt-2">Contract Owner: {owner ?? "Unavailable"}</p>
+          <p>Connected Wallet: {connectedWallet ? shortenAddress(connectedWallet) : "Unavailable"}</p>
+          <p className="mt-2">Contract Owner: {owner ? maskAddress(owner) : "Unavailable"}</p>
           <p className="mt-2">isOwner: {String(isOwner)}</p>
           <p className="mt-2">Chain ID: {chainId ?? "none"}</p>
         </div>
@@ -290,6 +291,7 @@ export default function DevAdminMintPage() {
           walletStatus={walletStatus}
           adminCheckResult={adminCheckResult}
           error={error}
+          revealFullAddresses={isOwner}
         />
       </AnimatedPage>
     );
@@ -334,6 +336,7 @@ export default function DevAdminMintPage() {
         walletStatus={walletStatus}
         adminCheckResult={adminCheckResult}
         error={error}
+        revealFullAddresses={isOwner}
       />
 
       <div className="section-shell text-sm text-zinc-300">
@@ -423,7 +426,7 @@ export default function DevAdminMintPage() {
 
             {error ? (
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-100">
-                {error}
+                {maskAddressesInText(error)}
               </div>
             ) : null}
 
@@ -513,7 +516,7 @@ export default function DevAdminMintPage() {
                         View on explorer
                       </a>
                     ) : null}
-                    {result.error ? <p className="mt-1 text-rose-300">{result.error}</p> : null}
+                    {result.error ? <p className="mt-1 text-rose-300">{maskAddressesInText(result.error)}</p> : null}
                   </div>
                 ))}
               </div>
