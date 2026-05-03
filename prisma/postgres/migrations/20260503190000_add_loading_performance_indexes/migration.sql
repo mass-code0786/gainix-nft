@@ -1,0 +1,15 @@
+CREATE INDEX IF NOT EXISTS "users_createdAt_idx" ON "users"("createdAt");
+CREATE INDEX IF NOT EXISTS "wallets_userId_idx" ON "wallets"("userId");
+CREATE INDEX IF NOT EXISTS "wallets_createdAt_idx" ON "wallets"("createdAt");
+CREATE INDEX IF NOT EXISTS "nfts_status_idx" ON "nfts"("status");
+CREATE INDEX IF NOT EXISTS "nfts_category_idx" ON "nfts"("category");
+CREATE INDEX IF NOT EXISTS "nfts_createdAt_idx" ON "nfts"("createdAt");
+CREATE INDEX IF NOT EXISTS "nft_trades_status_createdAt_idx" ON "nft_trades"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "nft_trades_source_createdAt_idx" ON "nft_trades"("source", "createdAt");
+CREATE INDEX IF NOT EXISTS "wallet_ledger_type_createdAt_idx" ON "wallet_ledger"("type", "createdAt");
+CREATE INDEX IF NOT EXISTS "deposits_status_createdAt_idx" ON "deposits"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "income_ledger_type_createdAt_idx" ON "income_ledger"("type", "createdAt");
+CREATE INDEX IF NOT EXISTS "bot_subscriptions_status_createdAt_idx" ON "bot_subscriptions"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "bot_activity_status_createdAt_idx" ON "bot_activity"("status", "createdAt");
+CREATE INDEX IF NOT EXISTS "bot_activity_action_createdAt_idx" ON "bot_activity"("action", "createdAt");
+CREATE INDEX IF NOT EXISTS "withdrawals_status_createdAt_idx" ON "withdrawals"("status", "createdAt");

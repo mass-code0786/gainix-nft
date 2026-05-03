@@ -39,7 +39,7 @@ export interface WalletHistoryEntry {
   amount: number;
   createdAt: string;
   status: "Completed" | "Requested" | "Approved" | "Approved Pending TX" | "Active";
-  walletAffected: "Trading Wallet" | "Withdrawal Wallet" | "GXN Token";
+  walletAffected: "Trading Wallet" | "Withdrawal Wallet" | "Income Wallet" | "GXN Token";
   referenceId: string | null;
   metadata: Record<string, string | number | boolean | null>;
 }
@@ -55,7 +55,7 @@ export function useWalletHistory() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!isConnected || !fullAddress) {
       setHistory([]);
       setError(null);
@@ -69,18 +69,32 @@ export function useWalletHistory() {
     try {
       const response = await fetchJson<WalletHistoryResponse>(
         `/api/wallet/history?walletAddress=${fullAddress}`,
+        { signal },
       );
       setHistory(response.history);
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : "Unable to load wallet history.");
       setHistory([]);
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [fullAddress, isConnected]);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    const startedAt = performance.now();
+    void refresh(controller.signal).finally(() => {
+      if (!controller.signal.aborted) {
+        console.info(`[perf.ui] page=wallet-history loadMs=${Math.round(performance.now() - startedAt)}`);
+      }
+    });
+
+    return () => controller.abort();
   }, [refresh]);
 
   return {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useWallet } from "@/hooks/useWallet";
+import { fetchJson } from "@/lib/api/client";
 import type {
   BotAutomationActivity,
   BotAutomationPlan,
@@ -17,7 +18,7 @@ interface BotStatusResponse {
   latestActivity: BotAutomationActivity | null;
 }
 
-interface BotActivityResponse {
+interface BotSummaryResponse extends BotStatusResponse {
   activity: BotAutomationActivity[];
 }
 
@@ -44,37 +45,31 @@ export function useBotSubscription() {
       return;
     }
 
-    let isCancelled = false;
+    const controller = new AbortController();
+    const startedAt = performance.now();
 
     async function load() {
       setIsLoading(true);
 
       try {
-        const [statusResponse, activityResponse] = await Promise.all([
-          fetch(`/api/bot/status?walletAddress=${fullAddress}`, { cache: "no-store" }),
-          fetch(`/api/bot/activity?walletAddress=${fullAddress}`, { cache: "no-store" }),
-        ]);
+        const payload = await fetchJson<BotSummaryResponse>(
+          `/api/bot/summary?walletAddress=${fullAddress}`,
+          { signal: controller.signal },
+        );
 
-        if (!statusResponse.ok || !activityResponse.ok) {
-          throw new Error("Unable to load bot status.");
-        }
-
-        const statusPayload = (await statusResponse.json()) as BotStatusResponse;
-        const activityPayload = (await activityResponse.json()) as BotActivityResponse;
-
-        if (isCancelled) {
+        if (controller.signal.aborted) {
           return;
         }
 
-        setPlans(statusPayload.plans ?? []);
-        setSubscriptions(statusPayload.subscriptions ?? []);
-        setTimeline(activityPayload.activity ?? []);
-        setTodayBotProfit(statusPayload.todayBotProfit ?? 0);
-        setTotalBotProfit(statusPayload.totalBotProfit ?? 0);
-        setLatestActivity(statusPayload.latestActivity ?? null);
-        setStatus(statusPayload.activeSubscriptions > 0 ? "active" : "inactive");
+        setPlans(payload.plans ?? []);
+        setSubscriptions(payload.subscriptions ?? []);
+        setTimeline(payload.activity ?? []);
+        setTodayBotProfit(payload.todayBotProfit ?? 0);
+        setTotalBotProfit(payload.totalBotProfit ?? 0);
+        setLatestActivity(payload.latestActivity ?? null);
+        setStatus(payload.activeSubscriptions > 0 ? "active" : "inactive");
       } catch {
-        if (isCancelled) {
+        if (controller.signal.aborted) {
           return;
         }
 
@@ -86,8 +81,9 @@ export function useBotSubscription() {
         setLatestActivity(null);
         setStatus("fallback");
       } finally {
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
+          console.info(`[perf.ui] page=bot-subscription loadMs=${Math.round(performance.now() - startedAt)}`);
         }
       }
     }
@@ -95,7 +91,7 @@ export function useBotSubscription() {
     void load();
 
     return () => {
-      isCancelled = true;
+      controller.abort();
     };
   }, [fullAddress, isConnected]);
 
@@ -134,25 +130,17 @@ export function useBotSubscription() {
         return;
       }
 
-      const [statusResponse, activityResponse] = await Promise.all([
-        fetch(`/api/bot/status?walletAddress=${fullAddress}`, { cache: "no-store" }),
-        fetch(`/api/bot/activity?walletAddress=${fullAddress}`, { cache: "no-store" }),
-      ]);
+      const payload = await fetchJson<BotSummaryResponse>(
+        `/api/bot/summary?walletAddress=${fullAddress}`,
+      );
 
-      if (!statusResponse.ok || !activityResponse.ok) {
-        throw new Error("Unable to refresh bot status.");
-      }
-
-      const statusPayload = (await statusResponse.json()) as BotStatusResponse;
-      const activityPayload = (await activityResponse.json()) as BotActivityResponse;
-
-      setPlans(statusPayload.plans ?? []);
-      setSubscriptions(statusPayload.subscriptions ?? []);
-      setTimeline(activityPayload.activity ?? []);
-      setTodayBotProfit(statusPayload.todayBotProfit ?? 0);
-      setTotalBotProfit(statusPayload.totalBotProfit ?? 0);
-      setLatestActivity(statusPayload.latestActivity ?? null);
-      setStatus(statusPayload.activeSubscriptions > 0 ? "active" : "inactive");
+      setPlans(payload.plans ?? []);
+      setSubscriptions(payload.subscriptions ?? []);
+      setTimeline(payload.activity ?? []);
+      setTodayBotProfit(payload.todayBotProfit ?? 0);
+      setTotalBotProfit(payload.totalBotProfit ?? 0);
+      setLatestActivity(payload.latestActivity ?? null);
+      setStatus(payload.activeSubscriptions > 0 ? "active" : "inactive");
     },
   };
 }

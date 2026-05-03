@@ -3075,6 +3075,70 @@ export async function getRoyaltyStatus(selector: UserSelector) {
   });
 }
 
+export async function getTeamSummary(selector: UserSelector) {
+  await ensureStoreInitialized();
+  await processTradingEngineTick();
+
+  return withStoreTransaction(async (state) => {
+    const { user, wallet } = requireUser(state, selector);
+    const minimumPackageAmount = state.admin_settings.vipMinimumTeamPackageAmount;
+    const directs = state.mlm_tree
+      .filter((item) => item.ancestorUserId === user.id && item.level === 1)
+      .map((item) => state.users.find((entry) => entry.id === item.userId))
+      .filter((item): item is UserRecord => Boolean(item));
+    const levelBreakdown = MLM_LEVEL_PERCENTAGES.map((_, index) => ({
+      level: index + 1,
+      downlineCount: state.mlm_tree.filter(
+        (item) => item.ancestorUserId === user.id && item.level === index + 1,
+      ).length,
+      unlocked: unlockedLevels(state, user.id) >= index + 1,
+    }));
+    const progress = royaltyProgress(state, user.id);
+    const payoutHistory = state.income_ledger
+      .filter((item) => item.userId === user.id && item.type === "ROYALTY_INCOME")
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    return {
+      user,
+      sponsor: sponsorUserForUser(state, user.id),
+      directs,
+      directCount: directs.length,
+      unlockedLevels: unlockedLevels(state, user.id),
+      levelBreakdown,
+      vipStatus: progress,
+      royalty: {
+        user: {
+          id: user.id,
+          walletAddress: user.walletAddress,
+          selfPackageAmount: user.selfPackageAmount,
+          currentVipLevel: user.currentVipLevel,
+          vipAchievedAt: user.vipAchievedAt,
+        },
+        currentVipLevel: progress.currentVipLevel,
+        nextVipLevel: progress.nextVipLevel,
+        currentRequirementProgress: progress.currentRequirementProgress,
+        payoutAmount: progress.payoutAmount,
+        payoutHistory,
+        withdrawalWallet: wallet.withdrawalWallet,
+        payoutSchedule: {
+          firstDay: state.admin_settings.vipFirstPayoutDay,
+          secondDay: state.admin_settings.vipSecondPayoutDay,
+          monthEnd: true,
+        },
+      },
+      metrics: {
+        minimumPackageAmount,
+        level1Qualified: qualifiedPackageUsersAtLevel(
+          state,
+          user.id,
+          1,
+          minimumPackageAmount,
+        ),
+      },
+    };
+  });
+}
+
 export async function getBotStatus(selector: UserSelector) {
   await ensureStoreInitialized();
   await processTradingEngineTick();
@@ -3112,6 +3176,52 @@ export async function getBotStatus(selector: UserSelector) {
       ),
       totalBotProfit: sumAmounts(botProfitEntries),
       latestActivity,
+    };
+  });
+}
+
+export async function getBotSummary(selector: UserSelector) {
+  await ensureStoreInitialized();
+  await processTradingEngineTick();
+
+  return withStoreTransaction(async (state) => {
+    const { user } = requireUser(state, selector);
+    const subscriptions = state.bot_subscriptions
+      .filter((item) => item.userId === user.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((item) => toPublicBotSubscription(item));
+    const todayStart = startOfToday(new Date());
+    const botProfitEntries = state.income_ledger.filter(
+      (item) =>
+        item.userId === user.id &&
+        (item.type === "BOT_TRADING_INCOME" ||
+          (item.type === "NFT_TRADING_INCOME" && sourceTradeIsBot(state, item))),
+    );
+    const activity = state.bot_activity
+      .filter((item) => item.userId === user.id)
+      .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((item) => ({
+        ...item,
+        nft: item.nftId ? state.nfts.find((entry) => entry.id === item.nftId) ?? null : null,
+      }));
+
+    return {
+      user,
+      settings: toPublicSettings(state.admin_settings),
+      plans: Object.values(BOT_PLANS).map((plan) => ({
+        ...plan,
+        totalCycles: Math.min(plan.buyTrades, plan.sellTrades),
+      })),
+      subscriptions,
+      activeSubscriptions: subscriptions.filter((item) => item.status === "active").length,
+      todayBotProfit: sumAmounts(
+        botProfitEntries.filter((item) => new Date(item.createdAt) >= todayStart),
+      ),
+      totalBotProfit: sumAmounts(botProfitEntries),
+      latestActivity: activity[0] ?? null,
+      activity,
+      totalActivity: activity.length,
     };
   });
 }
@@ -3509,6 +3619,68 @@ export async function activateBotByAdmin(input: AdminActivateBotInput) {
       message: "Bot activated by admin.",
       user,
       subscription: toPublicBotSubscription(subscription),
+    };
+  });
+}
+
+export async function getWalletSummary(selector: UserSelector) {
+  await ensureStoreInitialized();
+  await processTradingEngineTick();
+
+  return withStoreTransaction(async (state) => {
+    const { user, wallet } = requireUser(state, selector);
+    const now = new Date();
+    const todayStart = startOfToday(now);
+    const weeklyStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = startOfMonth(now);
+    const incomeEntries = state.income_ledger
+      .filter((item) => item.userId === user.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const recentLedger = state.wallet_ledger
+      .filter((item) => item.userId === user.id && WALLET_HISTORY_TYPES.has(item.type))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 25)
+      .map((entry) => ({
+        id: entry.id,
+        type: entry.type === "BOT_PURCHASE_DEBIT" ? "BOT_PURCHASE" : entry.type,
+        title: typeof entry.metadata.title === "string" ? entry.metadata.title : null,
+        description: typeof entry.metadata.description === "string" ? entry.metadata.description : null,
+        category: categoryForLedgerEntry(entry.type),
+        amount: entry.amount,
+        createdAt: entry.createdAt,
+        status: statusForLedgerEntry(state, entry),
+        walletAffected: walletAffectedForLedgerEntry(entry),
+        referenceId: entry.referenceId,
+        metadata: entry.metadata,
+      }));
+    const trades = state.nft_trades
+      .filter((item) => item.userId === user.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((item) => toPublicTrade(state, item));
+
+    return {
+      user,
+      wallet: toPublicWallet(wallet, user, state),
+      incomeOverview: {
+        totalIncome: sumAmounts(incomeEntries),
+        nftTradingIncome: summarizeIncome(incomeEntries.filter(isNftTradingIncomeEntry), todayStart, weeklyStart, monthStart),
+        levelIncome: summarizeIncome(incomeEntries.filter((item) => item.type === "LEVEL_INCOME"), todayStart, weeklyStart, monthStart),
+        botTradingIncome: summarizeIncome([], todayStart, weeklyStart, monthStart),
+        botPurchaseUplineIncome: summarizeIncome(
+          incomeEntries.filter((item) => item.type === "BOT_PURCHASE_UPLINE_INCOME"),
+          todayStart,
+          weeklyStart,
+          monthStart,
+        ),
+        royaltyIncome: summarizeIncome(incomeEntries.filter((item) => item.type === "ROYALTY_INCOME"), todayStart, weeklyStart, monthStart),
+        history: incomeEntries,
+      },
+      recentLedger,
+      trades,
+      botSubscriptions: state.bot_subscriptions
+        .filter((item) => item.userId === user.id)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map((item) => toPublicBotSubscription(item)),
     };
   });
 }

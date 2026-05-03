@@ -40,27 +40,40 @@ export function useMarketplaceListings() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     setIsRefreshing(true);
     setError(null);
 
     try {
-      const response = await fetchJson<BackendMarketplaceResponse>("/api/nft/marketplace");
+      const response = await fetchJson<BackendMarketplaceResponse>("/api/nft/marketplace", { signal });
       const nextListings = response.marketplace
         .map((item) => adaptBackendNftToItem(item))
         .sort((left, right) => right.tokenId - left.tokenId);
 
       setLiveListings(nextListings);
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : "Unable to load marketplace.");
       setLiveListings([]);
     } finally {
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    const startedAt = performance.now();
+    void refresh(controller.signal).finally(() => {
+      if (!controller.signal.aborted) {
+        console.info(`[perf.ui] page=marketplace loadMs=${Math.round(performance.now() - startedAt)}`);
+      }
+    });
+
+    return () => controller.abort();
   }, [refresh]);
 
   const topMovers = [...liveListings].sort((left, right) => right.changePercent - left.changePercent).slice(0, 3);

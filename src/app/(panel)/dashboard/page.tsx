@@ -13,13 +13,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
+import { SkeletonBlock } from "@/components/ui/skeleton-block";
 import { WalletActionPanel } from "@/components/wallet/wallet-action-panel";
 import { incomeCategoryMeta, incomeCategoryOrder } from "@/data/income";
-import { useBotSubscription } from "@/hooks/useBotSubscription";
-import { useIncome } from "@/hooks/useIncome";
-import { usePortfolio } from "@/hooks/usePortfolio";
+import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import { useRegistration } from "@/hooks/useRegistration";
-import { useTeam } from "@/hooks/useTeam";
 import { useWallet } from "@/hooks/useWallet";
 import { formatCurrency } from "@/utils/format";
 
@@ -204,19 +202,22 @@ export default function DashboardPage() {
     hasResolvedWalletSession,
   } = useWallet();
   const { isRegistered, isCheckingRegistration } = useRegistration(walletAddress, isConnected);
+  const dashboard = useDashboardSummary();
   const {
     wallet,
     refresh: refreshPortfolio,
     error: portfolioError,
-  } = usePortfolio();
-  const { categories: incomeCategories, error: incomeError } = useIncome();
+    isLoading: isWalletDataLoading,
+  } = dashboard.portfolio;
+  const { categories: incomeCategories, error: incomeError, isLoading: isIncomeLoading } = dashboard.income;
   const {
     activeSubscription,
     latestActivity,
     todayBotProfit,
     status: botStatus,
-  } = useBotSubscription();
-  const { data: teamData, error: teamError } = useTeam();
+    isLoading: isBotLoading,
+  } = dashboard.bot;
+  const { data: teamData, error: teamError, isLoading: isTeamLoading } = dashboard.team;
 
   if (!hasResolvedWalletSession || isWalletHydrating || isCheckingRegistration) {
     return (
@@ -270,25 +271,29 @@ export default function DashboardPage() {
 
   return (
     <AnimatedPage>
-      <WalletActionPanel
-        walletAddress={walletAddress}
-        tradingWallet={wallet?.tradingWallet ?? 0}
-        withdrawalWallet={wallet?.withdrawalWallet ?? 0}
-        gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
-        gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
-        gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
-        totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
-        totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
-        dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}
-        dailySellCount={wallet?.tradeLimits.dailySellCount ?? wallet?.dailySellCount ?? 0}
-        dailyBuyLimit={wallet?.tradeLimits.dailyBuyLimit ?? 6}
-        dailySellLimit={wallet?.tradeLimits.dailySellLimit ?? 6}
-        currentVipLevel={wallet?.tradeLimits.currentVipLevel ?? vipLevel}
-        bonusTrades={wallet?.tradeLimits.bonusTrades ?? 0}
-        capitalUnlocked={wallet?.capitalUnlocked ?? wallet?.isCapitalUnlocked ?? false}
-        capitalTransferredAt={wallet?.capitalTransferredAt ?? null}
-        onRefresh={refreshPortfolio}
-      />
+      {isWalletDataLoading ? (
+        <SkeletonBlock className="h-96" />
+      ) : (
+        <WalletActionPanel
+          walletAddress={walletAddress}
+          tradingWallet={wallet?.tradingWallet ?? 0}
+          withdrawalWallet={wallet?.withdrawalWallet ?? 0}
+          gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
+          gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
+          gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
+          totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
+          totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
+          dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}
+          dailySellCount={wallet?.tradeLimits.dailySellCount ?? wallet?.dailySellCount ?? 0}
+          dailyBuyLimit={wallet?.tradeLimits.dailyBuyLimit ?? 6}
+          dailySellLimit={wallet?.tradeLimits.dailySellLimit ?? 6}
+          currentVipLevel={wallet?.tradeLimits.currentVipLevel ?? vipLevel}
+          bonusTrades={wallet?.tradeLimits.bonusTrades ?? 0}
+          capitalUnlocked={wallet?.capitalUnlocked ?? wallet?.isCapitalUnlocked ?? false}
+          capitalTransferredAt={wallet?.capitalTransferredAt ?? null}
+          onRefresh={refreshPortfolio}
+        />
+      )}
 
       {(portfolioError || incomeError || teamError) ? (
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -298,7 +303,14 @@ export default function DashboardPage() {
 
       <SectionShell title="Income Overview">
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-          {incomeCategoryOrder.map((key) => {
+          {isIncomeLoading ? (
+            <>
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+            </>
+          ) : incomeCategoryOrder.map((key) => {
             const category = incomeCategories.find((item) => item.key === key);
             const Icon = incomeIcons[key];
 
@@ -319,26 +331,37 @@ export default function DashboardPage() {
 
       <SectionShell title="Bot Status">
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-          <ActivePlanCard price={activeSubscription?.price} isRunning={botStatus === "active"} />
-          <SummaryCard
-            label="Completed Cycles"
-            value={completedCycles}
-            icon={Layers3}
-            compact
-          />
-          <SummaryCard
-            label="Today Bot Profit"
-            value={formatCurrency(todayBotProfit)}
-            icon={CircleDollarSign}
-            compact
-          />
-          <SummaryCard
-            label="Latest Action"
-            value={latestActionLabel(latestActivity?.action)}
-            detail={latestActivity ? formatCurrency(latestActivity.amount) : undefined}
-            icon={Network}
-            compact
-          />
+          {isBotLoading ? (
+            <>
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+              <SkeletonBlock className="h-28" />
+            </>
+          ) : (
+            <>
+              <ActivePlanCard price={activeSubscription?.price} isRunning={botStatus === "active"} />
+              <SummaryCard
+                label="Completed Cycles"
+                value={completedCycles}
+                icon={Layers3}
+                compact
+              />
+              <SummaryCard
+                label="Today Bot Profit"
+                value={formatCurrency(todayBotProfit)}
+                icon={CircleDollarSign}
+                compact
+              />
+              <SummaryCard
+                label="Latest Action"
+                value={latestActionLabel(latestActivity?.action)}
+                detail={latestActivity ? formatCurrency(latestActivity.amount) : undefined}
+                icon={Network}
+                compact
+              />
+            </>
+          )}
         </div>
         <Link href="/bot-subscription" className="secondary-button mt-4 w-full sm:w-fit">
           Auto Trading Bot
@@ -348,22 +371,32 @@ export default function DashboardPage() {
       <div className="pb-20 sm:pb-0">
         <SectionShell title="Team Summary">
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
-            <TeamSummaryCard
-              label="Total Team"
-              value={`${totalTeam}`}
-              icon={Users}
-            />
-            <TeamSummaryCard
-              label="Referral Team"
-              value={`${teamData?.directCount ?? 0}`}
-              icon={Network}
-            />
-            <TeamSummaryCard
-              label="VIP/Royalty"
-              value={`VIP ${vipLevel}`}
-              detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
-              icon={Crown}
-            />
+            {isTeamLoading ? (
+              <>
+                <SkeletonBlock className="h-28" />
+                <SkeletonBlock className="h-28" />
+                <SkeletonBlock className="h-28" />
+              </>
+            ) : (
+              <>
+                <TeamSummaryCard
+                  label="Total Team"
+                  value={`${totalTeam}`}
+                  icon={Users}
+                />
+                <TeamSummaryCard
+                  label="Referral Team"
+                  value={`${teamData?.directCount ?? 0}`}
+                  icon={Network}
+                />
+                <TeamSummaryCard
+                  label="VIP/Royalty"
+                  value={`VIP ${vipLevel}`}
+                  detail={nextVipLevel ? `Next VIP ${nextVipLevel}` : "Max status"}
+                  icon={Crown}
+                />
+              </>
+            )}
           </div>
         </SectionShell>
       </div>

@@ -4,7 +4,8 @@ import { Crown, Share2, Users } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { useTeam } from "@/hooks/useTeam";
+import { SkeletonBlock } from "@/components/ui/skeleton-block";
+import { useTeamSummary } from "@/hooks/useTeamSummary";
 import { formatUsdt } from "@/utils/format";
 import { formatWallet } from "@/utils/format";
 
@@ -27,7 +28,7 @@ function TeamMetricCard({
 }
 
 export default function TeamPage() {
-  const { data, isLoading, error } = useTeam();
+  const { data, isLoading, error } = useTeamSummary();
   const royalty = data?.royalty ?? null;
   const progress = royalty?.currentRequirementProgress ?? null;
   const teamOverview = {
@@ -61,11 +62,6 @@ export default function TeamPage() {
     <AnimatedPage>
       <PageHeader title="Team" />
 
-      {isLoading ? (
-        <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-          Loading team overview.
-        </div>
-      ) : null}
       {error ? (
         <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-200">
           {error}
@@ -73,7 +69,12 @@ export default function TeamPage() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3">
-        {teamSummaryCards.map(({ title, value, icon: Icon }) => (
+        {isLoading ? (
+          <>
+            <SkeletonBlock className="h-32" />
+            <SkeletonBlock className="h-32" />
+          </>
+        ) : teamSummaryCards.map(({ title, value, icon: Icon }) => (
           <div
             key={title}
             className="section-shell lux-card interactive-surface rounded-[24px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.14),transparent_34%),linear-gradient(160deg,rgba(22,8,10,0.96),rgba(10,10,14,0.98))] p-3 sm:p-4"

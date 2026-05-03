@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useBotSubscription } from "@/hooks/useBotSubscription";
-import { useMarketplaceListings } from "@/hooks/useMarketplaceListings";
 import { useWallet } from "@/hooks/useWallet";
 import { fetchJson } from "@/lib/api/client";
 import { adaptBackendTradeToItem } from "@/lib/api/nft-adapters";
 import type { NFTItem, PortfolioHolding } from "@/types";
+import type { WalletHistoryEntry } from "@/hooks/useWalletHistory";
 
 interface WalletResponse {
   tradingWallet: number;
@@ -35,7 +34,13 @@ interface WalletResponse {
   capitalTransferredAt: string | null;
 }
 
-interface TradesHistoryResponse {
+interface WalletSummaryResponse {
+  wallet: WalletResponse;
+  recentLedger: WalletHistoryEntry[];
+  botSubscriptions: Array<{
+    planName: string;
+    status: "active" | "completed";
+  }>;
   trades: Array<{
     id: string;
     nftId: string;
@@ -96,18 +101,22 @@ function buildHolding(item: NFTItem): PortfolioHolding {
 
 export function usePortfolio() {
   const { fullAddress, isConnected } = useWallet();
-  const { liveListings, source: marketSource, refresh: refreshMarket, isRefreshing: isRefreshingMarket } = useMarketplaceListings();
-  const { activeSubscription } = useBotSubscription();
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
   const [ownedNfts, setOwnedNfts] = useState<NFTItem[]>([]);
+  const [recentLedger, setRecentLedger] = useState<WalletHistoryEntry[]>([]);
+  const [activePlanName, setActivePlanName] = useState("No bot plan");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!isConnected || !fullAddress) {
       setWallet(null);
       setOwnedNfts([]);
+      setRecentLedger([]);
+      setActivePlanName("No bot plan");
       setError(null);
+      setHasLoaded(false);
       return;
     }
 
@@ -115,14 +124,13 @@ export function usePortfolio() {
     setError(null);
 
     try {
-      const [walletResponse, tradesResponse] = await Promise.all([
-        fetchJson<WalletResponse>(`/api/wallet?walletAddress=${fullAddress}`),
-        fetchJson<TradesHistoryResponse>(`/api/trades/history?walletAddress=${fullAddress}`),
-        refreshMarket(),
-      ]);
+      const summaryResponse = await fetchJson<WalletSummaryResponse>(
+        `/api/wallet/summary?walletAddress=${fullAddress}`,
+        { signal },
+      );
 
       const openTrades = new Map<string, NFTItem>();
-      for (const trade of tradesResponse.trades) {
+      for (const trade of summaryResponse.trades) {
         if (trade.status === "auto_sold") {
           continue;
         }
@@ -133,21 +141,42 @@ export function usePortfolio() {
         }
       }
 
-      setWallet(walletResponse);
+      setWallet(summaryResponse.wallet);
+      setRecentLedger(summaryResponse.recentLedger ?? []);
+      setActivePlanName(
+        summaryResponse.botSubscriptions.find((subscription) => subscription.status === "active")?.planName ??
+          summaryResponse.botSubscriptions[0]?.planName ??
+          "No bot plan",
+      );
       setOwnedNfts(
         Array.from(openTrades.values()).sort((left, right) => right.tokenId - left.tokenId),
       );
+      setHasLoaded(true);
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : "Unable to load portfolio.");
       setWallet(null);
       setOwnedNfts([]);
+      setRecentLedger([]);
     } finally {
-      setIsRefreshing(false);
+      if (!signal?.aborted) {
+        setIsRefreshing(false);
+      }
     }
-  }, [fullAddress, isConnected, refreshMarket]);
+  }, [fullAddress, isConnected]);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    const startedAt = performance.now();
+    void refresh(controller.signal).finally(() => {
+      if (!controller.signal.aborted) {
+        console.info(`[perf.ui] page=portfolio loadMs=${Math.round(performance.now() - startedAt)}`);
+      }
+    });
+
+    return () => controller.abort();
   }, [refresh]);
 
   const holdings = useMemo(() => ownedNfts.map(buildHolding), [ownedNfts]);
@@ -161,13 +190,16 @@ export function usePortfolio() {
   const totalPortfolioBalance = liquidBalance + gxnTokenUsdValue + nftValue;
 
   return {
-    source: marketSource,
+    source: "api" as const,
     error,
-    isRefreshing: isRefreshing || isRefreshingMarket,
+    isRefreshing,
+    isLoading: isRefreshing && !hasLoaded,
+    hasLoaded,
     holdings,
     ownedNfts,
     wallet,
-    liveListings,
+    recentLedger,
+    liveListings: [],
     activity: [],
     summary: {
       totalBalance: Number(totalPortfolioBalance.toFixed(2)),
@@ -183,10 +215,10 @@ export function usePortfolio() {
       dailyPnl: 0,
       liveListings: holdings.filter((item) => item.status === "Listed").length,
       ownedNfts: ownedNfts.length,
-      activePlan: activeSubscription?.planName ?? "No bot plan",
+      activePlan: activePlanName,
     },
     activePlan: {
-      badge: activeSubscription ? "Live" : "None",
+      badge: activePlanName === "No bot plan" ? "None" : "Live",
     },
     refresh,
   };

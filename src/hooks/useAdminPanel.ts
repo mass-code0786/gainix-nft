@@ -28,7 +28,7 @@ export function useAdminPanel(enabled: boolean) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!enabled) {
       setData(null);
       setAnalytics(null);
@@ -44,22 +44,38 @@ export function useAdminPanel(enabled: boolean) {
     try {
       await ensureVerifiedSession();
       const [overview, analyticsPayload, nftPayload] = await Promise.all([
-        fetchJson<AdminOverview>("/api/admin/overview"),
-        fetchJson<AdminAnalytics>("/api/admin/analytics"),
-        fetchJson<{ nfts: AdminNftRecord[] }>("/api/admin/nfts"),
+        fetchJson<AdminOverview>("/api/admin/overview", { signal }),
+        fetchJson<AdminAnalytics>("/api/admin/analytics", { signal }),
+        fetchJson<{ nfts: AdminNftRecord[] }>("/api/admin/nfts", { signal }),
       ]);
+      if (signal?.aborted) {
+        return;
+      }
       setData(overview);
       setAnalytics(analyticsPayload);
       setNfts(nftPayload.nfts);
     } catch (loadError) {
+      if (loadError instanceof DOMException && loadError.name === "AbortError") {
+        return;
+      }
       setError(loadError instanceof Error ? loadError.message : "Unable to load admin data.");
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [enabled, ensureVerifiedSession]);
 
   useEffect(() => {
-    void refresh();
+    const controller = new AbortController();
+    const startedAt = performance.now();
+    void refresh(controller.signal).finally(() => {
+      if (!controller.signal.aborted) {
+        console.info(`[perf.ui] page=admin loadMs=${Math.round(performance.now() - startedAt)}`);
+      }
+    });
+
+    return () => controller.abort();
   }, [refresh]);
 
   const saveSettings = useCallback(

@@ -76,9 +76,11 @@ interface RoyaltyStatusResponse {
   };
 }
 
+type TeamSummaryResponse = TeamOverviewResponse & { royalty: RoyaltyStatusResponse };
+
 export function useTeam() {
   const { fullAddress, isConnected } = useWallet();
-  const [data, setData] = useState<(TeamOverviewResponse & { royalty: RoyaltyStatusResponse }) | null>(null);
+  const [data, setData] = useState<TeamSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,32 +92,31 @@ export function useTeam() {
       return;
     }
 
-    let isCancelled = false;
+    const controller = new AbortController();
+    const startedAt = performance.now();
 
     async function load() {
       setIsLoading(true);
       setError(null);
 
       try {
-        const [teamResponse, royaltyResponse] = await Promise.all([
-          fetchJson<TeamOverviewResponse>(`/api/team?walletAddress=${fullAddress}`),
-          fetchJson<RoyaltyStatusResponse>(`/api/royalty/status?walletAddress=${fullAddress}`),
-        ]);
+        const teamResponse = await fetchJson<TeamSummaryResponse>(
+          `/api/team/summary?walletAddress=${fullAddress}`,
+          { signal: controller.signal },
+        );
 
-        if (!isCancelled) {
-          setData({
-            ...teamResponse,
-            royalty: royaltyResponse,
-          });
+        if (!controller.signal.aborted) {
+          setData(teamResponse);
         }
       } catch (loadError) {
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load team.");
           setData(null);
         }
       } finally {
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
+          console.info(`[perf.ui] page=team loadMs=${Math.round(performance.now() - startedAt)}`);
         }
       }
     }
@@ -123,7 +124,7 @@ export function useTeam() {
     void load();
 
     return () => {
-      isCancelled = true;
+      controller.abort();
     };
   }, [fullAddress, isConnected]);
 

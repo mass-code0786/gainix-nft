@@ -3,11 +3,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { CircleDollarSign, Clock3, Gem, WalletCards } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
+import { SkeletonBlock } from "@/components/ui/skeleton-block";
 import { StatCard } from "@/components/ui/stat-card";
 import { WalletActionPanel } from "@/components/wallet/wallet-action-panel";
-import { usePortfolio } from "@/hooks/usePortfolio";
+import { useWalletSummary } from "@/hooks/useWalletSummary";
 import {
-  useWalletHistory,
   type WalletHistoryCategory,
   type WalletHistoryEntry,
   type WalletHistoryType,
@@ -88,8 +88,7 @@ function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
 }
 
 export default function WalletPage() {
-  const { summary, wallet, refresh } = usePortfolio();
-  const { history, isLoading: isHistoryLoading, error: historyError, refresh: refreshHistory } = useWalletHistory();
+  const { summary, wallet, recentLedger: history, isLoading, error: historyError, refresh } = useWalletSummary();
   const { fullAddress, shortAddress, chainName, isConnected } = useWallet();
   const [referralCopyMessage, setReferralCopyMessage] = useState<string | null>(null);
   const [selectedHistoryFilter, setSelectedHistoryFilter] = useState<WalletHistoryFilter>("ALL");
@@ -103,8 +102,8 @@ export default function WalletPage() {
   );
 
   const refreshWalletData = useCallback(async () => {
-    await Promise.all([refresh(), refreshHistory()]);
-  }, [refresh, refreshHistory]);
+    await refresh();
+  }, [refresh]);
 
   const copyReferralLink = useCallback(async () => {
     if (!referralLink) {
@@ -119,10 +118,21 @@ export default function WalletPage() {
   return (
     <AnimatedPage>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard label="Total balance" value={formatCurrency(summary.totalBalance)} detail="Wallet + collection" icon={WalletCards} />
-        <StatCard label="Cash Balance" value={formatCurrency(summary.liquidBnb)} detail="Available now" icon={CircleDollarSign} tone="positive" />
-        <StatCard label="GXN token value" value={formatCurrency(summary.gxnTokenUsdValue)} detail={`${(wallet?.gxnTokenBalance ?? 0).toLocaleString()} GXN`} icon={Gem} />
-        <StatCard label="Collection value" value={formatCurrency(summary.nftValue)} detail="Held NFTs" icon={Gem} />
+        {isLoading ? (
+          <>
+            <SkeletonBlock className="h-32" />
+            <SkeletonBlock className="h-32" />
+            <SkeletonBlock className="h-32" />
+            <SkeletonBlock className="h-32" />
+          </>
+        ) : (
+          <>
+            <StatCard label="Total balance" value={formatCurrency(summary.totalBalance)} detail="Wallet + collection" icon={WalletCards} />
+            <StatCard label="Cash Balance" value={formatCurrency(summary.liquidBnb)} detail="Available now" icon={CircleDollarSign} tone="positive" />
+            <StatCard label="GXN token value" value={formatCurrency(summary.gxnTokenUsdValue)} detail={`${(wallet?.gxnTokenBalance ?? 0).toLocaleString()} GXN`} icon={Gem} />
+            <StatCard label="Collection value" value={formatCurrency(summary.nftValue)} detail="Held NFTs" icon={Gem} />
+          </>
+        )}
       </div>
 
       <div className="section-shell space-y-4">
@@ -159,25 +169,29 @@ export default function WalletPage() {
         ) : null}
       </section>
 
-      <WalletActionPanel
-        walletAddress={fullAddress}
-        tradingWallet={wallet?.tradingWallet ?? 0}
-        withdrawalWallet={wallet?.withdrawalWallet ?? 0}
-        gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
-        gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
-        gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
-        totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
-        totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
-        dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}
-        dailySellCount={wallet?.tradeLimits.dailySellCount ?? wallet?.dailySellCount ?? 0}
-        dailyBuyLimit={wallet?.tradeLimits.dailyBuyLimit ?? 6}
-        dailySellLimit={wallet?.tradeLimits.dailySellLimit ?? 6}
-        currentVipLevel={wallet?.tradeLimits.currentVipLevel ?? 0}
-        bonusTrades={wallet?.tradeLimits.bonusTrades ?? 0}
-        capitalUnlocked={wallet?.capitalUnlocked ?? wallet?.isCapitalUnlocked ?? false}
-        capitalTransferredAt={wallet?.capitalTransferredAt ?? null}
-        onRefresh={refreshWalletData}
-      />
+      {isLoading ? (
+        <SkeletonBlock className="h-96" />
+      ) : (
+        <WalletActionPanel
+          walletAddress={fullAddress}
+          tradingWallet={wallet?.tradingWallet ?? 0}
+          withdrawalWallet={wallet?.withdrawalWallet ?? 0}
+          gxnTokenBalance={wallet?.gxnTokenBalance ?? 0}
+          gxnTokenValueUsd={wallet?.gxnTokenValueUsd ?? 0.05}
+          gxnTokenUsdValue={wallet?.gxnTokenUsdValue ?? 0}
+          totalBuyCount={wallet?.totalBuyCount ?? wallet?.buyCount ?? 0}
+          totalSellCount={wallet?.totalSellCount ?? wallet?.sellCount ?? 0}
+          dailyBuyCount={wallet?.tradeLimits.dailyBuyCount ?? wallet?.dailyBuyCount ?? 0}
+          dailySellCount={wallet?.tradeLimits.dailySellCount ?? wallet?.dailySellCount ?? 0}
+          dailyBuyLimit={wallet?.tradeLimits.dailyBuyLimit ?? 6}
+          dailySellLimit={wallet?.tradeLimits.dailySellLimit ?? 6}
+          currentVipLevel={wallet?.tradeLimits.currentVipLevel ?? 0}
+          bonusTrades={wallet?.tradeLimits.bonusTrades ?? 0}
+          capitalUnlocked={wallet?.capitalUnlocked ?? wallet?.isCapitalUnlocked ?? false}
+          capitalTransferredAt={wallet?.capitalTransferredAt ?? null}
+          onRefresh={refreshWalletData}
+        />
+      )}
 
       <section className="section-shell space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -187,7 +201,7 @@ export default function WalletPage() {
               Recent ledger entries
             </h2>
           </div>
-          <button type="button" onClick={() => void refreshHistory()} className="secondary-button w-full sm:w-auto">
+          <button type="button" onClick={() => void refresh()} className="secondary-button w-full sm:w-auto">
             Refresh
           </button>
         </div>
@@ -221,20 +235,22 @@ export default function WalletPage() {
           </div>
         ) : null}
 
-        {isHistoryLoading ? (
-          <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-            Loading wallet history.
+        {isLoading ? (
+          <div className="grid gap-3">
+            <SkeletonBlock className="h-28" />
+            <SkeletonBlock className="h-28" />
+            <SkeletonBlock className="h-28" />
           </div>
         ) : null}
 
-        {!isHistoryLoading && filteredHistory.length === 0 ? (
+        {!isLoading && filteredHistory.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4 sm:p-5 text-sm text-zinc-300">
             No ledger entries for this category.
           </div>
         ) : null}
 
         <div className="grid gap-3">
-          {filteredHistory.slice(0, 25).map((entry) => (
+          {!isLoading && filteredHistory.slice(0, 25).map((entry) => (
             <WalletHistoryRow key={entry.id} entry={entry} />
           ))}
         </div>

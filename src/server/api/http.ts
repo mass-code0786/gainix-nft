@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { ApiError } from "@/server/api/errors";
 
-export function successResponse(payload: unknown, status = 200) {
-  return withSecurityHeaders(NextResponse.json(payload, { status }));
+export function successResponse(payload: unknown, status = 200, cacheControl = "no-store, max-age=0") {
+  return withSecurityHeaders(NextResponse.json(payload, { status }), cacheControl);
 }
 
 export function errorResponse(error: unknown) {
@@ -30,8 +30,8 @@ export function errorResponse(error: unknown) {
   return withSecurityHeaders(NextResponse.json({ error: "Internal server error." }, { status: 500 }));
 }
 
-export function withSecurityHeaders(response: NextResponse) {
-  response.headers.set("Cache-Control", "no-store, max-age=0");
+export function withSecurityHeaders(response: NextResponse, cacheControl = "no-store, max-age=0") {
+  response.headers.set("Cache-Control", cacheControl);
   response.headers.set("Pragma", "no-cache");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");

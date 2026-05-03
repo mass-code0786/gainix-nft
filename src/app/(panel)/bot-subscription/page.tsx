@@ -5,6 +5,7 @@ import { ActiveBotPreview } from "@/components/bot-pass/active-bot-preview";
 import { BotActivityTimeline } from "@/components/bot-pass/bot-activity-timeline";
 import { BotPlanCard } from "@/components/bot-pass/bot-plan-card";
 import { AnimatedPage } from "@/components/ui/animated-page";
+import { SkeletonBlock } from "@/components/ui/skeleton-block";
 import { useBotSubscription } from "@/hooks/useBotSubscription";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -109,7 +110,13 @@ export default function BotSubscriptionPage() {
       </div>
 
       <div className="space-y-3 sm:space-y-4">
-        {plans.map((plan) => (
+        {isLoading && plans.length === 0 ? (
+          <>
+            <SkeletonBlock className="h-36" />
+            <SkeletonBlock className="h-36" />
+            <SkeletonBlock className="h-36" />
+          </>
+        ) : plans.map((plan) => (
           <BotPlanCard
             key={plan.planId}
             name={plan.planName}
@@ -123,45 +130,44 @@ export default function BotSubscriptionPage() {
         ))}
       </div>
 
-      <ActiveBotPreview
-        botName={activeSubscription?.planName ?? "No Active Bot"}
-        statusLabel={
-          activeSubscription
-            ? activeSubscription.status === "completed"
-              ? "Completed"
-              : "Running"
-            : status === "fallback"
-              ? "Paused"
-              : "Paused"
-        }
-        completedBuyTrades={
-          activeSubscription
-            ? `${activeSubscription.completedBuyTrades} / ${activeSubscription.totalBuyTrades}`
-            : "0 / 0"
-        }
-        completedSellTrades={
-          activeSubscription
-            ? `${activeSubscription.completedSellTrades} / ${activeSubscription.totalSellTrades}`
-            : "0 / 0"
-        }
-        remainingTrades={
-          activeSubscription
-            ? `${activeSubscription.remainingBuyTrades + activeSubscription.remainingSellTrades}`
-            : "0"
-        }
-        progress={progress}
-        todayProfit={todayBotProfit}
-        totalProfit={totalBotProfit}
-        latestAction={formatLatestAction(latestActivity?.action)}
-      />
+      {isLoading ? (
+        <SkeletonBlock className="h-64" />
+      ) : (
+        <ActiveBotPreview
+          botName={activeSubscription?.planName ?? "No Active Bot"}
+          statusLabel={
+            activeSubscription
+              ? activeSubscription.status === "completed"
+                ? "Completed"
+                : "Running"
+              : status === "fallback"
+                ? "Paused"
+                : "Paused"
+          }
+          completedBuyTrades={
+            activeSubscription
+              ? `${activeSubscription.completedBuyTrades} / ${activeSubscription.totalBuyTrades}`
+              : "0 / 0"
+          }
+          completedSellTrades={
+            activeSubscription
+              ? `${activeSubscription.completedSellTrades} / ${activeSubscription.totalSellTrades}`
+              : "0 / 0"
+          }
+          remainingTrades={
+            activeSubscription
+              ? `${activeSubscription.remainingBuyTrades + activeSubscription.remainingSellTrades}`
+              : "0"
+          }
+          progress={progress}
+          todayProfit={todayBotProfit}
+          totalProfit={totalBotProfit}
+          latestAction={formatLatestAction(latestActivity?.action)}
+        />
+      )}
 
       <BotActivityTimeline activity={timeline} />
 
-      {isLoading ? (
-        <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-400">
-          Loading bot automation data.
-        </div>
-      ) : null}
       {purchaseMessage ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
           {purchaseMessage}

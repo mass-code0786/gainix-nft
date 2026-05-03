@@ -82,7 +82,8 @@ export function useIncome() {
       return;
     }
 
-    let isCancelled = false;
+    const controller = new AbortController();
+    const startedAt = performance.now();
 
     async function load() {
       setIsLoading(true);
@@ -91,6 +92,7 @@ export function useIncome() {
       try {
         const response = await fetchJson<BackendIncomeOverviewResponse>(
           `/api/income?walletAddress=${fullAddress}`,
+          { signal: controller.signal },
         );
         const history = response.history
           .slice()
@@ -110,7 +112,7 @@ export function useIncome() {
           .filter((entry) => entry.type === "ROYALTY_INCOME")
           .map(toHistoryRecord);
 
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setOverview({
             nftTradingIncome: {
               ...response.nftTradingIncome,
@@ -152,12 +154,13 @@ export function useIncome() {
           setSource("api");
         }
       } catch (loadError) {
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load income.");
         }
       } finally {
-        if (!isCancelled) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
+          console.info(`[perf.ui] page=income loadMs=${Math.round(performance.now() - startedAt)}`);
         }
       }
     }
@@ -165,7 +168,7 @@ export function useIncome() {
     void load();
 
     return () => {
-      isCancelled = true;
+      controller.abort();
     };
   }, [fullAddress, isConnected]);
 
