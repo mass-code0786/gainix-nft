@@ -2704,6 +2704,41 @@ export async function getMarketplaceNfts() {
   };
 }
 
+export async function getLatestMarketplaceNfts(limit = 5) {
+  await ensureStoreInitialized();
+  await processTradingEngineTick();
+  const state = await readState();
+  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 20);
+  const activeStatuses = new Set(["listed", "marketplace", "live", "active"]);
+  const latestListings = state.nfts
+    .filter(
+      (item) =>
+        activeStatuses.has(item.status) &&
+        Boolean(item.imageUrl) &&
+        !isLegacyDemoMarketplaceNft(item),
+    )
+    .map((nft) => {
+      const latestTrade = state.nft_trades
+        .filter((trade) => trade.nftId === nft.id && trade.status === "listed")
+        .sort((left, right) =>
+          (right.listedAt ?? right.createdAt).localeCompare(left.listedAt ?? left.createdAt),
+        )[0];
+
+      return {
+        imageUrl: nft.imageUrl,
+        sortDate: latestTrade?.listedAt ?? latestTrade?.createdAt ?? nft.createdAt,
+      };
+    })
+    .sort((left, right) => right.sortDate.localeCompare(left.sortDate))
+    .slice(0, safeLimit)
+    .map(({ imageUrl }) => ({ imageUrl }));
+
+  return {
+    nfts: latestListings,
+    total: latestListings.length,
+  };
+}
+
 export async function getAdminNfts() {
   await ensureStoreInitialized();
 

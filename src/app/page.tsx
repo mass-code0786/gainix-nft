@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { HeroActionButtons, HeroPrimaryActions } from "@/components/sections/hero-primary-actions";
+import { LatestListedNfts } from "@/components/sections/latest-listed-nfts";
 import { nfts } from "@/data/mock-data";
 import { resolveNftImageUri } from "@/lib/web3/token-metadata";
 
@@ -51,6 +52,7 @@ export default function SplashPage() {
         </section>
 
         <HeroPrimaryActions imageSrc={heroImageSrc} imageAlt={heroNft.name} />
+        <LatestListedNfts />
       </div>
     </main>
   );
