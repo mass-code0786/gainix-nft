@@ -162,6 +162,39 @@ function latestActionLabel(action: string | undefined) {
   return "Waiting";
 }
 
+function formatActivePlanAmount(price: number | undefined) {
+  if (typeof price !== "number") {
+    return "No Active Plan";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(price);
+}
+
+function ActivePlanCard({
+  price,
+  isRunning,
+}: {
+  price?: number;
+  isRunning: boolean;
+}) {
+  return (
+    <div className="rounded-[22px] border border-white/10 bg-black/25 p-3 text-center sm:p-4">
+      <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-xs sm:tracking-[0.16em]">
+        Active Plan
+      </p>
+      <p className="mt-2 whitespace-normal break-words font-display text-xl font-bold leading-tight text-white">
+        {formatActivePlanAmount(price)}
+      </p>
+      {isRunning ? <p className="mt-1 text-xs text-zinc-400 sm:text-sm">Running</p> : null}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const {
     fullAddress: walletAddress,
@@ -286,13 +319,7 @@ export default function DashboardPage() {
 
       <SectionShell title="Bot Status">
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
-          <SummaryCard
-            label="Active Plan"
-            value={activeSubscription?.planName ?? "None"}
-            detail={botStatus === "active" ? "Running" : "Inactive"}
-            icon={Bot}
-            compact
-          />
+          <ActivePlanCard price={activeSubscription?.price} isRunning={botStatus === "active"} />
           <SummaryCard
             label="Completed Cycles"
             value={completedCycles}
