@@ -146,7 +146,10 @@ interface ListNftInput extends UserSelector {
 interface TransferCapitalInput extends UserSelector {}
 
 interface BuyBotInput extends UserSelector {
-  planId: BotPlanId;
+  packageId?: string;
+  planId?: string;
+  amount?: number;
+  price?: number;
 }
 
 interface UpdateAdminSettingsInput {
@@ -1202,6 +1205,49 @@ function botPlanFromAmount(amount: number): BotPlan | null {
   return Object.values(BOT_PLANS).find((plan) => plan.price === amount) ?? null;
 }
 
+function normalizeBotPackageIdentifier(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function botPlanFromIdentifier(identifier: string | undefined) {
+  if (!identifier) {
+    return null;
+  }
+
+  const normalized = normalizeBotPackageIdentifier(identifier);
+  return (
+    Object.values(BOT_PLANS).find((plan) => {
+      const normalizedPlanId = normalizeBotPackageIdentifier(plan.planId);
+      const normalizedPlanName = normalizeBotPackageIdentifier(plan.planName);
+      const normalizedPrice = String(plan.price);
+
+      return (
+        normalized === normalizedPlanId ||
+        normalized === normalizedPlanName ||
+        normalized === normalizedPrice ||
+        normalized === `$${normalizedPrice}` ||
+        normalized === `gainix bot $${normalizedPrice}`
+      );
+    }) ?? null
+  );
+}
+
+function resolveBotPlan(input: BuyBotInput) {
+  const identifierPlan = botPlanFromIdentifier(input.planId) ?? botPlanFromIdentifier(input.packageId);
+  const amountPlan =
+    typeof input.amount === "number"
+      ? botPlanFromAmount(input.amount)
+      : typeof input.price === "number"
+        ? botPlanFromAmount(input.price)
+        : null;
+
+  if (identifierPlan && amountPlan && identifierPlan.planId !== amountPlan.planId) {
+    return null;
+  }
+
+  return identifierPlan ?? amountPlan;
+}
+
 function botHasRemainingCapacity(subscription: BotSubscriptionRecord) {
   return subscription.remainingBuyTrades > 0 && subscription.remainingSellTrades > 0;
 }
@@ -2098,31 +2144,33 @@ export async function buyBotSubscription(input: BuyBotInput) {
   return withStoreTransaction(async (state) => {
     const { user, wallet } = requireUser(state, input);
     console.info(`[bot.buy] wallet=${user.walletAddress}`);
-    console.info(`[bot.buy] package=${input.planId}`);
 
-    const plan = BOT_PLANS[input.planId];
+    const plan = resolveBotPlan(input);
     if (!plan) {
-      throw new ApiError(404, "Bot plan not found.");
+      console.warn("[bot.buy] failed reason=Invalid bot package");
+      throw new ApiError(400, "Invalid bot package");
     }
+    console.info(`[bot.buy] package resolved=${plan.planId}`);
 
     const matchedPlan = botPlanFromAmount(plan.price);
     if (!matchedPlan || matchedPlan.planId !== plan.planId) {
-      console.warn("[bot.buy] conflict reason=Bot plan configuration is invalid.");
-      throw new ApiError(409, "Bot plan configuration is invalid.");
+      console.warn("[bot.buy] failed reason=Invalid bot package");
+      throw new ApiError(400, "Invalid bot package");
     }
 
     const activeSamePlanSubscription = state.bot_subscriptions.find(
       (item) => item.userId === user.id && item.planId === plan.planId && item.status === "active",
     );
     if (activeSamePlanSubscription) {
-      console.warn("[bot.buy] conflict reason=You already have an active bot subscription.");
+      console.warn("[bot.buy] failed reason=You already have an active bot subscription.");
       throw new ApiError(409, "You already have an active bot subscription.", {
         subscriptionId: activeSamePlanSubscription.id,
       });
     }
 
     if (wallet.tradingWallet < plan.price) {
-      throw new ApiError(400, "Insufficient balance.");
+      console.warn("[bot.buy] failed reason=Insufficient balance");
+      throw new ApiError(400, "Insufficient balance");
     }
 
     wallet.tradingWallet = roundAmount(wallet.tradingWallet - plan.price);
@@ -2167,7 +2215,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
     user.selfPackageAmount = roundAmount(user.selfPackageAmount + plan.price);
     refreshVipLevels(state);
     const uplineIncome = processBotPurchaseUplineIncome(state, user.id, subscription);
-    console.info(`[bot.buy] success subscriptionId=${subscription.id}`);
+    console.info(`[bot.buy] success=${subscription.id}`);
 
     return {
       message: "Bot subscription activated.",

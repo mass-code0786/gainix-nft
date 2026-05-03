@@ -96,7 +96,10 @@ export const nftMutationInputSchema = z.object({
 
 export const botBuyInputSchema = z.object({
   walletAddress: walletAddressSchema,
-  planId: planIdSchema,
+  packageId: z.string().trim().min(1).optional(),
+  planId: z.string().trim().min(1).optional(),
+  amount: amountSchema.optional(),
+  price: amountSchema.optional(),
 });
 
 export const adminSettingsInputSchema = z

@@ -8,6 +8,7 @@ import { AnimatedPage } from "@/components/ui/animated-page";
 import { useBotSubscription } from "@/hooks/useBotSubscription";
 import { useWallet } from "@/hooks/useWallet";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
+import type { BotAutomationPlan } from "@/types";
 
 function formatLatestAction(label: string | null | undefined) {
   if (!label) {
@@ -57,12 +58,12 @@ export default function BotSubscriptionPage() {
   const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
-  async function handleBuy(planId: string) {
+  async function handleBuy(plan: BotAutomationPlan) {
     if (!fullAddress) {
       return;
     }
 
-    setIsPurchasing(planId);
+    setIsPurchasing(plan.planId);
     setPurchaseMessage(null);
     setPurchaseError(null);
 
@@ -75,7 +76,9 @@ export default function BotSubscriptionPage() {
         },
         body: JSON.stringify({
           walletAddress: fullAddress,
-          planId,
+          planId: plan.planId,
+          packageId: plan.planId,
+          price: plan.price,
         }),
       });
 
@@ -109,7 +112,7 @@ export default function BotSubscriptionPage() {
             price={plan.price}
             buyLimit={plan.buyTrades}
             sellLimit={plan.sellTrades}
-            onBuy={() => void handleBuy(plan.planId)}
+            onBuy={() => void handleBuy(plan)}
             isDisabled={!isConnected || Boolean(isPurchasing)}
             isLoading={isPurchasing === plan.planId}
           />
