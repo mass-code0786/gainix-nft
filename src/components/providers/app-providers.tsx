@@ -43,10 +43,22 @@ export function AppProviders({ children }: PropsWithChildren) {
 }
 
 function WalletSessionGuard() {
-  const { address, isConnected, status } = useAccount();
+  const { address, connector, isConnected, status } = useAccount();
   const { resetWalletSession } = useWalletSessionReset();
   const wasConnectedRef = useRef(false);
   const isCleaningRef = useRef(false);
+
+  useEffect(() => {
+    if (!connector) {
+      return;
+    }
+
+    console.info("[wallet.mobile] connector selected", {
+      id: connector.id,
+      name: connector.name,
+      type: connector.type,
+    });
+  }, [connector]);
 
   useEffect(() => {
     const wasConnected = wasConnectedRef.current;

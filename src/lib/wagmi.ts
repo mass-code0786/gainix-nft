@@ -12,6 +12,7 @@ import { GAINIX_RPC_READ_TIMEOUT_MS, GAINIX_RPC_RETRY_LIMIT } from "@/lib/web3/r
 export const supportedChains = gainixChains;
 export const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim();
 export const isWalletConnectConfigured = Boolean(walletConnectProjectId);
+const walletConnectProjectIdForRainbowKit = walletConnectProjectId ?? "";
 
 const transports = {
   [gainixDefaultChain.id]: http(
@@ -27,47 +28,51 @@ const walletConnectParameters = {
   },
 } as const;
 
+console.info("[wallet.config] projectId loaded", {
+  configured: isWalletConnectConfigured,
+  source: "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID",
+});
+
 if (!walletConnectProjectId) {
-  console.warn("[wallet.mobile] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is missing; WalletConnect mobile options are disabled.");
+  console.error(
+    "[wallet.config] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is missing; MetaMask, Trust Wallet, and WalletConnect mobile deep links require it. Falling back to injected/browser wallet connectors only.",
+  );
 }
 
-const rainbowKitConnectors = walletConnectProjectId
-  ? connectorsForWallets(
-      [
-        {
-          groupName: "Mobile wallets",
-          wallets: [metaMaskWallet, trustWallet, injectedWallet, walletConnectWallet],
-        },
-      ],
+const walletGroups = walletConnectProjectId
+  ? [
       {
-        appName: "Gainix NFT",
-        projectId: walletConnectProjectId,
-        walletConnectParameters,
+        groupName: "Mobile wallets",
+        wallets: [metaMaskWallet, trustWallet, walletConnectWallet],
       },
-    )
-  : connectorsForWallets(
-      [
-        {
-          groupName: "Browser wallet",
-          wallets: [injectedWallet],
-        },
-      ],
       {
-        appName: "Gainix NFT",
-        projectId: "missing-walletconnect-project-id",
+        groupName: "Browser wallet",
+        wallets: [injectedWallet],
       },
-    );
+    ]
+  : [
+      {
+        groupName: "Browser wallet",
+        wallets: [injectedWallet],
+      },
+    ];
 
-export const wagmiConfig = walletConnectProjectId
-  ? createConfig({
-      chains: supportedChains,
-      connectors: rainbowKitConnectors,
-      transports,
-      ssr: true,
-    })
-  : createConfig({
-      chains: supportedChains,
-      connectors: rainbowKitConnectors,
-      transports,
-      ssr: true,
-    });
+console.info("[wallet.config] connectors", {
+  chains: supportedChains.map((chain) => ({ id: chain.id, name: chain.name })),
+  walletGroups: walletConnectProjectId
+    ? ["MetaMask", "Trust Wallet", "WalletConnect", "Injected/Browser Wallet"]
+    : ["Injected/Browser Wallet"],
+});
+
+const rainbowKitConnectors = connectorsForWallets(walletGroups, {
+  appName: "Gainix NFT",
+  projectId: walletConnectProjectIdForRainbowKit,
+  walletConnectParameters,
+});
+
+export const wagmiConfig = createConfig({
+  chains: supportedChains,
+  connectors: rainbowKitConnectors,
+  transports,
+  ssr: true,
+});
