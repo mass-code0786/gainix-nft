@@ -326,6 +326,16 @@ function pushBotActivity(
   });
 }
 
+function logBotSchedulerSkip(
+  reason: string,
+  metadata: Record<string, unknown>,
+) {
+  console.info("[bot.scheduler] skipped", {
+    reason,
+    ...metadata,
+  });
+}
+
 function directReferralCount(state: NftSimState, userId: string) {
   return state.mlm_tree.filter(
     (item) => item.ancestorUserId === userId && item.level === 1,
@@ -921,17 +931,16 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
   }
 
   if (!canUseDailyTrade(state, user, "sell")) {
-    if (trade.botSubscriptionId) {
-      pushBotActivity(state, {
-        userId: trade.userId,
-        botSubscriptionId: trade.botSubscriptionId,
-        nftId: trade.nftId,
-        action: "AUTO_SELL",
-        amount: 0,
-        profit: null,
-        status: "SKIPPED",
-      });
-    }
+    logBotSchedulerSkip("Daily limit reached. Bot will resume after reset.", {
+      userId: trade.userId,
+      subscriptionId: trade.botSubscriptionId,
+      tradeId: trade.id,
+      nftId: trade.nftId,
+      tradeSource: trade.source,
+      side: "sell",
+      dailySellCount: user.dailySellCount,
+      dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
+    });
     return null;
   }
 
@@ -1132,15 +1141,16 @@ function executeBotCycleInternal(state: NftSimState) {
     }
 
     if (!canUseDailyTrade(state, user, "buy") || !canUseDailyTrade(state, user, "sell")) {
-      pushBotActivity(state, {
+      logBotSchedulerSkip("Daily limit reached. Bot will resume after reset.", {
         userId: subscription.userId,
-        botSubscriptionId: subscription.id,
-        nftId: null,
-        action: "AUTO_BUY",
-        amount: 0,
-        profit: null,
-        status: "SKIPPED",
+        subscriptionId: subscription.id,
+        dailyBuyCount: user.dailyBuyCount,
+        dailySellCount: user.dailySellCount,
+        ...tradeLimitsForUser(user),
       });
+      if (!selectionMessages.includes("Daily limit reached. Bot will resume after reset.")) {
+        selectionMessages.push("Daily limit reached. Bot will resume after reset.");
+      }
       continue;
     }
 

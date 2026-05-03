@@ -18,7 +18,18 @@ function formatActionLabel(activity: BotAutomationActivity) {
   return "Auto Bought NFT";
 }
 
+function isFakeSkippedBotAttempt(activity: BotAutomationActivity) {
+  return (
+    activity.status === "SKIPPED" &&
+    activity.amount === 0 &&
+    formatActionLabel(activity).includes("Auto Bought NFT") &&
+    (activity.nft?.name ?? activity.nftId ?? "System NFT") === "System NFT"
+  );
+}
+
 export function BotActivityTimeline({ activity }: BotActivityTimelineProps) {
+  const visibleActivity = activity.filter((entry) => !isFakeSkippedBotAttempt(entry));
+
   return (
     <div className="section-shell lux-card space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -29,12 +40,12 @@ export function BotActivityTimeline({ activity }: BotActivityTimelineProps) {
       </div>
 
       <div className="space-y-3">
-        {activity.length === 0 ? (
+        {visibleActivity.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-400">
             No bot activity yet.
           </div>
         ) : (
-          activity.map((entry) => (
+          visibleActivity.map((entry) => (
             <div
               key={entry.id}
               className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between"

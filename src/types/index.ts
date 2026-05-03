@@ -180,7 +180,7 @@ export interface BotAutomationActivity {
   action: "AUTO_BUY" | "AUTO_LIST" | "AUTO_SELL";
   amount: number;
   profit: number | null;
-  status: "SUCCESS" | "WAITING" | "COMPLETED";
+  status: "SUCCESS" | "WAITING" | "COMPLETED" | "SKIPPED";
   createdAt: string;
   nft?: {
     id: string;

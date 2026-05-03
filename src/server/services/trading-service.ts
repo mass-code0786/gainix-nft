@@ -481,6 +481,16 @@ function pushSafetyLog(
   });
 }
 
+function logBotSchedulerSkip(
+  reason: string,
+  metadata: Record<string, unknown>,
+) {
+  console.info("[bot.scheduler] skipped", {
+    reason,
+    ...metadata,
+  });
+}
+
 function directReferralCount(state: NftSimState, userId: string) {
   return state.mlm_tree.filter(
     (item) => item.ancestorUserId === userId && item.level === 1,
@@ -1581,30 +1591,15 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
   }
 
   if (!canUseDailyTrade(state, user, "sell")) {
-    if (trade.botSubscriptionId) {
-      pushBotActivity(state, {
-        userId: trade.userId,
-        botSubscriptionId: trade.botSubscriptionId,
-        nftId: trade.nftId,
-        action: "AUTO_SELL",
-        amount: 0,
-        profit: null,
-        status: "SKIPPED",
-      });
-    }
-    pushSafetyLog(state, {
-      eventType: "TRADE_LIMIT_REACHED",
+    logBotSchedulerSkip("Daily limit reached. Bot will resume after reset.", {
       userId: trade.userId,
-      amount: null,
-      reason: "Skipped: daily limit reached",
-      metadata: {
-        tradeId: trade.id,
-        nftId: trade.nftId,
-        tradeSource: trade.source,
-        side: "sell",
-        dailySellCount: user.dailySellCount,
-        dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
-      },
+      subscriptionId: trade.botSubscriptionId,
+      tradeId: trade.id,
+      nftId: trade.nftId,
+      tradeSource: trade.source,
+      side: "sell",
+      dailySellCount: user.dailySellCount,
+      dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
     });
     return null;
   }
@@ -1804,12 +1799,9 @@ function executeBotCycleInternal(state: NftSimState) {
 
   if (state.admin_settings.systemStopped) {
     for (const subscription of state.bot_subscriptions.filter((item) => item.status === "active")) {
-      pushSafetyLog(state, {
-        eventType: "BOT_CYCLE_SKIPPED",
+      logBotSchedulerSkip("System emergency stop is active.", {
         userId: subscription.userId,
-        amount: null,
-        reason: "System emergency stop is active.",
-        metadata: { subscriptionId: subscription.id },
+        subscriptionId: subscription.id,
       });
     }
     return { executions, selectionMessages };
@@ -1828,29 +1820,19 @@ function executeBotCycleInternal(state: NftSimState) {
     }
 
     if (activeTradeForBotSubscription(state, subscription.id)) {
+      logBotSchedulerSkip("Bot cycle cooldown: active trade is still open.", {
+        userId: subscription.userId,
+        subscriptionId: subscription.id,
+      });
       continue;
     }
 
     if (wallet.tradingWallet < state.admin_settings.minimumTradeAmount) {
-      pushBotActivity(state, {
+      logBotSchedulerSkip("Trading wallet is below minimum trade amount.", {
         userId: subscription.userId,
-        botSubscriptionId: subscription.id,
-        nftId: null,
-        action: "AUTO_BUY",
-        amount: 0,
-        profit: null,
-        status: "SKIPPED",
-      });
-      pushSafetyLog(state, {
-        eventType: "BOT_CYCLE_SKIPPED",
-        userId: subscription.userId,
-        amount: wallet.tradingWallet,
-        reason: "Trading wallet is below minimum trade amount.",
-        metadata: {
-          subscriptionId: subscription.id,
-          tradingWallet: wallet.tradingWallet,
-          minimumTradeAmount: state.admin_settings.minimumTradeAmount,
-        },
+        subscriptionId: subscription.id,
+        tradingWallet: wallet.tradingWallet,
+        minimumTradeAmount: state.admin_settings.minimumTradeAmount,
       });
       continue;
     }
@@ -1864,27 +1846,16 @@ function executeBotCycleInternal(state: NftSimState) {
     }
 
     if (!canUseDailyTrade(state, user, "buy") || !canUseDailyTrade(state, user, "sell")) {
-      pushBotActivity(state, {
+      logBotSchedulerSkip("Daily limit reached. Bot will resume after reset.", {
         userId: subscription.userId,
-        botSubscriptionId: subscription.id,
-        nftId: null,
-        action: "AUTO_BUY",
-        amount: 0,
-        profit: null,
-        status: "SKIPPED",
+        subscriptionId: subscription.id,
+        dailyBuyCount: user.dailyBuyCount,
+        dailySellCount: user.dailySellCount,
+        ...tradeLimitsForUser(user),
       });
-      pushSafetyLog(state, {
-        eventType: "BOT_CYCLE_SKIPPED",
-        userId: subscription.userId,
-        amount: null,
-        reason: "Skipped: daily limit reached",
-        metadata: {
-          subscriptionId: subscription.id,
-          dailyBuyCount: user.dailyBuyCount,
-          dailySellCount: user.dailySellCount,
-          ...tradeLimitsForUser(user),
-        },
-      });
+      if (!selectionMessages.includes("Daily limit reached. Bot will resume after reset.")) {
+        selectionMessages.push("Daily limit reached. Bot will resume after reset.");
+      }
       continue;
     }
 
@@ -1899,15 +1870,10 @@ function executeBotCycleInternal(state: NftSimState) {
 
     if (!nft) {
       selectionMessages.push(NO_SUITABLE_NFT_MESSAGE);
-      pushSafetyLog(state, {
-        eventType: "BOT_CYCLE_SKIPPED",
+      logBotSchedulerSkip(NO_SUITABLE_NFT_MESSAGE, {
         userId: subscription.userId,
-        amount: wallet.tradingWallet,
-        reason: NO_SUITABLE_NFT_MESSAGE,
-        metadata: {
-          subscriptionId: subscription.id,
-          tradingWallet: wallet.tradingWallet,
-        },
+        subscriptionId: subscription.id,
+        tradingWallet: wallet.tradingWallet,
       });
       continue;
     }
@@ -2990,6 +2956,7 @@ export async function getBotStatus(selector: UserSelector) {
     const latestActivity =
       state.bot_activity
         .filter((item) => item.userId === user.id)
+        .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
 
     return {
@@ -3018,6 +2985,7 @@ export async function getBotActivity(selector: UserSelector) {
     const { user } = requireUser(state, selector);
     const activity = state.bot_activity
       .filter((item) => item.userId === user.id)
+      .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((item) => ({
         ...item,
