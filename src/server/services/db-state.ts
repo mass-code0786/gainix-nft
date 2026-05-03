@@ -22,6 +22,10 @@ let transactionQueue = Promise.resolve();
 type DbClient = PrismaClient | Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 let registrationBonusColumnReady = false;
 
+interface StoreTransactionOptions {
+  lockActiveBotRows?: boolean;
+}
+
 function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -648,12 +652,24 @@ export async function readState() {
 
 export async function withStoreTransaction<T>(
   callback: (draft: NftSimState) => Promise<T> | T,
+  options: StoreTransactionOptions = {},
 ) {
   let result!: T;
 
   const runTransaction = transactionQueue.catch(() => undefined).then(async () => {
     await ensureStoreInitialized();
     await prisma.$transaction(async (tx) => {
+      if (options.lockActiveBotRows) {
+        const databaseUrl = process.env.DATABASE_URL ?? "";
+        if (!databaseUrl.startsWith("file:")) {
+          await tx.$queryRawUnsafe(
+            'SELECT id FROM "bot_subscriptions" WHERE status = \'ACTIVE\' ORDER BY id FOR UPDATE',
+          );
+          await tx.$queryRawUnsafe(
+            'SELECT u.id FROM "users" u INNER JOIN "bot_subscriptions" b ON b."userId" = u.id WHERE b.status = \'ACTIVE\' ORDER BY u.id FOR UPDATE',
+          );
+        }
+      }
       const current = await buildState(tx);
       const draft = cloneState(current);
       result = await callback(draft);

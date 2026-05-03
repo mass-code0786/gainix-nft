@@ -1,4 +1,4 @@
-import { processTradingEngineTick } from "@/server/nft-sim/service";
+import { processTradingEngineTick } from "@/server/services/trading-service";
 
 declare global {
   // eslint-disable-next-line no-var

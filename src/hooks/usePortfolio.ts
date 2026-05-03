@@ -129,9 +129,13 @@ export function usePortfolio() {
         { signal },
       );
 
+      const sortedOpenTrades = summaryResponse.trades
+        .filter((trade) => trade.status !== "auto_sold")
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      const currentBotTrade = sortedOpenTrades.find((trade) => trade.source === "bot") ?? null;
       const openTrades = new Map<string, NFTItem>();
-      for (const trade of summaryResponse.trades) {
-        if (trade.status === "auto_sold") {
+      for (const trade of sortedOpenTrades) {
+        if (trade.source === "bot" && trade.id !== currentBotTrade?.id) {
           continue;
         }
 

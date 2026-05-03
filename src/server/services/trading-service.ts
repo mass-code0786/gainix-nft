@@ -104,6 +104,7 @@ const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
 
 let botExecutionRunning = false;
 const scheduledBotListTradeIds = new Set<string>();
+const activeBotBuyUserIds = new Set<string>();
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -590,6 +591,17 @@ function activeTradeForBotSubscription(state: NftSimState, botSubscriptionId: st
       item.botSubscriptionId === botSubscriptionId &&
       item.status !== "auto_sold",
   );
+}
+
+function activeBotTradeForUser(state: NftSimState, userId: string) {
+  return state.nft_trades
+    .filter(
+      (item) =>
+        item.userId === userId &&
+        item.source === "bot" &&
+        item.status !== "auto_sold",
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
 }
 
 function toPublicTrade(state: NftSimState, trade: NftTradeRecord) {
@@ -1299,6 +1311,10 @@ function botCanStartNextCycle(
     return false;
   }
 
+  if (activeBotTradeForUser(state, subscription.userId)) {
+    return false;
+  }
+
   return combinedWalletBalance(wallet) > 0;
 }
 
@@ -1350,6 +1366,12 @@ function buyNft(
   }
 
   if (input.source === "bot" && input.botSubscriptionId) {
+    const existingBotTrade = activeBotTradeForUser(state, user.id);
+    if (existingBotTrade) {
+      console.info(`[bot.buy] skipped existing pending trade userId=${user.id}`);
+      throw new ApiError(409, "Bot already has a pending NFT trade.");
+    }
+
     const subscription = state.bot_subscriptions.find(
       (item) => item.id === input.botSubscriptionId,
     );
@@ -1526,6 +1548,7 @@ function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
     nft.id,
     nft.currentPrice,
   );
+  settleAutoSell(state, trade);
   console.info(`[bot.sell] nftId=${nft.id} triggered after 5min`);
   return true;
 }
@@ -1889,10 +1912,18 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
-    if (activeTradeForBotSubscription(state, subscription.id)) {
+    const existingSubscriptionTrade = activeTradeForBotSubscription(state, subscription.id);
+    const existingUserBotTrade = activeBotTradeForUser(state, subscription.userId);
+    const existingPendingTrade = existingUserBotTrade ?? existingSubscriptionTrade ?? null;
+    if (existingPendingTrade) {
+      console.info(`[bot.buy] skipped existing pending trade userId=${subscription.userId}`);
       logBotSchedulerSkip("Bot cycle cooldown: active trade is still open.", {
         userId: subscription.userId,
         subscriptionId: subscription.id,
+        tradeId: existingPendingTrade.id,
+        nftId: existingPendingTrade.nftId,
+        tradeStatus: existingPendingTrade.status,
+        autoSellAt: existingPendingTrade.autoSellAt,
       });
       continue;
     }
@@ -1915,6 +1946,31 @@ function executeBotCycleInternal(state: NftSimState) {
     }
     const user = state.users.find((item) => item.id === subscription.userId);
     if (!user) {
+      continue;
+    }
+
+    if (activeBotBuyUserIds.has(user.id)) {
+      logBotSchedulerSkip("Bot buy already running for user.", {
+        userId: user.id,
+        subscriptionId: subscription.id,
+      });
+      continue;
+    }
+
+    const cycleId = `${subscription.id}:${subscription.completedBuyTrades + 1}`;
+    const idempotencyKey = `bot_buy:${user.id}:${cycleId}`;
+    const duplicateBuy = state.safety_logs.some(
+      (item) =>
+        item.eventType === "BOT_BUY_IDEMPOTENCY" &&
+        item.userId === user.id &&
+        item.metadata.idempotencyKey === idempotencyKey,
+    );
+    if (duplicateBuy) {
+      logBotSchedulerSkip("Duplicate bot buy cycle skipped.", {
+        userId: user.id,
+        subscriptionId: subscription.id,
+        idempotencyKey,
+      });
       continue;
     }
 
@@ -1953,13 +2009,34 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
-    console.info(`[bot.buy] balance=${combinedBalance} selected=${nft.currentPrice} nftId=${nft.id}`);
-    const buyResult = buyNft(state, user, wallet, {
-      nftId: nft.id,
-      userId: user.id,
-      source: "bot",
-      botSubscriptionId: subscription.id,
-    });
+    activeBotBuyUserIds.add(user.id);
+    console.info(`[bot.buy] locked user=${user.id} subscription=${subscription.id}`);
+    let buyResult: ReturnType<typeof buyNft>;
+    try {
+      const existingTradeInsideLock = activeBotTradeForUser(state, user.id);
+      if (existingTradeInsideLock) {
+        console.info(`[bot.buy] skipped existing pending trade userId=${user.id}`);
+        logBotSchedulerSkip("Bot cycle cooldown: active trade is still open.", {
+          userId: user.id,
+          subscriptionId: subscription.id,
+          tradeId: existingTradeInsideLock.id,
+          nftId: existingTradeInsideLock.nftId,
+          tradeStatus: existingTradeInsideLock.status,
+          autoSellAt: existingTradeInsideLock.autoSellAt,
+        });
+        continue;
+      }
+
+      console.info(`[bot.buy] balance=${combinedBalance} selected=${nft.currentPrice} nftId=${nft.id}`);
+      buyResult = buyNft(state, user, wallet, {
+        nftId: nft.id,
+        userId: user.id,
+        source: "bot",
+        botSubscriptionId: subscription.id,
+      });
+    } finally {
+      activeBotBuyUserIds.delete(user.id);
+    }
     subscription.remainingBuyTrades -= 1;
     subscription.completedBuyTrades += 1;
     subscription.lastExecutedAt = nowIso();
@@ -1975,6 +2052,20 @@ function executeBotCycleInternal(state: NftSimState) {
       profit: null,
       status: "SUCCESS",
     });
+    pushSafetyLog(state, {
+      eventType: "BOT_BUY_IDEMPOTENCY",
+      userId: user.id,
+      amount: buyResult.trade.buyPrice,
+      reason: "Bot buy cycle completed.",
+      metadata: {
+        idempotencyKey,
+        cycleId,
+        subscriptionId: subscription.id,
+        tradeId: buyResult.trade.id,
+        nftId: buyResult.nft.id,
+      },
+    });
+    console.info(`[bot.buy] purchased one nft=${buyResult.nft.id} userId=${user.id} tradeId=${buyResult.trade.id} idempotencyKey=${idempotencyKey}`);
 
     executions.push({
       subscriptionId: subscription.id,
@@ -2382,7 +2473,7 @@ export async function processTradingEngineTick() {
         dueBotListTradeIds,
         royaltyPayouts,
       };
-    });
+    }, { lockActiveBotRows: true });
   } finally {
     botExecutionRunning = false;
   }
