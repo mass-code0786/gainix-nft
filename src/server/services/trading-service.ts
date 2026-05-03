@@ -88,6 +88,7 @@ const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
 const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
 const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
 const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
+const NO_AFFORDABLE_NFT_MESSAGE = "No affordable NFT available for your wallet balance.";
 const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
   ["1001", 120],
   ["1002", 175],
@@ -1607,6 +1608,7 @@ function executeBotCycleInternal(state: NftSimState) {
     tradeId: string;
     nftId: string;
   }> = [];
+  const selectionMessages: string[] = [];
 
   if (state.admin_settings.systemStopped) {
     for (const subscription of state.bot_subscriptions.filter((item) => item.status === "active")) {
@@ -1618,7 +1620,7 @@ function executeBotCycleInternal(state: NftSimState) {
         metadata: { subscriptionId: subscription.id },
       });
     }
-    return executions;
+    return { executions, selectionMessages };
   }
 
   for (const subscription of state.bot_subscriptions) {
@@ -1695,15 +1697,27 @@ function executeBotCycleInternal(state: NftSimState) {
     }
 
     const nft = state.nfts
-      .filter((item) => item.status === "marketplace" && item.currentPrice <= wallet.tradingWallet)
-      .sort((a, b) => a.currentPrice - b.currentPrice)[0];
+      .filter(
+        (item) =>
+          item.status === "marketplace" &&
+          !isLegacyDemoMarketplaceNft(item) &&
+          item.currentPrice <= wallet.tradingWallet,
+      )
+      .sort((a, b) => b.currentPrice - a.currentPrice)[0];
+
+    console.info("[bot.selection]", {
+      balance: wallet.tradingWallet,
+      selectedPrice: nft?.currentPrice ?? null,
+      selectedNftId: nft?.id ?? null,
+    });
 
     if (!nft) {
+      selectionMessages.push(NO_AFFORDABLE_NFT_MESSAGE);
       pushSafetyLog(state, {
         eventType: "BOT_CYCLE_SKIPPED",
         userId: subscription.userId,
         amount: wallet.tradingWallet,
-        reason: "No marketplace NFT is affordable for the trading wallet.",
+        reason: NO_AFFORDABLE_NFT_MESSAGE,
         metadata: {
           subscriptionId: subscription.id,
           tradingWallet: wallet.tradingWallet,
@@ -1750,7 +1764,7 @@ function executeBotCycleInternal(state: NftSimState) {
     });
   }
 
-  return executions;
+  return { executions, selectionMessages };
 }
 
 export async function registerUser(input: RegisterUserInput) {
@@ -2078,14 +2092,15 @@ export async function processTradingEngineTick() {
       }
     }
 
-    const botExecutions = executeBotCycleInternal(state);
+    const botCycle = executeBotCycleInternal(state);
     refreshVipLevels(state);
     const royaltyPayouts = processRoyaltyPayouts(state, currentTime);
 
     return {
       serverTime: currentTime.toISOString(),
       settledSales,
-      botExecutions,
+      botExecutions: botCycle.executions,
+      botSelectionMessages: botCycle.selectionMessages,
       royaltyPayouts,
     };
   });
