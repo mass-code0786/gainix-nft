@@ -31,6 +31,10 @@ function formatLatestAction(label: string | null | undefined) {
 }
 
 async function readApiError(response: Response) {
+  if (response.status === 401) {
+    return "Please reconnect wallet and try again";
+  }
+
   try {
     const payload = (await response.json()) as { error?: string; message?: string };
     return payload.error ?? payload.message ?? "Bot purchase failed.";

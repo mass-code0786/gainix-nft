@@ -2228,6 +2228,18 @@ export async function buyBotSubscription(input: BuyBotInput) {
   });
 }
 
+export async function assertRegisteredWalletForBotBuy(walletAddress: string) {
+  await ensureStoreInitialized();
+
+  return withStoreTransaction(async (state) => {
+    const { user } = requireUser(state, { walletAddress });
+    return {
+      id: user.id,
+      walletAddress: user.walletAddress,
+    };
+  });
+}
+
 export async function processTradingEngineTick() {
   if (botExecutionRunning) {
     return {
