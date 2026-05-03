@@ -728,6 +728,36 @@ function vipConfig(level: number) {
   return VIP_LEVELS.find((item) => item.level === level) ?? null;
 }
 
+function confirmedDepositAmountForUser(state: NftSimState, userId: string) {
+  return roundAmount(
+    state.deposits
+      .filter(
+        (deposit) =>
+          deposit.userId === userId &&
+          deposit.status === "confirmed" &&
+          typeof deposit.creditedAmount === "number",
+      )
+      .reduce((total, deposit) => total + (deposit.creditedAmount ?? 0), 0),
+  );
+}
+
+function qualifiedPackageAmountForUser(state: NftSimState, userId: string) {
+  const user = state.users.find((item) => item.id === userId);
+  const wallet = state.wallets.find((item) => item.userId === userId);
+  const selfPackageAmount = user?.selfPackageAmount ?? 0;
+  const totalDeposited = wallet?.totalDeposited ?? 0;
+  const tradingWalletFundedAmount = wallet?.tradingWallet ?? 0;
+
+  return roundAmount(
+    Math.max(
+      selfPackageAmount,
+      totalDeposited,
+      confirmedDepositAmountForUser(state, userId),
+      tradingWalletFundedAmount,
+    ),
+  );
+}
+
 function qualifiedPackageUsersAtLevel(
   state: NftSimState,
   ancestorUserId: string,
@@ -736,7 +766,7 @@ function qualifiedPackageUsersAtLevel(
 ) {
   const qualifiedUserIds = new Set(
     state.users
-      .filter((user) => user.selfPackageAmount >= minimumPackageAmount)
+      .filter((user) => qualifiedPackageAmountForUser(state, user.id) >= minimumPackageAmount)
       .map((user) => user.id),
   );
 
@@ -746,6 +776,22 @@ function qualifiedPackageUsersAtLevel(
       item.level === level &&
       qualifiedUserIds.has(item.userId),
   ).length;
+}
+
+function qualifiedPackageSalesAtLevel(
+  state: NftSimState,
+  ancestorUserId: string,
+  level: number,
+  minimumPackageAmount: number,
+) {
+  return roundAmount(
+    state.mlm_tree
+      .filter((item) => item.ancestorUserId === ancestorUserId && item.level === level)
+      .reduce((total, item) => {
+        const qualifiedAmount = qualifiedPackageAmountForUser(state, item.userId);
+        return qualifiedAmount >= minimumPackageAmount ? total + qualifiedAmount : total;
+      }, 0),
+  );
 }
 
 function directUsersWithVipLevel(
@@ -769,10 +815,11 @@ function calculateImmediateVipLevel(state: NftSimState, userId: string) {
   }
 
   const minimumPackageAmount = state.admin_settings.vipMinimumTeamPackageAmount;
+  const userQualifiedAmount = qualifiedPackageAmountForUser(state, user.id);
   let level = 0;
 
   if (
-    user.selfPackageAmount >= 100 &&
+    userQualifiedAmount >= 100 &&
     qualifiedPackageUsersAtLevel(state, user.id, 1, minimumPackageAmount) >= 5 &&
     qualifiedPackageUsersAtLevel(state, user.id, 2, minimumPackageAmount) >= 10
   ) {
@@ -780,7 +827,7 @@ function calculateImmediateVipLevel(state: NftSimState, userId: string) {
   }
 
   for (const item of VIP_LEVELS.slice(1)) {
-    if (user.selfPackageAmount < item.selfPackageAmount) {
+    if (userQualifiedAmount < item.selfPackageAmount) {
       break;
     }
 
@@ -931,6 +978,7 @@ function royaltyProgress(state: NftSimState, userId: string) {
   const nextVipLevel = user.currentVipLevel + 1;
   const config = vipConfig(nextVipLevel);
   const minimumPackageAmount = state.admin_settings.vipMinimumTeamPackageAmount;
+  const userQualifiedAmount = qualifiedPackageAmountForUser(state, user.id);
 
   if (!config) {
     return {
@@ -947,13 +995,17 @@ function royaltyProgress(state: NftSimState, userId: string) {
       nextVipLevel,
       payoutAmount: config.payoutAmount,
       currentRequirementProgress: {
-        selfPackageAmount: user.selfPackageAmount,
+        selfPackageAmount: userQualifiedAmount,
         selfPackageRequired: config.selfPackageAmount,
         qualifiedLevel1Users: qualifiedPackageUsersAtLevel(state, user.id, 1, minimumPackageAmount),
         qualifiedLevel1Required: 5,
         qualifiedLevel2Users: qualifiedPackageUsersAtLevel(state, user.id, 2, minimumPackageAmount),
         qualifiedLevel2Required: 10,
         minimumTeamPackageAmount: minimumPackageAmount,
+        teamSalesAmount: roundAmount(
+          qualifiedPackageSalesAtLevel(state, user.id, 1, minimumPackageAmount) +
+            qualifiedPackageSalesAtLevel(state, user.id, 2, minimumPackageAmount),
+        ),
       },
     };
   }
@@ -963,7 +1015,7 @@ function royaltyProgress(state: NftSimState, userId: string) {
     nextVipLevel,
     payoutAmount: config.payoutAmount,
     currentRequirementProgress: {
-      selfPackageAmount: user.selfPackageAmount,
+      selfPackageAmount: userQualifiedAmount,
       selfPackageRequired: config.selfPackageAmount,
       directQualifiedUsers: directUsersWithVipLevel(state, user.id, nextVipLevel - 1),
       directQualifiedRequired: 2,
@@ -2742,10 +2794,18 @@ export async function getTeamOverview(selector: UserSelector) {
 
   return withStoreTransaction(async (state) => {
     const { user } = requireUser(state, selector);
+    const minimumPackageAmount = state.admin_settings.vipMinimumTeamPackageAmount;
     const directs = state.mlm_tree
       .filter((item) => item.ancestorUserId === user.id && item.level === 1)
       .map((item) => state.users.find((entry) => entry.id === item.userId))
       .filter((item): item is UserRecord => Boolean(item));
+    const level1Total = directs.length;
+    const level1Qualified = qualifiedPackageUsersAtLevel(
+      state,
+      user.id,
+      1,
+      minimumPackageAmount,
+    );
     const levelBreakdown = MLM_LEVEL_PERCENTAGES.map((_, index) => ({
       level: index + 1,
       downlineCount: state.mlm_tree.filter(
@@ -2754,11 +2814,15 @@ export async function getTeamOverview(selector: UserSelector) {
       unlocked: unlockedLevels(state, user.id) >= index + 1,
     }));
 
+    console.info(
+      `[team.qualified] wallet=${user.walletAddress} level1Total=${level1Total} level1Qualified=${level1Qualified} minPackage=${minimumPackageAmount}`,
+    );
+
     return {
       user,
       sponsor: sponsorUserForUser(state, user.id),
       directs,
-      directCount: directs.length,
+      directCount: level1Total,
       unlockedLevels: unlockedLevels(state, user.id),
       levelBreakdown,
       vipStatus: royaltyProgress(state, user.id),
