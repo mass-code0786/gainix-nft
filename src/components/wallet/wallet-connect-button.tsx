@@ -3,6 +3,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDown, RotateCcw, Wallet2 } from "lucide-react";
 import { useState } from "react";
+import { useConnectors } from "wagmi";
 import { useWalletSessionReset } from "@/hooks/useWalletSessionReset";
 
 interface WalletConnectButtonProps {
@@ -12,6 +13,7 @@ interface WalletConnectButtonProps {
 export function WalletConnectButton({ variant = "default" }: WalletConnectButtonProps) {
   const isHeader = variant === "header";
   const [connectError, setConnectError] = useState(false);
+  const connectors = useConnectors();
   const { forceResetWagmiClient, resetWalletSession } = useWalletSessionReset();
 
   return (
@@ -19,6 +21,15 @@ export function WalletConnectButton({ variant = "default" }: WalletConnectButton
       {({ account, chain, mounted, openAccountModal, openChainModal, openConnectModal }) => {
         const handleConnect = async () => {
           console.log("[wallet] connect triggered");
+          console.log("[wallet.mobile] connect modal opened");
+          console.log(
+            "[wallet.mobile] connectors available",
+            connectors.map((connector) => ({
+              id: connector.id,
+              name: connector.name,
+              type: connector.type,
+            })),
+          );
           setConnectError(false);
 
           try {
@@ -28,6 +39,7 @@ export function WalletConnectButton({ variant = "default" }: WalletConnectButton
             }, 150);
           } catch (error) {
             console.warn("[wallet] connect failed", error);
+            console.error("[wallet.mobile] connect failed", error);
             forceResetWagmiClient();
             setConnectError(true);
           }
