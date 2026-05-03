@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CircleDollarSign, Clock3, Gem, WalletCards } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { StatCard } from "@/components/ui/stat-card";
 import { WalletActionPanel } from "@/components/wallet/wallet-action-panel";
 import { usePortfolio } from "@/hooks/usePortfolio";
-import { useWalletHistory, type WalletHistoryEntry, type WalletHistoryType } from "@/hooks/useWalletHistory";
+import {
+  useWalletHistory,
+  type WalletHistoryCategory,
+  type WalletHistoryEntry,
+  type WalletHistoryType,
+} from "@/hooks/useWalletHistory";
 import { useWallet } from "@/hooks/useWallet";
 import { formatCurrency } from "@/utils/format";
 
@@ -35,6 +40,19 @@ const debitTypes = new Set<WalletHistoryType>([
   "WITHDRAWAL_FEE",
   "GXN_TOKEN_DEDUCTION",
 ]);
+
+type WalletHistoryFilter = "ALL" | WalletHistoryCategory;
+
+const historyFilters: Array<{ key: WalletHistoryFilter; label: string }> = [
+  { key: "ALL", label: "All" },
+  { key: "NFT_TRADING", label: "NFT Trading Income" },
+  { key: "BOT", label: "Bot Income" },
+  { key: "REFERRAL", label: "Referral Income" },
+  { key: "ROYALTY", label: "Royalty Income" },
+  { key: "DEPOSIT", label: "Deposit" },
+  { key: "WITHDRAWAL", label: "Withdrawal" },
+  { key: "BONUS", label: "Bonus" },
+];
 
 function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
   const isDebit = debitTypes.has(entry.type);
@@ -74,7 +92,15 @@ export default function WalletPage() {
   const { history, isLoading: isHistoryLoading, error: historyError, refresh: refreshHistory } = useWalletHistory();
   const { fullAddress, shortAddress, chainName, isConnected } = useWallet();
   const [referralCopyMessage, setReferralCopyMessage] = useState<string | null>(null);
+  const [selectedHistoryFilter, setSelectedHistoryFilter] = useState<WalletHistoryFilter>("ALL");
   const referralLink = fullAddress ? `https://gainixnft.live/register?ref=${fullAddress}` : "";
+  const filteredHistory = useMemo(
+    () =>
+      selectedHistoryFilter === "ALL"
+        ? history
+        : history.filter((entry) => entry.category === selectedHistoryFilter),
+    [history, selectedHistoryFilter],
+  );
 
   const refreshWalletData = useCallback(async () => {
     await Promise.all([refresh(), refreshHistory()]);
@@ -166,6 +192,29 @@ export default function WalletPage() {
           </button>
         </div>
 
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div className="flex min-w-max gap-2">
+            {historyFilters.map((filter) => {
+              const isSelected = selectedHistoryFilter === filter.key;
+
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setSelectedHistoryFilter(filter.key)}
+                  className={`rounded-full border px-3 py-2 text-xs font-semibold transition sm:text-sm ${
+                    isSelected
+                      ? "border-gainix-400/40 bg-gainix-500/15 text-white"
+                      : "border-white/10 bg-white/[0.04] text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {historyError ? (
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             {historyError}
@@ -178,14 +227,14 @@ export default function WalletPage() {
           </div>
         ) : null}
 
-        {!isHistoryLoading && history.length === 0 ? (
+        {!isHistoryLoading && filteredHistory.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4 sm:p-5 text-sm text-zinc-300">
-            No wallet ledger entries yet.
+            No ledger entries for this category.
           </div>
         ) : null}
 
         <div className="grid gap-3">
-          {history.slice(0, 25).map((entry) => (
+          {filteredHistory.slice(0, 25).map((entry) => (
             <WalletHistoryRow key={entry.id} entry={entry} />
           ))}
         </div>

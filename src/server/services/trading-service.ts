@@ -2728,6 +2728,43 @@ function statusForLedgerEntry(state: NftSimState, entry: WalletLedgerRecord) {
   return withdrawal?.status === "approved" ? "Approved" : "Requested";
 }
 
+function categoryForLedgerEntry(type: WalletLedgerRecord["type"]) {
+  if (
+    type === "NFT_BUY_DEBIT" ||
+    type === "NFT_SELL_PRINCIPAL_RETURN" ||
+    type === "NFT_TRADING_PROFIT"
+  ) {
+    return "NFT_TRADING";
+  }
+
+  if (type === "BOT_PURCHASE_DEBIT" || type === "BOT_TRADING_PROFIT") {
+    return "BOT";
+  }
+
+  if (type === "BOT_PURCHASE_UPLINE_INCOME" || type === "LEVEL_INCOME") {
+    return "REFERRAL";
+  }
+
+  if (type === "ROYALTY_INCOME") {
+    return "ROYALTY";
+  }
+
+  if (type === "DEPOSIT_TO_TRADING") {
+    return "DEPOSIT";
+  }
+
+  if (
+    type === "CAPITAL_TRANSFER" ||
+    type === "CAPITAL_TRANSFER_TO_WITHDRAWAL" ||
+    type === "WITHDRAWAL_REQUEST" ||
+    type === "WITHDRAWAL_FEE"
+  ) {
+    return "WITHDRAWAL";
+  }
+
+  return "BONUS";
+}
+
 export async function getWalletHistory(selector: UserSelector) {
   await ensureStoreInitialized();
   await processTradingEngineTick();
@@ -2746,6 +2783,7 @@ export async function getWalletHistory(selector: UserSelector) {
           type: entry.type === "BOT_PURCHASE_DEBIT" ? "BOT_PURCHASE" : entry.type,
           title,
           description,
+          category: categoryForLedgerEntry(entry.type),
           amount: entry.amount,
           createdAt: entry.createdAt,
           status: statusForLedgerEntry(state, entry),

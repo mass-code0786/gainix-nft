@@ -21,11 +21,21 @@ export type WalletHistoryType =
   | "GXN_TOKEN_REWARD"
   | "GXN_TOKEN_DEDUCTION";
 
+export type WalletHistoryCategory =
+  | "NFT_TRADING"
+  | "BOT"
+  | "REFERRAL"
+  | "ROYALTY"
+  | "DEPOSIT"
+  | "WITHDRAWAL"
+  | "BONUS";
+
 export interface WalletHistoryEntry {
   id: string;
   type: WalletHistoryType;
   title: string | null;
   description: string | null;
+  category: WalletHistoryCategory;
   amount: number;
   createdAt: string;
   status: "Completed" | "Requested" | "Approved" | "Approved Pending TX" | "Active";
