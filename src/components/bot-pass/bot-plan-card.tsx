@@ -8,6 +8,7 @@ interface BotPlanCardProps {
   sellLimit: number;
   onBuy?: () => void;
   isDisabled?: boolean;
+  isLoading?: boolean;
 }
 
 const features = ["Auto Trading", "Profit Generation", "MLM Enabled"] as const;
@@ -19,6 +20,7 @@ export function BotPlanCard({
   sellLimit,
   onBuy,
   isDisabled = false,
+  isLoading = false,
 }: BotPlanCardProps) {
   return (
     <div className="section-shell lux-card flex h-full flex-col gap-4 rounded-[28px] p-4 sm:p-5">
@@ -53,7 +55,7 @@ export function BotPlanCard({
         className="premium-button mt-auto w-full disabled:cursor-not-allowed disabled:opacity-60"
       >
         <BadgeCheck className="mr-2 h-4 w-4" />
-        Buy
+        {isLoading ? "Buying..." : "Buy"}
       </button>
     </div>
   );

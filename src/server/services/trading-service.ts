@@ -2097,6 +2097,9 @@ export async function buyBotSubscription(input: BuyBotInput) {
 
   return withStoreTransaction(async (state) => {
     const { user, wallet } = requireUser(state, input);
+    console.info(`[bot.buy] wallet=${user.walletAddress}`);
+    console.info(`[bot.buy] package=${input.planId}`);
+
     const plan = BOT_PLANS[input.planId];
     if (!plan) {
       throw new ApiError(404, "Bot plan not found.");
@@ -2104,14 +2107,25 @@ export async function buyBotSubscription(input: BuyBotInput) {
 
     const matchedPlan = botPlanFromAmount(plan.price);
     if (!matchedPlan || matchedPlan.planId !== plan.planId) {
+      console.warn("[bot.buy] conflict reason=Bot plan configuration is invalid.");
       throw new ApiError(409, "Bot plan configuration is invalid.");
     }
 
-    if (wallet.withdrawalWallet < plan.price) {
-      throw new ApiError(409, "Insufficient withdrawal wallet balance.");
+    const activeSamePlanSubscription = state.bot_subscriptions.find(
+      (item) => item.userId === user.id && item.planId === plan.planId && item.status === "active",
+    );
+    if (activeSamePlanSubscription) {
+      console.warn("[bot.buy] conflict reason=You already have an active bot subscription.");
+      throw new ApiError(409, "You already have an active bot subscription.", {
+        subscriptionId: activeSamePlanSubscription.id,
+      });
     }
 
-    wallet.withdrawalWallet = roundAmount(wallet.withdrawalWallet - plan.price);
+    if (wallet.tradingWallet < plan.price) {
+      throw new ApiError(400, "Insufficient balance.");
+    }
+
+    wallet.tradingWallet = roundAmount(wallet.tradingWallet - plan.price);
     wallet.updatedAt = nowIso();
 
     pushWalletLedger(state, {
@@ -2121,7 +2135,9 @@ export async function buyBotSubscription(input: BuyBotInput) {
       referenceId: plan.planId,
       metadata: {
         planName: plan.planName,
-        withdrawalWalletAfter: wallet.withdrawalWallet,
+        buyLimit: plan.buyTrades,
+        sellLimit: plan.sellTrades,
+        tradingWalletAfter: wallet.tradingWallet,
       },
     });
 
@@ -2151,6 +2167,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
     user.selfPackageAmount = roundAmount(user.selfPackageAmount + plan.price);
     refreshVipLevels(state);
     const uplineIncome = processBotPurchaseUplineIncome(state, user.id, subscription);
+    console.info(`[bot.buy] success subscriptionId=${subscription.id}`);
 
     return {
       message: "Bot subscription activated.",

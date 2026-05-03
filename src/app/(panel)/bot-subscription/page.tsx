@@ -29,6 +29,15 @@ function formatLatestAction(label: string | null | undefined) {
   return label;
 }
 
+async function readApiError(response: Response) {
+  try {
+    const payload = (await response.json()) as { error?: string; message?: string };
+    return payload.error ?? payload.message ?? "Bot purchase failed.";
+  } catch {
+    return "Bot purchase failed.";
+  }
+}
+
 export default function BotSubscriptionPage() {
   const { fullAddress, isConnected } = useWallet();
   const walletAuth = useWalletAuth(fullAddress);
@@ -71,8 +80,7 @@ export default function BotSubscriptionPage() {
       });
 
       if (!response.ok) {
-        const payload = (await response.json()) as { error?: string };
-        throw new Error(payload.error ?? "Bot purchase failed.");
+        throw new Error(await readApiError(response));
       }
 
       const payload = (await response.json()) as { message?: string };
@@ -102,7 +110,8 @@ export default function BotSubscriptionPage() {
             buyLimit={plan.buyTrades}
             sellLimit={plan.sellTrades}
             onBuy={() => void handleBuy(plan.planId)}
-            isDisabled={!isConnected || isPurchasing === plan.planId}
+            isDisabled={!isConnected || Boolean(isPurchasing)}
+            isLoading={isPurchasing === plan.planId}
           />
         ))}
       </div>
