@@ -20,6 +20,7 @@ import type {
 
 let transactionQueue = Promise.resolve();
 type DbClient = PrismaClient | Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+let registrationBonusColumnReady = false;
 
 function cloneState<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -49,7 +50,37 @@ function normalizeDepositStatus(status: string) {
   return status.toLowerCase() as DepositRecord["status"];
 }
 
+async function ensureRegistrationBonusColumn() {
+  if (registrationBonusColumnReady) {
+    return;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+
+  try {
+    if (databaseUrl.startsWith("file:")) {
+      const columns = await prisma.$queryRawUnsafe<Array<{ name: string }>>('PRAGMA table_info("users")');
+      const hasColumn = columns.some((column) => column.name === "registration_bonus_given");
+      if (!hasColumn) {
+        await prisma.$executeRawUnsafe(
+          'ALTER TABLE "users" ADD COLUMN "registration_bonus_given" BOOLEAN NOT NULL DEFAULT false',
+        );
+      }
+    } else {
+      await prisma.$executeRawUnsafe(
+        'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "registration_bonus_given" BOOLEAN NOT NULL DEFAULT false',
+      );
+    }
+
+    registrationBonusColumnReady = true;
+  } catch (error) {
+    console.error("[bonus] failed to ensure registration bonus column", error);
+  }
+}
+
 export async function ensureStoreInitialized() {
+  await ensureRegistrationBonusColumn();
+
   await prisma.$transaction(async (tx) => {
     const [adminSetting, reserve] = await Promise.all([
       tx.adminSetting.findFirst(),
@@ -146,7 +177,7 @@ async function buildState(db: DbClient) {
       capitalUnlocked: item.capitalUnlocked,
       capitalUnlockedAt: toIso(item.capitalUnlockedAt),
       capitalTransferredAt: toIso(item.capitalTransferredAt),
-      registrationBonusGiven: item.registrationBonusGiven,
+      registrationBonusGiven: item.registrationBonusGiven ?? false,
       createdAt: item.createdAt.toISOString(),
     })),
     nfts: nfts.map<NftRecord>((item) => ({
@@ -362,7 +393,7 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         capitalUnlocked: item.capitalUnlocked,
         capitalUnlockedAt: item.capitalUnlockedAt ? new Date(item.capitalUnlockedAt) : null,
         capitalTransferredAt: item.capitalTransferredAt ? new Date(item.capitalTransferredAt) : null,
-        registrationBonusGiven: item.registrationBonusGiven,
+        registrationBonusGiven: item.registrationBonusGiven ?? false,
         createdAt: new Date(item.createdAt),
         updatedAt: new Date(item.createdAt),
       })),

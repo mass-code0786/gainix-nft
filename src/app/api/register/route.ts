@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(result, 201);
   } catch (error) {
+    console.error("[register] error", error);
     return errorResponse(error);
   }
 }

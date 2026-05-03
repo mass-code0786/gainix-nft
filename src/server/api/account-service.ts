@@ -94,7 +94,7 @@ async function createMlmRelations(
 }
 
 export async function registerUser(input: RegisterInput) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const existingUser = await tx.user.findUnique({
       where: { walletAddress: input.walletAddress },
       include: { wallet: true },
@@ -133,20 +133,11 @@ export async function registerUser(input: RegisterInput) {
       sponsorUserId = sponsor.id;
     }
 
-    const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
-    const registrationBonusTokens = calculateRegistrationBonusTokens(tokenPriceUsd);
-    if (!registrationBonusTokens) {
-      console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
-    }
-
     const user = await tx.user.create({
       data: {
         walletAddress: input.walletAddress,
-        registrationBonusGiven: Boolean(registrationBonusTokens),
         wallet: {
-          create: {
-            gxnTokenBalance: registrationBonusTokens ?? 0,
-          },
+          create: {},
         },
       },
       include: {
@@ -155,27 +146,6 @@ export async function registerUser(input: RegisterInput) {
     });
 
     await createMlmRelations(tx, user.id, sponsorUserId);
-
-    if (registrationBonusTokens) {
-      await tx.walletLedger.create({
-        data: {
-          userId: user.id,
-          type: "GXN_TOKEN_REWARD",
-          amount: registrationBonusTokens,
-          referenceId: "registration_bonus",
-          metadata: {
-            type: "bonus",
-            subtype: "registration",
-            usd_value: REGISTRATION_BONUS_USD,
-            tokenPriceUsd,
-            gxnTokenBalanceAfter: registrationBonusTokens,
-            registration_bonus_given: true,
-          },
-        },
-      });
-
-      console.log("[bonus] registration bonus given", user.id, registrationBonusTokens);
-    }
 
     return {
       message: "User registered successfully.",
@@ -194,6 +164,70 @@ export async function registerUser(input: RegisterInput) {
       sponsorUserId,
     };
   });
+
+  if (result.message === "User registered successfully.") {
+    await applyRegistrationBonus(result.user.id);
+    const wallet = await getWallet({ userId: result.user.id }).catch(() => result.wallet);
+    return {
+      ...result,
+      wallet,
+    };
+  }
+
+  return result;
+}
+
+async function applyRegistrationBonus(userId: string) {
+  try {
+    const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
+    const registrationBonusTokens = calculateRegistrationBonusTokens(tokenPriceUsd);
+    if (!registrationBonusTokens) {
+      console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
+      return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        include: { wallet: true },
+      });
+
+      if (!user || !user.wallet || user.registrationBonusGiven) {
+        return;
+      }
+
+      const nextGxnTokenBalance = roundAmount(user.wallet.gxnTokenBalance + registrationBonusTokens);
+
+      await tx.wallet.update({
+        where: { userId },
+        data: { gxnTokenBalance: nextGxnTokenBalance },
+      });
+      await tx.user.update({
+        where: { id: userId },
+        data: { registrationBonusGiven: true },
+      });
+      await tx.walletLedger.create({
+        data: {
+          userId,
+          type: "GXN_TOKEN_REWARD",
+          amount: registrationBonusTokens,
+          referenceId: "registration_bonus",
+          metadata: {
+            type: "bonus",
+            subtype: "registration",
+            usd_value: REGISTRATION_BONUS_USD,
+            tokenPriceUsd,
+            gxnTokenBalanceAfter: nextGxnTokenBalance,
+            registration_bonus_given: true,
+          },
+        },
+      });
+    });
+
+    console.log("[bonus] registration bonus given", userId, registrationBonusTokens);
+  } catch (error) {
+    console.error("[bonus] failed", error);
+  }
 }
 
 export async function getWallet(input: WalletQueryInput) {

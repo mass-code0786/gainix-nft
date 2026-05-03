@@ -3308,37 +3308,41 @@ export async function activateBotByAdmin(input: AdminActivateBotInput) {
 }
 
 function applyRegistrationBonus(state: NftSimState, user: UserRecord, wallet: WalletRecord) {
-  if (user.registrationBonusGiven) {
-    return;
+  try {
+    if (user.registrationBonusGiven) {
+      return;
+    }
+
+    const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
+    const tokensToGive = calculateRegistrationBonusTokens(tokenPriceUsd);
+    if (!tokensToGive) {
+      console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
+      return;
+    }
+
+    wallet.gxnTokenBalance = roundAmount(wallet.gxnTokenBalance + tokensToGive);
+    wallet.updatedAt = nowIso();
+    user.registrationBonusGiven = true;
+
+    pushWalletLedger(state, {
+      userId: user.id,
+      type: "GXN_TOKEN_REWARD",
+      amount: tokensToGive,
+      referenceId: "registration_bonus",
+      metadata: {
+        type: "bonus",
+        subtype: "registration",
+        usd_value: REGISTRATION_BONUS_USD,
+        tokenPriceUsd,
+        gxnTokenBalanceAfter: wallet.gxnTokenBalance,
+        registration_bonus_given: true,
+      },
+    });
+
+    console.log("[bonus] registration bonus given", user.id, tokensToGive);
+  } catch (error) {
+    console.error("[bonus] failed", error);
   }
-
-  const tokenPriceUsd = getCurrentGxnTokenPriceUsd();
-  const tokensToGive = calculateRegistrationBonusTokens(tokenPriceUsd);
-  if (!tokensToGive) {
-    console.error("[bonus] registration bonus skipped: invalid GXN token price", tokenPriceUsd);
-    return;
-  }
-
-  wallet.gxnTokenBalance = roundAmount(wallet.gxnTokenBalance + tokensToGive);
-  wallet.updatedAt = nowIso();
-  user.registrationBonusGiven = true;
-
-  pushWalletLedger(state, {
-    userId: user.id,
-    type: "GXN_TOKEN_REWARD",
-    amount: tokensToGive,
-    referenceId: "registration_bonus",
-    metadata: {
-      type: "bonus",
-      subtype: "registration",
-      usd_value: REGISTRATION_BONUS_USD,
-      tokenPriceUsd,
-      gxnTokenBalanceAfter: wallet.gxnTokenBalance,
-      registration_bonus_given: true,
-    },
-  });
-
-  console.log("[bonus] registration bonus given", user.id, tokensToGive);
 }
 
 export async function transferFundByAdmin(input: AdminTransferFundInput) {
