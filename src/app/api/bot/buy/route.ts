@@ -20,13 +20,16 @@ export async function POST(request: NextRequest) {
     const cookiePresent = Boolean(request.cookies.get(AUTH_COOKIE)?.value);
     console.info(`[bot.buy] cookie present=${cookiePresent}`);
     const body = await request.json();
-    console.info("[bot.buy] body=", body);
+    console.info("[bot.buy] body =", body);
     const input = botBuyInputSchema.parse(body);
     walletAddress = input.walletAddress;
     console.info(`[bot.buy] body wallet=${walletAddress}`);
+    console.info(`[bot.buy] parsed planId = ${input.planId ?? null}`);
+    console.info(`[bot.buy] parsed packageId = ${input.packageId ?? null}`);
+    console.info(`[bot.buy] parsed price = ${input.price ?? input.amount ?? null}`);
 
     if (!cookiePresent) {
-      console.warn("[bot.buy] auth failed reason=Connect to Continue");
+      console.warn("[bot.buy] auth failed reason = Connect to Continue");
       throw new ApiError(401, "Connect to Continue");
     }
 
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest) {
       console.info(`[bot.buy] auth user=${session.walletAddress}`);
     } catch (authError) {
       const reason = authError instanceof Error ? authError.message : "Wallet auth failed.";
-      console.warn(`[bot.buy] auth failed reason=${reason}`);
+      console.warn(`[bot.buy] auth failed reason = ${reason}`);
       const user = await assertRegisteredWalletForBotBuy(input.walletAddress);
       console.info(`[bot.buy] auth user=${user.walletAddress}`);
     }
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
       metadata: { error: error instanceof Error ? error.message : "unknown" },
     });
     if (error instanceof Error) {
-      console.warn(`[bot.buy] failed reason=${error.message}`);
+      console.warn(`[bot.buy] failed reason = ${error.message}`);
     }
     return errorResponse(error);
   }

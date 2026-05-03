@@ -148,8 +148,8 @@ interface TransferCapitalInput extends UserSelector {}
 interface BuyBotInput extends UserSelector {
   packageId?: string;
   planId?: string;
-  amount?: number;
-  price?: number;
+  amount?: number | string;
+  price?: number | string;
 }
 
 interface UpdateAdminSettingsInput {
@@ -1205,6 +1205,19 @@ function botPlanFromAmount(amount: number): BotPlan | null {
   return Object.values(BOT_PLANS).find((plan) => plan.price === amount) ?? null;
 }
 
+function parseBotPackageAmount(value: number | string | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const amount = Number(value.trim());
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  return null;
+}
+
 function normalizeBotPackageIdentifier(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -1234,11 +1247,13 @@ function botPlanFromIdentifier(identifier: string | undefined) {
 
 function resolveBotPlan(input: BuyBotInput) {
   const identifierPlan = botPlanFromIdentifier(input.planId) ?? botPlanFromIdentifier(input.packageId);
+  const amount = parseBotPackageAmount(input.amount);
+  const price = parseBotPackageAmount(input.price);
   const amountPlan =
-    typeof input.amount === "number"
-      ? botPlanFromAmount(input.amount)
-      : typeof input.price === "number"
-        ? botPlanFromAmount(input.price)
+    typeof amount === "number"
+      ? botPlanFromAmount(amount)
+      : typeof price === "number"
+        ? botPlanFromAmount(price)
         : null;
 
   if (identifierPlan && amountPlan && identifierPlan.planId !== amountPlan.planId) {
@@ -1246,6 +1261,10 @@ function resolveBotPlan(input: BuyBotInput) {
   }
 
   return identifierPlan ?? amountPlan;
+}
+
+function botPackageInputValue(input: BuyBotInput) {
+  return input.planId ?? input.packageId ?? input.price ?? input.amount ?? "missing";
 }
 
 function botHasRemainingCapacity(subscription: BotSubscriptionRecord) {
@@ -2143,33 +2162,36 @@ export async function buyBotSubscription(input: BuyBotInput) {
 
   return withStoreTransaction(async (state) => {
     const { user, wallet } = requireUser(state, input);
-    console.info(`[bot.buy] wallet=${user.walletAddress}`);
+    console.info(`[bot.buy] user = ${user.id}`);
+    console.info(`[bot.buy] balance = ${wallet.tradingWallet}`);
 
     const plan = resolveBotPlan(input);
     if (!plan) {
-      console.warn("[bot.buy] failed reason=Invalid bot package");
-      throw new ApiError(400, "Invalid bot package");
+      const packageValue = botPackageInputValue(input);
+      console.warn(`[bot.buy] failed reason = Invalid bot package: ${packageValue}`);
+      throw new ApiError(400, `Invalid bot package: ${packageValue}`);
     }
     console.info(`[bot.buy] package resolved=${plan.planId}`);
 
     const matchedPlan = botPlanFromAmount(plan.price);
     if (!matchedPlan || matchedPlan.planId !== plan.planId) {
-      console.warn("[bot.buy] failed reason=Invalid bot package");
-      throw new ApiError(400, "Invalid bot package");
+      const packageValue = botPackageInputValue(input);
+      console.warn(`[bot.buy] failed reason = Invalid bot package: ${packageValue}`);
+      throw new ApiError(400, `Invalid bot package: ${packageValue}`);
     }
 
     const activeSamePlanSubscription = state.bot_subscriptions.find(
       (item) => item.userId === user.id && item.planId === plan.planId && item.status === "active",
     );
     if (activeSamePlanSubscription) {
-      console.warn("[bot.buy] failed reason=You already have an active bot subscription.");
+      console.warn("[bot.buy] failed reason = You already have an active bot subscription.");
       throw new ApiError(409, "You already have an active bot subscription.", {
         subscriptionId: activeSamePlanSubscription.id,
       });
     }
 
     if (wallet.tradingWallet < plan.price) {
-      console.warn("[bot.buy] failed reason=Insufficient balance");
+      console.warn("[bot.buy] failed reason = Insufficient balance");
       throw new ApiError(400, "Insufficient balance");
     }
 

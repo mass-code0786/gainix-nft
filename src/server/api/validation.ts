@@ -14,6 +14,17 @@ const amountSchema = z
   .finite("amount must be finite.")
   .positive("amount must be greater than 0.");
 
+const botPackageAmountSchema = z.union([amountSchema, z.string().trim().min(1)]);
+
+const optionalTrimmedStringSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}, z.string().min(1).optional());
+
 const nonNegativeAmountSchema = z
   .number({
     invalid_type_error: "value must be a number.",
@@ -96,10 +107,10 @@ export const nftMutationInputSchema = z.object({
 
 export const botBuyInputSchema = z.object({
   walletAddress: walletAddressSchema,
-  packageId: z.string().trim().min(1).optional(),
-  planId: z.string().trim().min(1).optional(),
-  amount: amountSchema.optional(),
-  price: amountSchema.optional(),
+  packageId: optionalTrimmedStringSchema,
+  planId: optionalTrimmedStringSchema,
+  amount: botPackageAmountSchema.optional(),
+  price: botPackageAmountSchema.optional(),
 });
 
 export const adminSettingsInputSchema = z
