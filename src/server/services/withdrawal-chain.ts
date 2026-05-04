@@ -1,12 +1,16 @@
 import {
   createPublicClient,
+  createWalletClient,
   decodeFunctionData,
   http,
   isAddressEqual,
   parseUnits,
+  stringToHex,
+  keccak256,
   type Address,
   type Hex,
 } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { withdrawalAbi } from "@/contracts/abis/withdrawal.abi";
 import { ApiError } from "@/server/api/errors";
 
@@ -28,6 +32,11 @@ function firstRequiredEnv(names: string[]) {
   return process.env[name]!.trim();
 }
 
+function firstOptionalEnv(names: string[]) {
+  const name = names.find((key) => process.env[key]?.trim());
+  return name ? process.env[name]!.trim() : null;
+}
+
 export function getServerWithdrawalConfig() {
   return {
     contractAddress: firstRequiredEnv([
@@ -41,6 +50,61 @@ export function getServerWithdrawalConfig() {
     chainId: Number(requiredEnv("BSC_CHAIN_ID")),
     decimals: 18,
     confirmations: Number(process.env.BSC_WITHDRAWAL_CONFIRMATIONS ?? 1),
+  };
+}
+
+function getWithdrawalOperatorPrivateKey() {
+  const privateKey = firstOptionalEnv([
+    "WITHDRAWAL_OPERATOR_PRIVATE_KEY",
+    "BACKEND_OPERATOR_PRIVATE_KEY",
+    "OPERATOR_PRIVATE_KEY",
+    "DEPLOYER_PRIVATE_KEY",
+  ]);
+
+  if (!privateKey) {
+    throw new ApiError(500, "Withdrawal operator private key is not configured.");
+  }
+
+  return (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Hex;
+}
+
+export function makeWithdrawalRequestId(withdrawalId: string) {
+  return keccak256(stringToHex(`gainix:withdrawal:${withdrawalId}`));
+}
+
+export async function authorizeUsdtWithdrawalOnChain(input: {
+  walletAddress: string;
+  netAmount: number;
+  withdrawalId: string;
+}) {
+  const config = getServerWithdrawalConfig();
+  const account = privateKeyToAccount(getWithdrawalOperatorPrivateKey());
+  const client = createPublicClient({
+    transport: http(config.rpcUrl),
+  });
+  const walletClient = createWalletClient({
+    account,
+    transport: http(config.rpcUrl),
+  });
+  const amount = parseUnits(input.netAmount.toFixed(config.decimals), config.decimals);
+  const requestId = makeWithdrawalRequestId(input.withdrawalId);
+
+  const hash = await walletClient.writeContract({
+    address: config.contractAddress,
+    abi: withdrawalAbi,
+    functionName: "authorizeUSDTWithdrawal",
+    args: [input.walletAddress as Address, amount, requestId],
+    chain: null,
+  });
+  const receipt = await client.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") {
+    throw new ApiError(502, "USDT withdrawal authorization transaction failed.");
+  }
+
+  return {
+    txHash: hash.toLowerCase(),
+    requestId,
+    contractAddress: config.contractAddress.toLowerCase(),
   };
 }
 
@@ -80,8 +144,8 @@ export async function verifyWithdrawalTransaction(input: {
     data: transaction.input,
   });
 
-  if (decoded.functionName !== "withdraw") {
-    throw new ApiError(409, "Transaction did not call withdraw.");
+  if (decoded.functionName !== "withdrawUSDT") {
+    throw new ApiError(409, "Transaction did not call withdrawUSDT.");
   }
 
   const [user, amount] = decoded.args;

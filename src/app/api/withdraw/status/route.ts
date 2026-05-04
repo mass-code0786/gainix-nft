@@ -4,9 +4,17 @@ import { withdrawalAbi } from "@/contracts/abis/withdrawal.abi";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { withSecurityHeaders } from "@/server/api/http";
 
-const knownWithdrawalVaultAddress = "0x520fF6fB8690b495901E482D2B2395c562931659";
 const decimals = 18;
 const zero = BigInt(0);
+const erc20BalanceAbi = [
+  {
+    type: "function",
+    stateMutability: "view",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
 
 function firstEnv(names: string[]) {
   return names.map((name) => process.env[name]?.trim()).find(Boolean) ?? null;
@@ -20,8 +28,8 @@ function resolveVaultAddress() {
       "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
       "WITHDRAWAL_VAULT_ADDRESS",
       "WITHDRAWAL_CONTRACT_ADDRESS",
-    ]) ?? knownWithdrawalVaultAddress
-  ) as Address;
+    ]) ?? null
+  ) as Address | null;
 }
 
 function resolveRpcUrl() {
@@ -77,6 +85,7 @@ export async function GET(request: NextRequest) {
       }),
     );
   }
+  const configuredVaultAddress = vaultAddress as Address;
 
   try {
     const client = createPublicClient({
@@ -84,15 +93,25 @@ export async function GET(request: NextRequest) {
       transport: http(resolveRpcUrl()),
     });
     const requestedAmount = amount ? parseUnits(amount, decimals) : null;
-    const [claimable, vaultBalance] = await Promise.all([
+    const [claimable, usdtToken] = await Promise.all([
       client.readContract({
-        address: vaultAddress,
+        address: configuredVaultAddress,
         abi: withdrawalAbi,
-        functionName: "claimable",
+        functionName: "usdtClaimable",
         args: [walletAddress as Address],
       }),
-      client.getBalance({ address: vaultAddress }),
+      client.readContract({
+        address: configuredVaultAddress,
+        abi: withdrawalAbi,
+        functionName: "usdtToken",
+      }),
     ]);
+    const vaultBalance = await client.readContract({
+      address: usdtToken,
+      abi: erc20BalanceAbi,
+      functionName: "balanceOf",
+      args: [configuredVaultAddress],
+    });
     const message = messageForStatus(claimable, vaultBalance, requestedAmount);
     const canWithdraw = !message;
 

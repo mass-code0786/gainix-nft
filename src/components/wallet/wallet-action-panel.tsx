@@ -42,6 +42,8 @@ interface WalletMutationResponse {
     gxnDeductionAmount: number;
     gxnTokens: number;
     netAmount: number;
+    status: "requested" | "approved_pending_tx" | "approved" | "failed" | string;
+    payoutStatus: string;
     withdrawalTxHash: string | null;
     onChainStatus: "PENDING" | "CONFIRMED" | "FAILED";
   };
@@ -69,6 +71,19 @@ interface WithdrawStatusResponse {
   vaultBalance: string;
   canWithdraw: boolean;
   message: string;
+}
+
+type WithdrawalFlowState =
+  | "IDLE"
+  | "CALCULATED"
+  | "REQUEST_SUBMITTED"
+  | "ADMIN_APPROVED_PENDING_CHAIN"
+  | "CHAIN_AUTHORIZED"
+  | "WITHDRAWN"
+  | "FAILED";
+
+interface WalletBalancesResponse {
+  withdrawals: NonNullable<WalletMutationResponse["withdrawal"]>[];
 }
 
 interface RecentWalletAction {
@@ -250,6 +265,7 @@ function WalletActionModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<WalletMutationResponse["withdrawal"] | null>(null);
+  const [withdrawalFlowState, setWithdrawalFlowState] = useState<WithdrawalFlowState>("IDLE");
   const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
   const [withdrawStatus, setWithdrawStatus] = useState<WithdrawStatusResponse | null>(null);
   const [isWithdrawStatusLoading, setIsWithdrawStatusLoading] = useState(false);
@@ -314,52 +330,108 @@ function WalletActionModal({
   }, [action, withdrawalConfigReady, withdrawalVaultAddress]);
 
   useEffect(() => {
-    if (action !== "withdraw" || !walletAddress || !withdrawalConfigReady || netAmount <= 0) {
-      setWithdrawStatus(null);
-      setIsWithdrawStatusLoading(false);
+    if (action !== "withdraw" || !walletAddress || !pendingWithdrawal) {
       return;
     }
 
     let isMounted = true;
-    const timeout = window.setTimeout(() => {
-      setIsWithdrawStatusLoading(true);
-      fetchJson<WithdrawStatusResponse>(
-        `/api/withdraw/status?walletAddress=${encodeURIComponent(walletAddress)}&amount=${encodeURIComponent(amountString(netAmount))}`,
-      )
-        .then((status) => {
+    const requestWalletAddress = walletAddress;
+    const trackedWithdrawal = pendingWithdrawal;
+
+    async function refreshWithdrawalState() {
+      try {
+        const balances = await fetchJson<WalletBalancesResponse>(
+          `/api/wallet/balances?walletAddress=${encodeURIComponent(requestWalletAddress)}`,
+        );
+        if (!isMounted) {
+          return;
+        }
+
+        const latestWithdrawal =
+          balances.withdrawals.find((withdrawal) => withdrawal.id === trackedWithdrawal.id) ??
+          trackedWithdrawal;
+        setPendingWithdrawal(latestWithdrawal);
+
+        if (latestWithdrawal.onChainStatus === "CONFIRMED" || latestWithdrawal.status === "approved") {
+          setWithdrawalFlowState("WITHDRAWN");
+          return;
+        }
+
+        if (latestWithdrawal.onChainStatus === "FAILED" || latestWithdrawal.status === "failed") {
+          setWithdrawalFlowState("FAILED");
+          return;
+        }
+
+        if (latestWithdrawal.status === "approved_pending_tx") {
+          setWithdrawalFlowState("ADMIN_APPROVED_PENDING_CHAIN");
+
+          if (!withdrawalConfigReady || !withdrawalPublicClient || !withdrawalVaultAddress) {
+            return;
+          }
+
+          setIsWithdrawStatusLoading(true);
+          const status = await fetchJson<WithdrawStatusResponse>(
+            `/api/withdraw/status?walletAddress=${encodeURIComponent(requestWalletAddress)}&amount=${encodeURIComponent(amountString(latestWithdrawal.netAmount))}`,
+          );
           if (!isMounted) {
             return;
           }
 
-          console.info("[withdraw.status] wallet=", walletAddress, "claimable=", status.claimableAmount, "vaultBalance=", status.vaultBalance);
+          console.info("[withdraw.status] wallet=", requestWalletAddress, "claimable=", status.claimableAmount, "vaultBalance=", status.vaultBalance);
           setWithdrawStatus(status);
-        })
-        .catch((statusError) => {
-          if (!isMounted) {
-            return;
+
+          if (status.authorized) {
+            setWithdrawalFlowState("CHAIN_AUTHORIZED");
           }
 
-          console.error("[withdraw.error] rawError=", statusError);
-          setWithdrawStatus({
-            authorized: false,
-            claimableAmount: "0",
-            vaultBalance: "0",
-            canWithdraw: false,
-            message: "Withdrawal failed. Please try again later.",
-          });
-        })
-        .finally(() => {
-          if (isMounted) {
-            setIsWithdrawStatusLoading(false);
+          if (status.canWithdraw) {
+            const netAmountWei = parseUnits(latestWithdrawal.netAmount.toFixed(18), USDT_DECIMALS);
+            const gas = await withdrawalPublicClient.estimateContractGas({
+              account: requestWalletAddress as `0x${string}`,
+              address: withdrawalVaultAddress,
+              abi: withdrawalAbi,
+              functionName: "withdrawUSDT",
+              args: [requestWalletAddress as `0x${string}`, netAmountWei],
+            });
+            const gasPrice = await withdrawalPublicClient.getGasPrice();
+            if (!isMounted) {
+              return;
+            }
+            setEstimatedGasFee(formatEther(gas * gasPrice));
           }
-        });
-    }, 350);
+          return;
+        }
+
+        setWithdrawalFlowState("REQUEST_SUBMITTED");
+      } catch (statusError) {
+        if (!isMounted) {
+          return;
+        }
+
+        console.error("[withdraw.error] rawError=", statusError);
+        setWithdrawalFlowState("REQUEST_SUBMITTED");
+      } finally {
+        if (isMounted) {
+          setIsWithdrawStatusLoading(false);
+        }
+      }
+    }
+
+    void refreshWithdrawalState();
+    const interval = window.setInterval(() => void refreshWithdrawalState(), 5000);
 
     return () => {
       isMounted = false;
-      window.clearTimeout(timeout);
+      window.clearInterval(interval);
     };
-  }, [action, netAmount, walletAddress, withdrawalConfigReady]);
+  }, [
+    action,
+    pendingWithdrawal?.id,
+    walletAddress,
+    withdrawalConfigReady,
+    withdrawalPublicClient,
+    withdrawalVaultAddress,
+  ]);
 
   useEffect(() => {
     if (action !== "deposit") {
@@ -459,22 +531,6 @@ function WalletActionModal({
       return depositConfigError ?? "USDT deposit settings are not configured.";
     }
 
-    if (action === "withdraw" && isWithdrawalConfigLoading) {
-      return null;
-    }
-
-    if (action === "withdraw" && !withdrawalConfigReady) {
-      return "Withdrawal contract is not configured.";
-    }
-
-    if (action === "withdraw" && isWithdrawStatusLoading) {
-      return null;
-    }
-
-    if (action === "withdraw" && withdrawStatus && !withdrawStatus.canWithdraw) {
-      return withdrawStatus.message || "Withdrawal failed. Please try again later.";
-    }
-
     return null;
   }, [
     action,
@@ -483,11 +539,7 @@ function WalletActionModal({
     depositConfigReady,
     depositConfigError,
     isDepositConfigLoading,
-    isWithdrawalConfigLoading,
-    isWithdrawStatusLoading,
-    withdrawalConfigReady,
     withdrawalWallet,
-    withdrawStatus,
     connectedAddress,
     walletAddress,
   ]);
@@ -520,17 +572,6 @@ function WalletActionModal({
       return;
     }
 
-    if (!withdrawalPublicClient) {
-      setError("Withdrawal RPC client is not available.");
-      return;
-    }
-
-    if (chainId !== withdrawalContract.chainId && switchChainAsync) {
-      await switchChainAsync({ chainId: withdrawalContract.chainId });
-    }
-
-    await requireWithdrawStatus(netAmount);
-
     const result = await fetchJson<WalletMutationResponse>("/api/withdraw", {
       method: "POST",
       body: JSON.stringify({
@@ -543,24 +584,10 @@ function WalletActionModal({
       throw new Error("Withdrawal request was not returned.");
     }
 
-    const netAmountWei = parseUnits(result.withdrawal.netAmount.toFixed(18), 18);
-    if (!withdrawalVaultAddress) {
-      throw new Error("Withdrawal contract is not configured.");
-    }
-
-    await requireWithdrawStatus(result.withdrawal.netAmount);
-
-    const gas = await withdrawalPublicClient.estimateContractGas({
-      account: walletAddress as `0x${string}`,
-      address: withdrawalVaultAddress,
-      abi: withdrawalAbi,
-      functionName: "withdraw",
-      args: [walletAddress as `0x${string}`, netAmountWei],
-    });
-    const gasPrice = await withdrawalPublicClient.getGasPrice();
-
     setPendingWithdrawal(result.withdrawal);
-    setEstimatedGasFee(formatEther(gas * gasPrice));
+    setWithdrawalFlowState("REQUEST_SUBMITTED");
+    setWithdrawStatus(null);
+    setEstimatedGasFee(null);
   }
 
   async function executeOnChainWithdrawal() {
@@ -578,7 +605,7 @@ function WalletActionModal({
     const hash = await writeContractAsync({
       address: withdrawalVaultAddress,
       abi: withdrawalAbi,
-      functionName: "withdraw",
+      functionName: "withdrawUSDT",
       args: [walletAddress as `0x${string}`, netAmountWei],
       chainId: withdrawalContract.chainId,
     });
@@ -671,6 +698,20 @@ function WalletActionModal({
         if (action === "withdraw") {
           if (!pendingWithdrawal) {
             await prepareOnChainWithdrawal();
+            await onRefresh();
+            onRecorded({
+              id: `withdraw-${Date.now()}`,
+              type: "withdraw",
+              amount,
+              netAmount,
+              createdAt: new Date().toISOString(),
+            });
+            setSuccess("Withdrawal request submitted. Waiting for admin approval.");
+            return;
+          }
+
+          if (withdrawalFlowState !== "CHAIN_AUTHORIZED") {
+            setError("Waiting for admin approval.");
             return;
           }
 
@@ -760,11 +801,14 @@ function WalletActionModal({
                 placeholder="0.00"
                 value={amountInput}
                 onChange={(event) => {
-                  setAmountInput(event.target.value);
+                  const nextAmountInput = event.target.value;
+                  const nextAmount = parseAmount(nextAmountInput);
+                  setAmountInput(nextAmountInput);
                   setError(null);
                   setSuccess(null);
                   setTxHash(null);
                   setPendingWithdrawal(null);
+                  setWithdrawalFlowState(nextAmount > 0 ? "CALCULATED" : "IDLE");
                   setEstimatedGasFee(null);
                   setWithdrawStatus(null);
                 }}
@@ -796,7 +840,7 @@ function WalletActionModal({
             {action === "withdraw" ? (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <span>BNB vault withdrawal</span>
+                  <span>USDT withdrawal</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <span>Withdrawal Amount</span>
@@ -818,13 +862,37 @@ function WalletActionModal({
                   <span>GXN tokens user will get</span>
                   <span className="text-amber-200">{gxnTokens.toLocaleString()} GXN</span>
                 </div>
-                {withdrawStatus ? (
+                {pendingWithdrawal ? (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-300">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Status</span>
+                      <span className="text-amber-200">
+                        {withdrawalFlowState === "REQUEST_SUBMITTED"
+                          ? "Pending admin approval"
+                          : withdrawalFlowState === "ADMIN_APPROVED_PENDING_CHAIN"
+                            ? "Admin approved"
+                            : withdrawalFlowState === "CHAIN_AUTHORIZED"
+                              ? "Authorized"
+                              : withdrawalFlowState === "WITHDRAWN"
+                                ? "Withdrawn"
+                                : withdrawalFlowState === "FAILED"
+                                  ? "Failed"
+                                  : "Waiting for admin approval"}
+                      </span>
+                    </div>
+                    {withdrawalFlowState === "REQUEST_SUBMITTED" ? (
+                      <div className="mt-2 text-amber-100">Waiting for admin approval.</div>
+                    ) : null}
+                    {withdrawalFlowState === "ADMIN_APPROVED_PENDING_CHAIN" ? (
+                      <div className="mt-2 text-amber-100">Admin approved. Waiting for on-chain USDT authorization.</div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {pendingWithdrawal && withdrawalFlowState === "CHAIN_AUTHORIZED" && withdrawStatus ? (
                   <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-300">
                     <div className="flex items-center justify-between gap-3">
                       <span>Authorized</span>
-                      <span className={withdrawStatus.authorized ? "text-emerald-200" : "text-amber-200"}>
-                        {withdrawStatus.authorized ? "Yes" : "Waiting"}
-                      </span>
+                      <span className="text-emerald-200">Yes</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <span>Claimable</span>
@@ -836,7 +904,7 @@ function WalletActionModal({
                     </div>
                   </div>
                 ) : null}
-                {pendingWithdrawal ? (
+                {pendingWithdrawal && withdrawalFlowState === "CHAIN_AUTHORIZED" ? (
                   <>
                     <div className="mt-3 border-t border-white/10 pt-3">
                       <div className="flex items-center justify-between gap-3">
@@ -855,7 +923,7 @@ function WalletActionModal({
                       </div>
                     </div>
                     <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-100">
-                      Confirm in your wallet to execute the on-chain withdrawal. Gas is paid by your connected wallet.
+                      Confirm in your wallet to execute the USDT withdrawal. Gas is paid by your connected wallet.
                     </div>
                   </>
                 ) : null}
@@ -867,7 +935,7 @@ function WalletActionModal({
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-3 text-zinc-500">
-              <span>Available</span>
+              <span>Available balance</span>
               <span>{formatCurrency(action === "withdraw" ? withdrawalWallet : tradingWallet)}</span>
             </div>
           </div>
@@ -901,10 +969,10 @@ function WalletActionModal({
               (action === "withdraw" &&
                 (!walletAddress ||
                   amount <= 0 ||
-                  isWithdrawalConfigLoading ||
-                  isWithdrawStatusLoading ||
-                  !withdrawalConfigReady ||
-                  Boolean(withdrawStatus && !withdrawStatus.canWithdraw)))
+                  Boolean(
+                    pendingWithdrawal &&
+                      (withdrawalFlowState !== "CHAIN_AUTHORIZED" || !withdrawStatus?.canWithdraw),
+                  )))
             }
             className="premium-button w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -914,8 +982,10 @@ function WalletActionModal({
                 ? `Send ${USDT_SYMBOL}`
                 : action === "withdraw"
                   ? pendingWithdrawal
-                    ? "Confirm On-Chain Withdrawal"
-                    : "Withdraw via Wallet"
+                    ? withdrawalFlowState === "CHAIN_AUTHORIZED"
+                      ? "Withdraw via Wallet"
+                      : "Waiting for Admin Approval"
+                    : "Submit Withdrawal Request"
                   : title)}
           </button>
         </div>

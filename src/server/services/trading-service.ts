@@ -33,6 +33,7 @@ import {
   WithdrawalRecord,
 } from "@/server/nft-sim/types";
 import { verifyUsdtDepositTransaction } from "@/server/services/usdt-payment";
+import { authorizeUsdtWithdrawalOnChain } from "@/server/services/withdrawal-chain";
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
 const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
@@ -3926,6 +3927,49 @@ export async function transferFundByAdmin(input: AdminTransferFundInput) {
 export async function approveWithdrawal(input: ApproveWithdrawalInput) {
   await ensureStoreInitialized();
 
+  const current = await readState();
+  if (current.admin_settings.systemStopped) {
+    pushSafetyLog(current, {
+      eventType: "BLOCKED_PAYOUT",
+      userId: null,
+      amount: null,
+      reason: "System emergency stop is active.",
+      metadata: { payoutType: "WITHDRAWAL_APPROVAL", withdrawalId: input.withdrawalId },
+    });
+    throw new ApiError(409, "System emergency stop is active.");
+  }
+
+  if (current.admin_settings.payoutsPaused) {
+    throw new ApiError(409, "Payouts are paused.");
+  }
+
+  const pendingWithdrawal = current.withdrawals.find((item) => item.id === input.withdrawalId);
+  if (!pendingWithdrawal) {
+    throw new ApiError(404, "Withdrawal request not found.");
+  }
+
+  if (pendingWithdrawal.status !== "requested") {
+    throw new ApiError(409, "Withdrawal request is already processed.");
+  }
+
+  if (
+    !checkPayoutSafety(current, {
+      userId: pendingWithdrawal.userId,
+      amount: pendingWithdrawal.netAmount,
+      payoutType: "WITHDRAWAL_APPROVAL",
+      referenceId: pendingWithdrawal.id,
+    })
+  ) {
+    throw new ApiError(409, "Withdrawal approval blocked by safety controls.");
+  }
+
+  const { user: pendingUser } = requireUser(current, { userId: pendingWithdrawal.userId });
+  const authorization = await authorizeUsdtWithdrawalOnChain({
+    walletAddress: pendingUser.walletAddress,
+    netAmount: pendingWithdrawal.netAmount,
+    withdrawalId: pendingWithdrawal.id,
+  });
+
   return withStoreTransaction(async (state) => {
     if (state.admin_settings.systemStopped) {
       pushSafetyLog(state, {
@@ -3969,11 +4013,13 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
 
     withdrawal.status = "approved_pending_tx";
     withdrawal.approvedAt = nowIso();
+    withdrawal.payoutTxHash = authorization.txHash;
     withdrawal.payoutStatus = "PENDING_TX";
 
     return {
-      message: "Withdrawal approved and pending on-chain payout transaction.",
+      message: "Withdrawal approved and authorized on-chain for USDT claim.",
       withdrawal,
+      authorizationTxHash: authorization.txHash,
     };
   });
 }

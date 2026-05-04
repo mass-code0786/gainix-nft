@@ -3,8 +3,6 @@ import { isAddress, zeroAddress } from "viem";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { withSecurityHeaders } from "@/server/api/http";
 
-const knownWithdrawalVaultAddress = "0x520fF6fB8690b495901E482D2B2395c562931659";
-
 function firstEnv(names: string[]) {
   return names.map((name) => process.env[name]?.trim()).find(Boolean) ?? null;
 }
@@ -21,7 +19,7 @@ export async function GET() {
       "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
       "WITHDRAWAL_VAULT_ADDRESS",
       "WITHDRAWAL_CONTRACT_ADDRESS",
-    ]) ?? knownWithdrawalVaultAddress;
+    ]) ?? "";
 
   const configured = isConfiguredAddress(vaultAddress);
 

@@ -34,6 +34,13 @@ export const withdrawalAbi = [
   },
   {
     type: "function",
+    stateMutability: "view",
+    name: "usdtWithdrawalRequests",
+    inputs: [{ name: "requestId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
     stateMutability: "nonpayable",
     name: "authorizeUSDTWithdrawal",
     inputs: [
@@ -49,6 +56,16 @@ export const withdrawalAbi = [
     name: "withdrawUSDT",
     inputs: [
       { name: "user", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    stateMutability: "nonpayable",
+    name: "recoverERC20",
+    inputs: [
+      { name: "token", type: "address" },
       { name: "amount", type: "uint256" },
     ],
     outputs: [],
@@ -81,6 +98,16 @@ export const withdrawalAbi = [
       { indexed: true, name: "user", type: "address" },
       { indexed: false, name: "amount", type: "uint256" },
       { indexed: false, name: "timestamp", type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "ERC20Recovered",
+    inputs: [
+      { indexed: true, name: "token", type: "address" },
+      { indexed: true, name: "to", type: "address" },
+      { indexed: false, name: "amount", type: "uint256" },
     ],
   },
 ] as const satisfies Abi;
