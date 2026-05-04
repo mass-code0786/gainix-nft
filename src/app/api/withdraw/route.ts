@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
     const input = walletAmountMutationInputSchema.parse(body);
     walletAddress = input.walletAddress;
     assertAuthenticatedWallet(session, input.walletAddress);
+    console.info("[withdraw.request] wallet=", input.walletAddress, "amount=", input.amount, "userId=", "pending");
     const result = await requestWithdrawal(input);
+    console.info("[withdraw.request] wallet=", input.walletAddress, "amount=", input.amount, "userId=", result.user.id);
     await writeAuditLog(request, {
       userId: result.user.id,
       walletAddress,
@@ -31,6 +33,10 @@ export async function POST(request: NextRequest) {
 
     return successResponse(result, 200);
   } catch (error) {
+    console.error("[withdraw.request.error]", {
+      message: error instanceof Error ? error.message : "unknown",
+      stack: error instanceof Error ? error.stack : null,
+    });
     await writeAuditLog(request, {
       walletAddress,
       action: "withdraw.request",

@@ -16,6 +16,7 @@ import {
   GXN_TOKEN_VALUE_USD,
   REGISTRATION_BONUS_USD,
 } from "@/server/services/gxn-token";
+import { MIN_WITHDRAWAL_AMOUNT } from "@/config/withdrawal";
 import {
   AdminSettingsRecord,
   BotActivityRecord,
@@ -2573,8 +2574,10 @@ export async function requestWithdrawal(input: WithdrawInput) {
   return withStoreTransaction(async (state) => {
     const { user, wallet } = requireUser(state, input);
     const amount = roundAmount(input.amount);
-    const minimum = state.admin_settings.withdrawalMinimumAmount;
+    const minimum = MIN_WITHDRAWAL_AMOUNT;
     const feePercent = state.admin_settings.withdrawalFeePercent;
+
+    console.info("[withdraw.request] wallet=", user.walletAddress, "amount=", amount, "userId=", user.id);
 
     if (state.admin_settings.systemStopped) {
       pushSafetyLog(state, {

@@ -206,6 +206,12 @@ function transferErrorMessage(error: unknown, buyCount: number, sellCount: numbe
 function safeWithdrawalErrorMessage(error: unknown) {
   console.error("[withdraw.error] rawError=", error);
 
+  if (error instanceof ApiRequestError) {
+    if (error.status < 500 && error.message) {
+      return error.message;
+    }
+  }
+
   const rawMessage = error instanceof Error ? error.message : "";
   const lowerMessage = rawMessage.toLowerCase();
 
