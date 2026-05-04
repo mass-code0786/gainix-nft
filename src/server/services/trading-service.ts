@@ -38,6 +38,9 @@ import { authorizeUsdtWithdrawalOnChain } from "@/server/services/withdrawal-cha
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
 const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
+const ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY =
+  process.env.ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY === "true" ||
+  process.env.TEST_WITHDRAWAL_MODE === "true";
 const VIP_LEVELS = [
   { level: 1, selfPackageAmount: 100, payoutAmount: 30 },
   { level: 2, selfPackageAmount: 200, payoutAmount: 60 },
@@ -275,6 +278,21 @@ function validateNonNegativeAmount(amount: number, label: string) {
   if (!Number.isFinite(amount) || amount < 0) {
     throw new ApiError(400, `${label} must be 0 or greater.`);
   }
+}
+
+function isFailedWithdrawal(withdrawal: WithdrawalRecord) {
+  const payoutStatus = withdrawal.payoutStatus.toUpperCase();
+  const onChainStatus = withdrawal.onChainStatus.toUpperCase();
+  const status = withdrawal.status.toUpperCase();
+
+  return (
+    payoutStatus === "FAILED" ||
+    payoutStatus.endsWith("_FAILED") ||
+    payoutStatus.includes("FAILED_REFUNDED") ||
+    onChainStatus === "FAILED" ||
+    status === "FAILED" ||
+    status.includes("FAILED_REFUNDED")
+  );
 }
 
 function requireNft(state: NftSimState, nftId: string) {
@@ -2604,20 +2622,23 @@ export async function requestWithdrawal(input: WithdrawInput) {
       const createdAt = new Date(item.createdAt);
       return item.userId === user.id && createdAt >= todayStart && createdAt < todayEnd;
     });
+    const activeTodaysWithdrawals = todaysWithdrawals.filter(
+      (item) => !isFailedWithdrawal(item),
+    );
 
-    if (todaysWithdrawals.length > 0) {
+    if (!ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY && activeTodaysWithdrawals.length > 0) {
       pushSafetyLog(state, {
         eventType: "BLOCKED_WITHDRAWAL",
         userId: user.id,
         amount,
         reason: "Only one withdrawal per user per day is allowed.",
-        metadata: { existingWithdrawalId: todaysWithdrawals[0]?.id ?? null },
+        metadata: { existingWithdrawalId: activeTodaysWithdrawals[0]?.id ?? null },
       });
       throw new ApiError(409, "Only one withdrawal per user per day is allowed.");
     }
 
     const withdrawnToday = roundAmount(
-      todaysWithdrawals.reduce((total, item) => total + item.grossAmount, 0),
+      activeTodaysWithdrawals.reduce((total, item) => total + item.grossAmount, 0),
     );
     if (
       roundAmount(withdrawnToday + amount) >
