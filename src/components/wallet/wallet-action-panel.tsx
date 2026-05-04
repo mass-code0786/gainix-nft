@@ -8,7 +8,7 @@ import {
   LoaderCircle,
   X,
 } from "lucide-react";
-import { formatEther, isAddress, parseUnits, zeroAddress, type Hex } from "viem";
+import { formatEther, isAddress, parseUnits, zeroAddress, type Address, type Hex } from "viem";
 import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
 import { withdrawalAbi, withdrawalContract } from "@/contracts";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
@@ -55,6 +55,12 @@ interface DepositVerifyResponse extends WalletMutationResponse {
 }
 
 type DepositConfigResponse = UsdtPaymentConfig;
+
+interface WithdrawConfigResponse {
+  vaultAddress: Address;
+  chainId: number;
+  configured: boolean;
+}
 
 interface RecentWalletAction {
   id: string;
@@ -125,8 +131,8 @@ function isValidUsdtPaymentConfig(config: UsdtPaymentConfig) {
   );
 }
 
-function hasValidWithdrawalContract() {
-  return isAddress(withdrawalContract.address) && withdrawalContract.address.toLowerCase() !== zeroAddress;
+function isValidVaultAddress(address: string | null | undefined) {
+  return Boolean(address && isAddress(address) && address.toLowerCase() !== zeroAddress);
 }
 
 function numberFromPayload(payload: Record<string, unknown> | null, key: string) {
@@ -190,6 +196,10 @@ function WalletActionModal({
   const [depositConfig, setDepositConfig] = useState<UsdtPaymentConfig>(usdtPaymentConfig);
   const [isDepositConfigLoading, setIsDepositConfigLoading] = useState(action === "deposit");
   const [depositConfigError, setDepositConfigError] = useState<string | null>(null);
+  const [withdrawalVaultAddress, setWithdrawalVaultAddress] = useState<Address | null>(
+    isValidVaultAddress(withdrawalContract.address) ? withdrawalContract.address : null,
+  );
+  const [isWithdrawalConfigLoading, setIsWithdrawalConfigLoading] = useState(action === "withdraw" && !withdrawalVaultAddress);
   const publicClient = usePublicClient({ chainId: depositConfig.chainId });
   const withdrawalPublicClient = usePublicClient({ chainId: withdrawalContract.chainId });
   const walletAuth = useWalletAuth(walletAddress);
@@ -209,7 +219,56 @@ function WalletActionModal({
   const netAmount = action === "withdraw" ? Number((amount - feeAmount - gxnDeductionAmount).toFixed(2)) : amount;
   const title = action === "deposit" ? "Deposit" : action === "withdraw" ? "Withdraw" : "Transfer capital";
   const depositConfigReady = isValidUsdtPaymentConfig(depositConfig);
-  const withdrawalConfigReady = hasValidWithdrawalContract();
+  const withdrawalConfigReady = isValidVaultAddress(withdrawalVaultAddress);
+
+  useEffect(() => {
+    if (action !== "withdraw") {
+      return;
+    }
+
+    console.info("[withdraw.config] frontendVaultAddress=", withdrawalVaultAddress ?? "");
+    console.info("[withdraw.config] configured=", withdrawalConfigReady);
+
+    if (withdrawalConfigReady) {
+      setIsWithdrawalConfigLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsWithdrawalConfigLoading(true);
+
+    fetchJson<WithdrawConfigResponse>("/api/withdraw/config")
+      .then((config) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const apiVaultAddress = isValidVaultAddress(config.vaultAddress) ? config.vaultAddress : null;
+        console.info("[withdraw.config] apiVaultAddress=", apiVaultAddress ?? "");
+        console.info("[withdraw.config] configured=", Boolean(apiVaultAddress && config.configured));
+        setWithdrawalVaultAddress(apiVaultAddress);
+      })
+      .catch((configError) => {
+        if (!isMounted) {
+          return;
+        }
+
+        console.info("[withdraw.config] apiVaultAddress=", "");
+        console.info("[withdraw.config] configured=", false);
+        console.warn("[withdraw.config] Unable to load withdrawal config:", {
+          error: configError instanceof Error ? configError.message : "unknown",
+        });
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsWithdrawalConfigLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [action, withdrawalConfigReady, withdrawalVaultAddress]);
 
   useEffect(() => {
     if (action !== "deposit") {
@@ -300,6 +359,10 @@ function WalletActionModal({
       return depositConfigError ?? "USDT deposit settings are not configured.";
     }
 
+    if (action === "withdraw" && isWithdrawalConfigLoading) {
+      return null;
+    }
+
     if (action === "withdraw" && !withdrawalConfigReady) {
       return "Withdrawal contract is not configured.";
     }
@@ -312,6 +375,7 @@ function WalletActionModal({
     depositConfigReady,
     depositConfigError,
     isDepositConfigLoading,
+    isWithdrawalConfigLoading,
     withdrawalConfigReady,
     withdrawalWallet,
     walletAddress,
@@ -345,9 +409,13 @@ function WalletActionModal({
     }
 
     const netAmountWei = parseUnits(result.withdrawal.netAmount.toFixed(18), 18);
+    if (!withdrawalVaultAddress) {
+      throw new Error("Withdrawal contract is not configured.");
+    }
+
     const gas = await withdrawalPublicClient.estimateContractGas({
       account: walletAddress as `0x${string}`,
-      address: withdrawalContract.address,
+      address: withdrawalVaultAddress,
       abi: withdrawalAbi,
       functionName: "withdraw",
       args: [walletAddress as `0x${string}`, netAmountWei],
@@ -359,7 +427,7 @@ function WalletActionModal({
   }
 
   async function executeOnChainWithdrawal() {
-    if (!walletAddress || !pendingWithdrawal || !withdrawalPublicClient) {
+    if (!walletAddress || !pendingWithdrawal || !withdrawalPublicClient || !withdrawalVaultAddress) {
       return;
     }
 
@@ -369,7 +437,7 @@ function WalletActionModal({
 
     const netAmountWei = parseUnits(pendingWithdrawal.netAmount.toFixed(18), 18);
     const hash = await writeContractAsync({
-      address: withdrawalContract.address,
+      address: withdrawalVaultAddress,
       abi: withdrawalAbi,
       functionName: "withdraw",
       args: [walletAddress as `0x${string}`, netAmountWei],
@@ -619,7 +687,7 @@ function WalletActionModal({
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span>Contract</span>
-                        <span className="text-zinc-400">{maskAddress(withdrawalContract.address)}</span>
+                        <span className="text-zinc-400">{maskAddress(withdrawalVaultAddress ?? zeroAddress)}</span>
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span>Request</span>
@@ -666,7 +734,12 @@ function WalletActionModal({
           <button
             type="button"
             onClick={() => void submit()}
-            disabled={isSubmitting || walletAuth.isSigning || Boolean(validationError)}
+            disabled={
+              isSubmitting ||
+              walletAuth.isSigning ||
+              Boolean(validationError) ||
+              (action === "withdraw" && (!walletAddress || amount <= 0 || isWithdrawalConfigLoading || !withdrawalConfigReady))
+            }
             className="premium-button w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting || walletAuth.isSigning ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}

@@ -33,6 +33,7 @@ export function getServerWithdrawalConfig() {
     contractAddress: firstRequiredEnv([
       "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
       "WITHDRAWAL_VAULT_ADDRESS",
       "WITHDRAWAL_CONTRACT_ADDRESS",
     ]) as Address,

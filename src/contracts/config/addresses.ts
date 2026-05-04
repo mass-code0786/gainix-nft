@@ -58,6 +58,7 @@ export const gainixContractAddresses: Record<number, GainixAddresses> = {
     withdrawal: envFirstAddress([
       "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
       "WITHDRAWAL_VAULT_ADDRESS",
     ]),
   },
@@ -76,6 +77,7 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_CHAIN_ID ==
     "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
     process.env.NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS ??
       process.env.NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS ??
+      process.env.NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS ??
       process.env.WITHDRAWAL_VAULT_ADDRESS,
     addresses.withdrawal,
   );
