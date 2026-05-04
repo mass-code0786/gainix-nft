@@ -13,6 +13,7 @@ import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "w
 import { withdrawalAbi, withdrawalContract } from "@/contracts";
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ApiRequestError, fetchJson } from "@/lib/api/client";
+import { MIN_WITHDRAWAL_AMOUNT } from "@/config/withdrawal";
 import {
   erc20TransferAbi,
   USDT_DECIMALS,
@@ -429,8 +430,8 @@ function WalletActionModal({
       return "Enter a valid USDT amount.";
     }
 
-    if (action === "withdraw" && amount < 10) {
-      return "Minimum withdrawal is $10.";
+    if (action === "withdraw" && amount < MIN_WITHDRAWAL_AMOUNT) {
+      return `Minimum withdrawal is $${MIN_WITHDRAWAL_AMOUNT}.`;
     }
 
     if (action === "withdraw" && amount > withdrawalWallet) {

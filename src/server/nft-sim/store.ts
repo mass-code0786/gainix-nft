@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { MIN_WITHDRAWAL_AMOUNT } from "@/config/withdrawal";
 import { NftSimState, UserRecord, WalletRecord } from "@/server/nft-sim/types";
 
 const DATA_DIRECTORY = path.join(process.cwd(), "data");
@@ -82,7 +83,7 @@ function createSeedState(): NftSimState {
       autoSellDelayMaxMinutes: 30,
       botProfitMinPercent: 0.25,
       botProfitMaxPercent: 0.35,
-      withdrawalMinimumAmount: 10,
+      withdrawalMinimumAmount: MIN_WITHDRAWAL_AMOUNT,
       withdrawalFeePercent: 10,
       vipMinimumTeamPackageAmount: 100,
       vipFirstPayoutDay: 10,

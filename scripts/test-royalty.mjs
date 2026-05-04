@@ -94,7 +94,7 @@ async function resetAndSeedRoyaltyFixture() {
         autoSellDelayMaxMinutes: 30,
         botProfitMinPercent: 0.25,
         botProfitMaxPercent: 0.35,
-        withdrawalMinimumAmount: 10,
+        withdrawalMinimumAmount: 1,
         withdrawalFeePercent: 10,
         vipMinimumTeamPackageAmount: 100,
         vipFirstPayoutDay: disabledPayoutDays.first,

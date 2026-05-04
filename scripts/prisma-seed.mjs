@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+const MIN_WITHDRAWAL_AMOUNT = Number(process.env.MIN_WITHDRAWAL_AMOUNT ?? 1);
 
 async function main() {
   const existingAdminSetting = await prisma.adminSetting.findFirst();
@@ -14,7 +15,7 @@ async function main() {
         autoSellDelayMaxMinutes: 30,
         botProfitMinPercent: 0.25,
         botProfitMaxPercent: 0.35,
-        withdrawalMinimumAmount: 10,
+        withdrawalMinimumAmount: MIN_WITHDRAWAL_AMOUNT,
         withdrawalFeePercent: 10,
         vipMinimumTeamPackageAmount: 100,
         vipFirstPayoutDay: 10,
@@ -38,7 +39,7 @@ async function main() {
         autoSellDelayMaxMinutes: 30,
         botProfitMinPercent: 0.25,
         botProfitMaxPercent: 0.35,
-        withdrawalMinimumAmount: 10,
+        withdrawalMinimumAmount: MIN_WITHDRAWAL_AMOUNT,
         withdrawalFeePercent: 10,
         vipMinimumTeamPackageAmount: 100,
         vipFirstPayoutDay: 10,

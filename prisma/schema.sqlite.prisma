@@ -335,7 +335,7 @@ model AdminSetting {
   autoSellDelayMaxMinutes         Int      @default(30)
   botProfitMinPercent             Float    @default(0.25)
   botProfitMaxPercent             Float    @default(0.35)
-  withdrawalMinimumAmount         Float    @default(10)
+  withdrawalMinimumAmount         Float    @default(1)
   withdrawalFeePercent            Float    @default(10)
   vipMinimumTeamPackageAmount     Float    @default(100)
   vipFirstPayoutDay               Int      @default(10)

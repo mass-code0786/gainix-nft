@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { prisma } from "@/server/api/prisma";
+import { MIN_WITHDRAWAL_AMOUNT } from "@/config/withdrawal";
 import type {
   AdminSettingsRecord,
   BotActivityRecord,
@@ -143,7 +144,7 @@ export async function ensureStoreInitialized() {
           autoSellDelayMaxMinutes: 30,
           botProfitMinPercent: 0.25,
           botProfitMaxPercent: 0.35,
-          withdrawalMinimumAmount: 10,
+          withdrawalMinimumAmount: MIN_WITHDRAWAL_AMOUNT,
           withdrawalFeePercent: 10,
           vipMinimumTeamPackageAmount: 100,
           vipFirstPayoutDay: 10,
