@@ -3,20 +3,26 @@ pragma solidity ^0.8.24;
 
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import {GainixErrors} from "./libraries/GainixErrors.sol";
 
 /// @title GainixWithdrawalVault
-/// @notice Native-token withdrawal vault. Users pay gas to claim operator-authorized net withdrawal amounts.
+/// @notice Withdrawal vault. Users pay gas to claim operator-authorized native or USDT withdrawal amounts.
 contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
+    IERC20 public immutable usdtToken;
+
     mapping(address => bool) public operators;
     mapping(address => uint256) public claimable;
+    mapping(address => uint256) public usdtClaimable;
 
     event OperatorUpdated(address indexed operator, bool isOperator);
     event WithdrawalAuthorized(address indexed user, uint256 amount, bytes32 indexed requestId);
     event WithdrawalExecuted(address indexed user, uint256 amount, uint256 timestamp);
+    event USDTWithdrawalAuthorized(address indexed user, uint256 amount, bytes32 indexed requestId);
+    event USDTWithdrawalExecuted(address indexed user, uint256 amount, uint256 timestamp);
     event VaultFunded(address indexed sender, uint256 amount);
 
     modifier onlyOperatorOrOwner() {
@@ -26,8 +32,10 @@ contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
         _;
     }
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner, address initialUsdtToken) Ownable(initialOwner) {
         if (initialOwner == address(0)) revert GainixErrors.ZeroAddress();
+        if (initialUsdtToken == address(0)) revert GainixErrors.ZeroAddress();
+        usdtToken = IERC20(initialUsdtToken);
     }
 
     receive() external payable {
@@ -47,6 +55,13 @@ contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
         emit WithdrawalAuthorized(user, amount, requestId);
     }
 
+    function authorizeUSDTWithdrawal(address user, uint256 amount, bytes32 requestId) external onlyOperatorOrOwner whenNotPaused {
+        if (user == address(0)) revert GainixErrors.ZeroAddress();
+        if (amount == 0) revert GainixErrors.InvalidAmount();
+        usdtClaimable[user] += amount;
+        emit USDTWithdrawalAuthorized(user, amount, requestId);
+    }
+
     /// @notice User-paid gas withdrawal. `amount` must already be authorized into `claimable[user]`.
     function withdraw(address user, uint256 amount) external nonReentrant whenNotPaused {
         if (user == address(0)) revert GainixErrors.ZeroAddress();
@@ -60,6 +75,21 @@ contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
         if (!sent) revert GainixErrors.InvalidAmount();
 
         emit WithdrawalExecuted(user, amount, block.timestamp);
+    }
+
+    /// @notice User-paid gas USDT withdrawal. `amount` must already be authorized into `usdtClaimable[user]`.
+    function withdrawUSDT(address user, uint256 amount) external nonReentrant whenNotPaused {
+        if (user == address(0)) revert GainixErrors.ZeroAddress();
+        if (msg.sender != user) revert GainixErrors.Unauthorized();
+        if (amount == 0 || usdtClaimable[user] < amount || usdtToken.balanceOf(address(this)) < amount) {
+            revert GainixErrors.InvalidAmount();
+        }
+
+        usdtClaimable[user] -= amount;
+        bool sent = usdtToken.transfer(user, amount);
+        if (!sent) revert GainixErrors.InvalidAmount();
+
+        emit USDTWithdrawalExecuted(user, amount, block.timestamp);
     }
 
     function pause() external onlyOwner {

@@ -27,6 +27,7 @@ export interface GainixWithdrawalVaultInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "acceptOwnership"
+      | "authorizeUSDTWithdrawal"
       | "authorizeWithdrawal"
       | "claimable"
       | "operators"
@@ -38,7 +39,10 @@ export interface GainixWithdrawalVaultInterface extends Interface {
       | "setOperator"
       | "transferOwnership"
       | "unpause"
+      | "usdtClaimable"
+      | "usdtToken"
       | "withdraw"
+      | "withdrawUSDT"
   ): FunctionFragment;
 
   getEvent(
@@ -47,6 +51,8 @@ export interface GainixWithdrawalVaultInterface extends Interface {
       | "OwnershipTransferStarted"
       | "OwnershipTransferred"
       | "Paused"
+      | "USDTWithdrawalAuthorized"
+      | "USDTWithdrawalExecuted"
       | "Unpaused"
       | "VaultFunded"
       | "WithdrawalAuthorized"
@@ -56,6 +62,10 @@ export interface GainixWithdrawalVaultInterface extends Interface {
   encodeFunctionData(
     functionFragment: "acceptOwnership",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "authorizeUSDTWithdrawal",
+    values: [AddressLike, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "authorizeWithdrawal",
@@ -90,12 +100,25 @@ export interface GainixWithdrawalVaultInterface extends Interface {
   ): string;
   encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "usdtClaimable",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(functionFragment: "usdtToken", values?: undefined): string;
+  encodeFunctionData(
     functionFragment: "withdraw",
+    values: [AddressLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "withdrawUSDT",
     values: [AddressLike, BigNumberish]
   ): string;
 
   decodeFunctionResult(
     functionFragment: "acceptOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "authorizeUSDTWithdrawal",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -124,7 +147,16 @@ export interface GainixWithdrawalVaultInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "usdtClaimable",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "usdtToken", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "withdrawUSDT",
+    data: BytesLike
+  ): Result;
 }
 
 export namespace OperatorUpdatedEvent {
@@ -171,6 +203,42 @@ export namespace PausedEvent {
   export type OutputTuple = [account: string];
   export interface OutputObject {
     account: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace USDTWithdrawalAuthorizedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    amount: BigNumberish,
+    requestId: BytesLike
+  ];
+  export type OutputTuple = [user: string, amount: bigint, requestId: string];
+  export interface OutputObject {
+    user: string;
+    amount: bigint;
+    requestId: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace USDTWithdrawalExecutedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    amount: BigNumberish,
+    timestamp: BigNumberish
+  ];
+  export type OutputTuple = [user: string, amount: bigint, timestamp: bigint];
+  export interface OutputObject {
+    user: string;
+    amount: bigint;
+    timestamp: bigint;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -284,6 +352,12 @@ export interface GainixWithdrawalVault extends BaseContract {
 
   acceptOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
+  authorizeUSDTWithdrawal: TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish, requestId: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   authorizeWithdrawal: TypedContractMethod<
     [user: AddressLike, amount: BigNumberish, requestId: BytesLike],
     [void],
@@ -318,7 +392,17 @@ export interface GainixWithdrawalVault extends BaseContract {
 
   unpause: TypedContractMethod<[], [void], "nonpayable">;
 
+  usdtClaimable: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
+
+  usdtToken: TypedContractMethod<[], [string], "view">;
+
   withdraw: TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  withdrawUSDT: TypedContractMethod<
     [user: AddressLike, amount: BigNumberish],
     [void],
     "nonpayable"
@@ -331,6 +415,13 @@ export interface GainixWithdrawalVault extends BaseContract {
   getFunction(
     nameOrSignature: "acceptOwnership"
   ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "authorizeUSDTWithdrawal"
+  ): TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish, requestId: BytesLike],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "authorizeWithdrawal"
   ): TypedContractMethod<
@@ -373,7 +464,20 @@ export interface GainixWithdrawalVault extends BaseContract {
     nameOrSignature: "unpause"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "usdtClaimable"
+  ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "usdtToken"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "withdraw"
+  ): TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "withdrawUSDT"
   ): TypedContractMethod<
     [user: AddressLike, amount: BigNumberish],
     [void],
@@ -407,6 +511,20 @@ export interface GainixWithdrawalVault extends BaseContract {
     PausedEvent.InputTuple,
     PausedEvent.OutputTuple,
     PausedEvent.OutputObject
+  >;
+  getEvent(
+    key: "USDTWithdrawalAuthorized"
+  ): TypedContractEvent<
+    USDTWithdrawalAuthorizedEvent.InputTuple,
+    USDTWithdrawalAuthorizedEvent.OutputTuple,
+    USDTWithdrawalAuthorizedEvent.OutputObject
+  >;
+  getEvent(
+    key: "USDTWithdrawalExecuted"
+  ): TypedContractEvent<
+    USDTWithdrawalExecutedEvent.InputTuple,
+    USDTWithdrawalExecutedEvent.OutputTuple,
+    USDTWithdrawalExecutedEvent.OutputObject
   >;
   getEvent(
     key: "Unpaused"
@@ -480,6 +598,28 @@ export interface GainixWithdrawalVault extends BaseContract {
       PausedEvent.InputTuple,
       PausedEvent.OutputTuple,
       PausedEvent.OutputObject
+    >;
+
+    "USDTWithdrawalAuthorized(address,uint256,bytes32)": TypedContractEvent<
+      USDTWithdrawalAuthorizedEvent.InputTuple,
+      USDTWithdrawalAuthorizedEvent.OutputTuple,
+      USDTWithdrawalAuthorizedEvent.OutputObject
+    >;
+    USDTWithdrawalAuthorized: TypedContractEvent<
+      USDTWithdrawalAuthorizedEvent.InputTuple,
+      USDTWithdrawalAuthorizedEvent.OutputTuple,
+      USDTWithdrawalAuthorizedEvent.OutputObject
+    >;
+
+    "USDTWithdrawalExecuted(address,uint256,uint256)": TypedContractEvent<
+      USDTWithdrawalExecutedEvent.InputTuple,
+      USDTWithdrawalExecutedEvent.OutputTuple,
+      USDTWithdrawalExecutedEvent.OutputObject
+    >;
+    USDTWithdrawalExecuted: TypedContractEvent<
+      USDTWithdrawalExecutedEvent.InputTuple,
+      USDTWithdrawalExecutedEvent.OutputTuple,
+      USDTWithdrawalExecutedEvent.OutputObject
     >;
 
     "Unpaused(address)": TypedContractEvent<

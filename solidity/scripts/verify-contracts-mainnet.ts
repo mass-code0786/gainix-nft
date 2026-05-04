@@ -74,6 +74,7 @@ async function main() {
   const initialOwner = requiredAddress("INITIAL_OWNER");
   const feeRecipient = requiredAddress("MARKETPLACE_FEE_RECIPIENT");
   const botPassTreasury = requiredAddress("BOTPASS_TREASURY");
+  const usdtToken = requiredAddressFrom(["NEXT_PUBLIC_USDT_TOKEN_ADDRESS", "USDT_TOKEN_ADDRESS"]);
 
   const nftName = process.env.NFT_NAME ?? "Gainix NFT";
   const nftSymbol = process.env.NFT_SYMBOL ?? "GNFT";
@@ -113,7 +114,7 @@ async function main() {
   await verifyContract(
     "contracts/GainixWithdrawalVault.sol:GainixWithdrawalVault",
     requiredAddressFrom(["NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS", "WITHDRAWAL_VAULT_ADDRESS", "WITHDRAWAL_CONTRACT_ADDRESS"]),
-    [initialOwner],
+    [initialOwner, usdtToken],
   );
 }
 

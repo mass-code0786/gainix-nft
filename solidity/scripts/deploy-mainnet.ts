@@ -24,6 +24,20 @@ function requiredAddress(name: string): string {
   return ethers.getAddress(value);
 }
 
+function requiredAddressFrom(names: string[]): string {
+  for (const name of names) {
+    const value = optionalEnv(name);
+    if (value) {
+      if (!ethers.isAddress(value) || value.toLowerCase() === zeroAddress) {
+        throw new Error(`${name} must be a non-zero EVM address.`);
+      }
+      return ethers.getAddress(value);
+    }
+  }
+
+  throw new Error(`Missing required env var: ${names.join(" or ")}`);
+}
+
 function parseCsvBigInt(input: string): bigint[] {
   return input
     .split(",")
@@ -92,8 +106,9 @@ async function main() {
   await botPass.waitForDeployment();
   const botPassAddress = await botPass.getAddress();
 
+  const usdtToken = requiredAddressFrom(["NEXT_PUBLIC_USDT_TOKEN_ADDRESS", "USDT_TOKEN_ADDRESS"]);
   const withdrawalVaultFactory = await ethers.getContractFactory("GainixWithdrawalVault");
-  const withdrawalVault = await withdrawalVaultFactory.deploy(initialOwner);
+  const withdrawalVault = await withdrawalVaultFactory.deploy(initialOwner, usdtToken);
   await withdrawalVault.waitForDeployment();
   const withdrawalVaultAddress = await withdrawalVault.getAddress();
 

@@ -795,7 +795,7 @@ function WalletActionModal({
             {action === "withdraw" ? (
               <>
                 <div className="flex items-center justify-between gap-3">
-                  <span>USDT withdrawal</span>
+                  <span>BNB vault withdrawal</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <span>Withdrawal Amount</span>

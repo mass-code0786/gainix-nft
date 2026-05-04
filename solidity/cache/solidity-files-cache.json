@@ -919,8 +919,8 @@
       ]
     },
     "C:\\Gainix\\Gainix NFT\\solidity\\contracts\\GainixWithdrawalVault.sol": {
-      "lastModificationDate": 1777426794014,
-      "contentHash": "b36ce0e0e2db76d58c3a38e4d3a67a7e",
+      "lastModificationDate": 1777896993247,
+      "contentHash": "96f131b5133b096cd81f46645e4c0373",
       "sourceName": "contracts/GainixWithdrawalVault.sol",
       "solcConfig": {
         "version": "0.8.26",
@@ -949,6 +949,7 @@
       "imports": [
         "@openzeppelin/contracts/access/Ownable2Step.sol",
         "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
         "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
         "@openzeppelin/contracts/utils/Pausable.sol",
         "./libraries/GainixErrors.sol"
@@ -958,6 +959,42 @@
       ],
       "artifacts": [
         "GainixWithdrawalVault"
+      ]
+    },
+    "C:\\Gainix\\Gainix NFT\\solidity\\node_modules\\@openzeppelin\\contracts\\token\\ERC20\\IERC20.sol": {
+      "lastModificationDate": 1776532902433,
+      "contentHash": "5517c8678c18eb1a8ba58810e7ca39ca",
+      "sourceName": "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+      "solcConfig": {
+        "version": "0.8.26",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "IERC20"
       ]
     }
   }
