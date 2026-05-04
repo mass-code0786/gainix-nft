@@ -62,6 +62,14 @@ interface WithdrawConfigResponse {
   configured: boolean;
 }
 
+interface WithdrawStatusResponse {
+  authorized: boolean;
+  claimableAmount: string;
+  vaultBalance: string;
+  canWithdraw: boolean;
+  message: string;
+}
+
 interface RecentWalletAction {
   id: string;
   type: WalletAction;
@@ -179,6 +187,38 @@ function transferErrorMessage(error: unknown, buyCount: number, sellCount: numbe
   return error instanceof Error ? error.message : "Transfer capital failed.";
 }
 
+function safeWithdrawalErrorMessage(error: unknown) {
+  console.error("[withdraw.error] rawError=", error);
+
+  const rawMessage = error instanceof Error ? error.message : "";
+  const lowerMessage = rawMessage.toLowerCase();
+
+  if (
+    lowerMessage.includes("insufficient balance") ||
+    lowerMessage.includes("insufficient funds") ||
+    lowerMessage.includes("vault has insufficient")
+  ) {
+    return "Withdrawal vault has insufficient balance.";
+  }
+
+  if (
+    lowerMessage.includes("unauthorized") ||
+    lowerMessage.includes("not authorized") ||
+    lowerMessage.includes("claimable") ||
+    lowerMessage.includes("0x2c5211c6") ||
+    lowerMessage.includes("reverted") ||
+    lowerMessage.includes("unable to decode")
+  ) {
+    return "Withdrawal is not authorized yet. Please wait for admin approval.";
+  }
+
+  return "Withdrawal failed. Please try again later.";
+}
+
+function amountString(value: number) {
+  return Number.isFinite(value) && value > 0 ? value.toFixed(18) : "0";
+}
+
 function WalletActionModal({
   action,
   walletAddress,
@@ -190,7 +230,7 @@ function WalletActionModal({
   onRefresh,
   onRecorded,
 }: WalletActionModalProps) {
-  const { chainId } = useAccount();
+  const { address: connectedAddress, chainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const [depositConfig, setDepositConfig] = useState<UsdtPaymentConfig>(usdtPaymentConfig);
@@ -210,6 +250,8 @@ function WalletActionModal({
   const [txHash, setTxHash] = useState<string | null>(null);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<WalletMutationResponse["withdrawal"] | null>(null);
   const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
+  const [withdrawStatus, setWithdrawStatus] = useState<WithdrawStatusResponse | null>(null);
+  const [isWithdrawStatusLoading, setIsWithdrawStatusLoading] = useState(false);
   const amount = parseAmount(amountInput);
   const transferAmount = Number(tradingWallet.toFixed(2));
   const feeAmount = action === "withdraw" ? Number((amount * 0.1).toFixed(2)) : 0;
@@ -269,6 +311,54 @@ function WalletActionModal({
       isMounted = false;
     };
   }, [action, withdrawalConfigReady, withdrawalVaultAddress]);
+
+  useEffect(() => {
+    if (action !== "withdraw" || !walletAddress || !withdrawalConfigReady || netAmount <= 0) {
+      setWithdrawStatus(null);
+      setIsWithdrawStatusLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const timeout = window.setTimeout(() => {
+      setIsWithdrawStatusLoading(true);
+      fetchJson<WithdrawStatusResponse>(
+        `/api/withdraw/status?walletAddress=${encodeURIComponent(walletAddress)}&amount=${encodeURIComponent(amountString(netAmount))}`,
+      )
+        .then((status) => {
+          if (!isMounted) {
+            return;
+          }
+
+          console.info("[withdraw.status] wallet=", walletAddress, "claimable=", status.claimableAmount, "vaultBalance=", status.vaultBalance);
+          setWithdrawStatus(status);
+        })
+        .catch((statusError) => {
+          if (!isMounted) {
+            return;
+          }
+
+          console.error("[withdraw.error] rawError=", statusError);
+          setWithdrawStatus({
+            authorized: false,
+            claimableAmount: "0",
+            vaultBalance: "0",
+            canWithdraw: false,
+            message: "Withdrawal failed. Please try again later.",
+          });
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsWithdrawStatusLoading(false);
+          }
+        });
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeout);
+    };
+  }, [action, netAmount, walletAddress, withdrawalConfigReady]);
 
   useEffect(() => {
     if (action !== "deposit") {
@@ -351,6 +441,15 @@ function WalletActionModal({
       return null;
     }
 
+    if (
+      action === "withdraw" &&
+      walletAddress &&
+      connectedAddress &&
+      connectedAddress.toLowerCase() !== walletAddress.toLowerCase()
+    ) {
+      return "Connect the wallet that owns this withdrawal.";
+    }
+
     if (action === "deposit" && isDepositConfigLoading) {
       return null;
     }
@@ -367,6 +466,14 @@ function WalletActionModal({
       return "Withdrawal contract is not configured.";
     }
 
+    if (action === "withdraw" && isWithdrawStatusLoading) {
+      return null;
+    }
+
+    if (action === "withdraw" && withdrawStatus && !withdrawStatus.canWithdraw) {
+      return withdrawStatus.message || "Withdrawal failed. Please try again later.";
+    }
+
     return null;
   }, [
     action,
@@ -376,10 +483,35 @@ function WalletActionModal({
     depositConfigError,
     isDepositConfigLoading,
     isWithdrawalConfigLoading,
+    isWithdrawStatusLoading,
     withdrawalConfigReady,
     withdrawalWallet,
+    withdrawStatus,
+    connectedAddress,
     walletAddress,
   ]);
+
+  async function requireWithdrawStatus(receiveAmount: number) {
+    if (!walletAddress) {
+      throw new Error("Connect your wallet to continue.");
+    }
+
+    if (connectedAddress && connectedAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+      throw new Error("Connect the wallet that owns this withdrawal.");
+    }
+
+    const status = await fetchJson<WithdrawStatusResponse>(
+      `/api/withdraw/status?walletAddress=${encodeURIComponent(walletAddress)}&amount=${encodeURIComponent(amountString(receiveAmount))}`,
+    );
+    console.info("[withdraw.status] wallet=", walletAddress, "claimable=", status.claimableAmount, "vaultBalance=", status.vaultBalance);
+    setWithdrawStatus(status);
+
+    if (!status.canWithdraw) {
+      throw new Error(status.message || "Withdrawal failed. Please try again later.");
+    }
+
+    return status;
+  }
 
   async function prepareOnChainWithdrawal() {
     if (!walletAddress) {
@@ -395,6 +527,8 @@ function WalletActionModal({
     if (chainId !== withdrawalContract.chainId && switchChainAsync) {
       await switchChainAsync({ chainId: withdrawalContract.chainId });
     }
+
+    await requireWithdrawStatus(netAmount);
 
     const result = await fetchJson<WalletMutationResponse>("/api/withdraw", {
       method: "POST",
@@ -412,6 +546,8 @@ function WalletActionModal({
     if (!withdrawalVaultAddress) {
       throw new Error("Withdrawal contract is not configured.");
     }
+
+    await requireWithdrawStatus(result.withdrawal.netAmount);
 
     const gas = await withdrawalPublicClient.estimateContractGas({
       account: walletAddress as `0x${string}`,
@@ -436,6 +572,8 @@ function WalletActionModal({
     }
 
     const netAmountWei = parseUnits(pendingWithdrawal.netAmount.toFixed(18), 18);
+    await requireWithdrawStatus(pendingWithdrawal.netAmount);
+
     const hash = await writeContractAsync({
       address: withdrawalVaultAddress,
       abi: withdrawalAbi,
@@ -568,9 +706,11 @@ function WalletActionModal({
         maskAddressesInText(
           action === "transfer"
             ? transferErrorMessage(submitError, totalBuyCount, totalSellCount)
-            : submitError instanceof Error
-              ? submitError.message
-              : `${title} failed.`,
+            : action === "withdraw"
+              ? safeWithdrawalErrorMessage(submitError)
+              : submitError instanceof Error
+                ? submitError.message
+                : `${title} failed.`,
         ),
       );
     } finally {
@@ -625,6 +765,7 @@ function WalletActionModal({
                   setTxHash(null);
                   setPendingWithdrawal(null);
                   setEstimatedGasFee(null);
+                  setWithdrawStatus(null);
                 }}
               />
             </label>
@@ -676,6 +817,24 @@ function WalletActionModal({
                   <span>GXN tokens user will get</span>
                   <span className="text-amber-200">{gxnTokens.toLocaleString()} GXN</span>
                 </div>
+                {withdrawStatus ? (
+                  <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-300">
+                    <div className="flex items-center justify-between gap-3">
+                      <span>Authorized</span>
+                      <span className={withdrawStatus.authorized ? "text-emerald-200" : "text-amber-200"}>
+                        {withdrawStatus.authorized ? "Yes" : "Waiting"}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <span>Claimable</span>
+                      <span>{formatCurrency(Number(withdrawStatus.claimableAmount))}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                      <span>Vault balance</span>
+                      <span>{formatCurrency(Number(withdrawStatus.vaultBalance))}</span>
+                    </div>
+                  </div>
+                ) : null}
                 {pendingWithdrawal ? (
                   <>
                     <div className="mt-3 border-t border-white/10 pt-3">
@@ -738,7 +897,13 @@ function WalletActionModal({
               isSubmitting ||
               walletAuth.isSigning ||
               Boolean(validationError) ||
-              (action === "withdraw" && (!walletAddress || amount <= 0 || isWithdrawalConfigLoading || !withdrawalConfigReady))
+              (action === "withdraw" &&
+                (!walletAddress ||
+                  amount <= 0 ||
+                  isWithdrawalConfigLoading ||
+                  isWithdrawStatusLoading ||
+                  !withdrawalConfigReady ||
+                  Boolean(withdrawStatus && !withdrawStatus.canWithdraw)))
             }
             className="premium-button w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
