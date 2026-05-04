@@ -41,6 +41,7 @@ const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
 const ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY =
   process.env.ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY === "true" ||
   process.env.TEST_WITHDRAWAL_MODE === "true";
+const DAILY_WITHDRAWAL_LIMIT = Number(process.env.DAILY_WITHDRAWAL_LIMIT ?? 3);
 const VIP_LEVELS = [
   { level: 1, selfPackageAmount: 100, payoutAmount: 30 },
   { level: 2, selfPackageAmount: 200, payoutAmount: 60 },
@@ -2626,15 +2627,27 @@ export async function requestWithdrawal(input: WithdrawInput) {
       (item) => !isFailedWithdrawal(item),
     );
 
-    if (!ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY && activeTodaysWithdrawals.length > 0) {
+    const dailyWithdrawalLimit =
+      Number.isFinite(DAILY_WITHDRAWAL_LIMIT) && DAILY_WITHDRAWAL_LIMIT > 0
+        ? Math.floor(DAILY_WITHDRAWAL_LIMIT)
+        : 3;
+
+    if (
+      !ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY &&
+      activeTodaysWithdrawals.length >= dailyWithdrawalLimit
+    ) {
       pushSafetyLog(state, {
         eventType: "BLOCKED_WITHDRAWAL",
         userId: user.id,
         amount,
-        reason: "Only one withdrawal per user per day is allowed.",
-        metadata: { existingWithdrawalId: activeTodaysWithdrawals[0]?.id ?? null },
+        reason: `Maximum ${dailyWithdrawalLimit} withdrawals per day allowed.`,
+        metadata: {
+          dailyWithdrawalLimit,
+          withdrawalCountToday: activeTodaysWithdrawals.length,
+          existingWithdrawalIds: activeTodaysWithdrawals.map((item) => item.id).join(","),
+        },
       });
-      throw new ApiError(409, "Only one withdrawal per user per day is allowed.");
+      throw new ApiError(409, `Maximum ${dailyWithdrawalLimit} withdrawals per day allowed.`);
     }
 
     const withdrawnToday = roundAmount(
