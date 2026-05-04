@@ -67,7 +67,8 @@ export function HeroActionButtons() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"default" | "warning" | "success">("default");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const referralWalletAddress = searchParams.get("ref");
+  const referralCode = searchParams.get("ref")?.trim() ?? "";
+  const isReferralMissing = !referralCode;
   const walletStatusLabel = !hasMounted
     ? "Connect Wallet"
     : isConnected
@@ -79,6 +80,12 @@ export function HeroActionButtons() {
       : "Not connected";
 
   async function startRegistrationFlow() {
+    if (isReferralMissing) {
+      setStatusMessage("Valid referral link required to register.");
+      setStatusTone("warning");
+      return;
+    }
+
     if (!walletAddress) {
       setStatusMessage("Connect your wallet before starting registration.");
       setStatusTone("warning");
@@ -97,7 +104,7 @@ export function HeroActionButtons() {
     setStatusTone("default");
 
     try {
-      const result = await registerWallet(referralWalletAddress);
+      const result = await registerWallet(referralCode);
       setStatusMessage(result.message);
       setStatusTone("success");
       router.push("/dashboard");
@@ -217,7 +224,7 @@ export function HeroActionButtons() {
       <button
         type="button"
         onClick={handleRegisterNow}
-        disabled={isSubmitting || isCheckingRegistration}
+        disabled={isSubmitting || isCheckingRegistration || isReferralMissing}
         className={`secondary-button w-full rounded-xl px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-70 ${
           !isRegistered ? "border-red-400/25 bg-red-500/10 text-red-100 hover:bg-red-500/15" : ""
         }`}
@@ -225,6 +232,16 @@ export function HeroActionButtons() {
         <UserPlus className="mr-2 h-4 w-4 text-red-300" />
         {isSubmitting ? "Registering..." : "Register Now"}
       </button>
+
+      <label className="block text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
+        Referral
+        <input
+          value={referralCode}
+          readOnly
+          placeholder="Referral link required"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm normal-case tracking-normal text-zinc-100 outline-none placeholder:text-zinc-600"
+        />
+      </label>
 
       <div
         className={`w-full max-w-full overflow-hidden rounded-2xl border px-4 py-3 text-sm leading-6 ${
@@ -239,6 +256,8 @@ export function HeroActionButtons() {
           Wallet: {walletAddress ?? "--"}
         </p>
         <p className="mt-1">Status: {walletStatusLabel}</p>
+        <p className="mt-2">Registration is allowed only via referral link.</p>
+        {isReferralMissing ? <p className="mt-2">Valid referral link required to register.</p> : null}
         {statusMessage ? <p className="mt-2">{statusMessage}</p> : null}
         {!statusMessage && registrationError ? <p className="mt-2">{registrationError}</p> : null}
       </div>

@@ -33,6 +33,9 @@ function createSeedState(): NftSimState {
     capitalUnlockedAt: null,
     capitalTransferredAt: null,
     registrationBonusGiven: false,
+    referralCode: "GX-DEMO",
+    referredBy: null,
+    referralCodeUsed: null,
     createdAt: now,
   };
   const demoWallet: WalletRecord = {
@@ -109,6 +112,9 @@ function normalizeState(state: NftSimState): NftSimState {
     dailySellCount: user.dailySellCount ?? 0,
     lastTradeResetAt: user.lastTradeResetAt ?? now,
     registrationBonusGiven: user.registrationBonusGiven ?? false,
+    referralCode: user.referralCode ?? null,
+    referredBy: user.referredBy ?? null,
+    referralCodeUsed: user.referralCodeUsed ?? null,
   }));
 
   state.admin_settings = {

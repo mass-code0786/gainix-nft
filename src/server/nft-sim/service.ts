@@ -1312,6 +1312,9 @@ export async function registerUser(input: RegisterUserInput) {
       capitalUnlockedAt: null,
       capitalTransferredAt: null,
       registrationBonusGiven: false,
+      referralCode: null,
+      referredBy: sponsorUserId,
+      referralCodeUsed: input.sponsorWalletAddress ?? null,
       createdAt: now,
     };
     const wallet = createUserWallet(now, user.id);

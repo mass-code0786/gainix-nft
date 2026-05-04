@@ -21,6 +21,7 @@ import type {
 let transactionQueue = Promise.resolve();
 type DbClient = PrismaClient | Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 let registrationBonusColumnReady = false;
+let referralColumnsReady = false;
 
 interface StoreTransactionOptions {
   lockActiveBotRows?: boolean;
@@ -82,8 +83,49 @@ async function ensureRegistrationBonusColumn() {
   }
 }
 
+async function ensureReferralColumns() {
+  if (referralColumnsReady) {
+    return;
+  }
+
+  const databaseUrl = process.env.DATABASE_URL ?? "";
+
+  try {
+    if (databaseUrl.startsWith("file:")) {
+      const columns = await prisma.$queryRawUnsafe<Array<{ name: string }>>('PRAGMA table_info("users")');
+      const columnNames = new Set(columns.map((column) => column.name));
+
+      if (!columnNames.has("referralCode")) {
+        await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN "referralCode" TEXT');
+      }
+      if (!columnNames.has("referredBy")) {
+        await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN "referredBy" TEXT');
+      }
+      if (!columnNames.has("referralCodeUsed")) {
+        await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN "referralCodeUsed" TEXT');
+      }
+
+      await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key" ON "users"("referralCode")');
+      await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "users_referredBy_idx" ON "users"("referredBy")');
+      await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "users_referralCodeUsed_idx" ON "users"("referralCodeUsed")');
+    } else {
+      await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referralCode" TEXT');
+      await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referredBy" TEXT');
+      await prisma.$executeRawUnsafe('ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referralCodeUsed" TEXT');
+      await prisma.$executeRawUnsafe('CREATE UNIQUE INDEX IF NOT EXISTS "users_referralCode_key" ON "users"("referralCode")');
+      await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "users_referredBy_idx" ON "users"("referredBy")');
+      await prisma.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS "users_referralCodeUsed_idx" ON "users"("referralCodeUsed")');
+    }
+
+    referralColumnsReady = true;
+  } catch (error) {
+    console.error("[referral] failed to ensure referral columns", error);
+  }
+}
+
 export async function ensureStoreInitialized() {
   await ensureRegistrationBonusColumn();
+  await ensureReferralColumns();
 
   await prisma.$transaction(async (tx) => {
     const [adminSetting, reserve] = await Promise.all([
@@ -182,6 +224,9 @@ async function buildState(db: DbClient) {
       capitalUnlockedAt: toIso(item.capitalUnlockedAt),
       capitalTransferredAt: toIso(item.capitalTransferredAt),
       registrationBonusGiven: item.registrationBonusGiven ?? false,
+      referralCode: item.referralCode ?? null,
+      referredBy: item.referredBy ?? null,
+      referralCodeUsed: item.referralCodeUsed ?? null,
       createdAt: item.createdAt.toISOString(),
     })),
     nfts: nfts.map<NftRecord>((item) => ({
@@ -398,6 +443,9 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         capitalUnlockedAt: item.capitalUnlockedAt ? new Date(item.capitalUnlockedAt) : null,
         capitalTransferredAt: item.capitalTransferredAt ? new Date(item.capitalTransferredAt) : null,
         registrationBonusGiven: item.registrationBonusGiven ?? false,
+        referralCode: item.referralCode,
+        referredBy: item.referredBy,
+        referralCodeUsed: item.referralCodeUsed,
         createdAt: new Date(item.createdAt),
         updatedAt: new Date(item.createdAt),
       })),

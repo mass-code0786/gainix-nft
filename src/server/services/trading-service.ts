@@ -105,6 +105,7 @@ const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
 let botExecutionRunning = false;
 const scheduledBotListTradeIds = new Set<string>();
 const activeBotBuyUserIds = new Set<string>();
+const isReferralRequired = true;
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -117,6 +118,7 @@ interface UserSelector {
 interface RegisterUserInput {
   walletAddress: string;
   sponsorWalletAddress?: string;
+  ref?: string;
 }
 
 interface DepositInput extends UserSelector {
@@ -235,6 +237,30 @@ function formatShortWalletAddress(walletAddress: string) {
 
 function isWalletAddressLike(value: string) {
   return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
+function normalizeReferralCode(value: string | undefined | null) {
+  return value?.trim() ?? "";
+}
+
+function createReferralCode(walletAddress: string, userId: string) {
+  return `GX-${walletAddress.slice(2, 8).toUpperCase()}-${userId.slice(-6).toUpperCase()}`;
+}
+
+function findReferralUser(state: NftSimState, referralCode: string) {
+  const normalizedReferral = normalizeReferralCode(referralCode);
+  const normalizedReferralLower = normalizedReferral.toLowerCase();
+
+  return state.users.find((item) => {
+    const itemReferralCode = normalizeReferralCode(item.referralCode).toLowerCase();
+    const itemWalletAddress = normalizeWalletAddress(item.walletAddress);
+
+    return (
+      itemReferralCode === normalizedReferralLower ||
+      item.id === normalizedReferral ||
+      itemWalletAddress === normalizedReferralLower
+    );
+  }) ?? null;
 }
 
 function validatePositiveAmount(amount: number, label: string) {
@@ -2088,6 +2114,11 @@ export async function registerUser(input: RegisterUserInput) {
       throw new ApiError(400, "walletAddress is required.");
     }
 
+    const referralCodeUsed = normalizeReferralCode(input.ref);
+    if (isReferralRequired && !referralCodeUsed) {
+      throw new ApiError(400, "Invalid or missing referral code");
+    }
+
     const existingUser = state.users.find(
       (item) => normalizeWalletAddress(item.walletAddress) === walletAddress,
     );
@@ -2095,25 +2126,21 @@ export async function registerUser(input: RegisterUserInput) {
       throw new ApiError(409, "Wallet is already registered.");
     }
 
-    let sponsorUserId: string | null = null;
-    if (input.sponsorWalletAddress) {
-      const sponsorWalletAddress = normalizeWalletAddress(input.sponsorWalletAddress);
-      if (sponsorWalletAddress === walletAddress) {
-        throw new ApiError(409, "Self-referral is not allowed.");
-      }
-
-      const sponsor = state.users.find(
-        (item) => normalizeWalletAddress(item.walletAddress) === sponsorWalletAddress,
-      );
-      if (!sponsor) {
-        throw new ApiError(404, "Sponsor user not found.");
-      }
-      sponsorUserId = sponsor.id;
+    const sponsor = referralCodeUsed ? findReferralUser(state, referralCodeUsed) : null;
+    if (isReferralRequired && !sponsor) {
+      throw new ApiError(400, "Invalid or missing referral code");
     }
 
+    if (sponsor && normalizeWalletAddress(sponsor.walletAddress) === walletAddress) {
+      throw new ApiError(409, "Self-referral is not allowed.");
+    }
+
+    const sponsorUserId = sponsor?.id ?? null;
+
     const now = nowIso();
+    const userId = makeId("user");
     const user: UserRecord = {
-      id: makeId("user"),
+      id: userId,
       walletAddress,
       selfPackageAmount: 0,
       currentVipLevel: 0,
@@ -2127,6 +2154,9 @@ export async function registerUser(input: RegisterUserInput) {
       capitalUnlockedAt: null,
       capitalTransferredAt: null,
       registrationBonusGiven: false,
+      referralCode: createReferralCode(walletAddress, userId),
+      referredBy: sponsorUserId,
+      referralCodeUsed,
       createdAt: now,
     };
     const wallet = createUserWallet(now, user.id);

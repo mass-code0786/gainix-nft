@@ -61,6 +61,7 @@ export const authVerifyInputSchema = z.object({
 export const registerInputSchema = z.object({
   walletAddress: walletAddressSchema,
   sponsorWalletAddress: walletAddressSchema.optional(),
+  ref: z.string().trim().optional(),
 });
 
 export const walletQuerySchema = z

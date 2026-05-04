@@ -91,6 +91,9 @@ model User {
   capitalUnlockedAt DateTime?
   capitalTransferredAt DateTime?
   registrationBonusGiven Boolean      @default(false) @map("registration_bonus_given")
+  referralCode      String?           @unique
+  referredBy        String?
+  referralCodeUsed  String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   wallet            Wallet?
@@ -104,8 +107,12 @@ model User {
   deposits          Deposit[]
   mlmDescendants    MLMTree[]         @relation("MlmDescendant")
   mlmAncestors      MLMTree[]         @relation("MlmAncestor")
+  referrer          User?             @relation("UserReferrals", fields: [referredBy], references: [id], onDelete: SetNull)
+  referrals         User[]            @relation("UserReferrals")
 
   @@index([createdAt])
+  @@index([referredBy])
+  @@index([referralCodeUsed])
   @@map("users")
 }
 

@@ -95,6 +95,11 @@ async function createMlmRelations(
 
 export async function registerUser(input: RegisterInput) {
   const result = await prisma.$transaction(async (tx) => {
+    const referralCodeUsed = input.ref?.trim() ?? "";
+    if (!referralCodeUsed) {
+      throw new ApiError(400, "Invalid or missing referral code");
+    }
+
     const existingUser = await tx.user.findUnique({
       where: { walletAddress: input.walletAddress },
       include: { wallet: true },
@@ -122,20 +127,28 @@ export async function registerUser(input: RegisterInput) {
       };
     }
 
-    let sponsorUserId: string | null = null;
-    if (input.sponsorWalletAddress) {
-      const sponsor = await tx.user.findUnique({
-        where: { walletAddress: input.sponsorWalletAddress },
-      });
-      if (!sponsor) {
-        throw new ApiError(404, "Sponsor wallet not found.");
-      }
-      sponsorUserId = sponsor.id;
+    const sponsor = await tx.user.findFirst({
+      where: {
+        OR: [
+          { referralCode: referralCodeUsed },
+          { id: referralCodeUsed },
+          { walletAddress: referralCodeUsed.toLowerCase() },
+        ],
+      },
+    });
+    if (!sponsor) {
+      throw new ApiError(400, "Invalid or missing referral code");
     }
+    if (sponsor.walletAddress.toLowerCase() === input.walletAddress) {
+      throw new ApiError(409, "Self-referral is not allowed.");
+    }
+    const sponsorUserId = sponsor.id;
 
     const user = await tx.user.create({
       data: {
         walletAddress: input.walletAddress,
+        referredBy: sponsorUserId,
+        referralCodeUsed,
         wallet: {
           create: {},
         },
