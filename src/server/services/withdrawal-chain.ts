@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
   createPublicClient,
   createWalletClient,
@@ -26,31 +28,51 @@ const erc20BalanceAbi = [
   },
 ] as const;
 
-function requiredEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new ApiError(500, `${name} is not configured.`);
+let envFilesLoaded = false;
+
+function loadEnvFile(filePath: string) {
+  if (!existsSync(filePath)) {
+    return;
   }
 
-  return value;
+  for (const line of readFileSync(filePath, "utf8").split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (!match || process.env[match[1]] !== undefined) {
+      continue;
+    }
+
+    process.env[match[1]] = match[2].trim().replace(/^['"]|['"]$/g, "");
+  }
 }
 
-function firstRequiredEnv(names: string[]) {
+function ensureWithdrawalEnvLoaded() {
+  if (envFilesLoaded) {
+    return;
+  }
+
+  loadEnvFile(path.join(process.cwd(), ".env"));
+  loadEnvFile(path.join(process.cwd(), ".env.mainnet"));
+  envFilesLoaded = true;
+}
+
+function firstRequiredEnv(names: string[], step: string) {
+  ensureWithdrawalEnvLoaded();
   const name = names.find((key) => process.env[key]?.trim());
   if (!name) {
-    throw new ApiError(500, `${names.join(" or ")} is not configured.`);
+    throw new ApiError(500, `${names.join(" or ")} is not configured.`, { step });
   }
 
   return process.env[name]!.trim();
 }
 
 function firstOptionalEnv(names: string[]) {
+  ensureWithdrawalEnvLoaded();
   const name = names.find((key) => process.env[key]?.trim());
   return name ? process.env[name]!.trim() : null;
 }
 
 export function getServerWithdrawalConfig() {
-  const usdtTokenAddress = firstRequiredEnv(["USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS"]) as Address;
+  const usdtTokenAddress = firstRequiredEnv(["USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS"], "ENV_USDT_TOKEN") as Address;
 
   return {
     contractAddress: firstRequiredEnv([
@@ -59,9 +81,9 @@ export function getServerWithdrawalConfig() {
       "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-    ]) as Address,
-    rpcUrl: firstRequiredEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"]),
-    chainId: Number(firstRequiredEnv(["BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID"])),
+    ], "ENV_WITHDRAWAL_VAULT") as Address,
+    rpcUrl: firstRequiredEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"], "ENV_RPC_URL"),
+    chainId: Number(firstRequiredEnv(["BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID"], "ENV_CHAIN_ID")),
     usdtTokenAddress,
     decimals: 18,
     confirmations: Number(process.env.BSC_WITHDRAWAL_CONFIRMATIONS ?? 1),
@@ -77,7 +99,7 @@ function getWithdrawalOperatorPrivateKey() {
   ]);
 
   if (!privateKey) {
-    throw new ApiError(500, "Withdrawal operator private key is not configured.");
+    throw new ApiError(500, "Withdrawal operator private key is not configured.", { step: "ENV_OPERATOR_PRIVATE_KEY" });
   }
 
   return (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Hex;
@@ -92,38 +114,91 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
   netAmount: number;
   withdrawalId: string;
 }) {
-  const config = getServerWithdrawalConfig();
-  const account = privateKeyToAccount(getWithdrawalOperatorPrivateKey());
-  const client = createPublicClient({
-    transport: http(config.rpcUrl),
-  });
-  const walletClient = createWalletClient({
-    account,
-    transport: http(config.rpcUrl),
-  });
-  const amount = parseUnits(input.netAmount.toFixed(config.decimals), config.decimals);
-  const requestId = makeWithdrawalRequestId(input.withdrawalId);
+  let step = "START";
+  let vaultAddress: string | null = null;
+  let operatorAddress: string | null = null;
 
   try {
-    const [owner, isOperator, operatorBalance, vaultUsdtToken] = await Promise.all([
-      client.readContract({
-        address: config.contractAddress,
-        abi: withdrawalAbi,
-        functionName: "owner",
-      }),
-      client.readContract({
-        address: config.contractAddress,
-        abi: withdrawalAbi,
-        functionName: "operators",
-        args: [account.address],
-      }),
-      client.getBalance({ address: account.address }),
-      client.readContract({
-        address: config.contractAddress,
-        abi: withdrawalAbi,
-        functionName: "usdtToken",
-      }),
+    step = "ENV_CONFIG";
+    ensureWithdrawalEnvLoaded();
+    const envVaultAddress = firstOptionalEnv([
+      "WITHDRAWAL_VAULT_ADDRESS",
+      "WITHDRAWAL_CONTRACT_ADDRESS",
+      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
     ]);
+    const envOperatorPrivateKey = firstOptionalEnv([
+      "WITHDRAWAL_OPERATOR_PRIVATE_KEY",
+      "BACKEND_OPERATOR_PRIVATE_KEY",
+      "OPERATOR_PRIVATE_KEY",
+      "DEPLOYER_PRIVATE_KEY",
+    ]);
+    const envRpcUrl = firstOptionalEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"]);
+    console.info("[withdraw.approve.debug]", {
+      step,
+      envVaultPresent: Boolean(envVaultAddress),
+      envOperatorPrivateKeyPresent: Boolean(envOperatorPrivateKey),
+      envOperatorPrivateKeyLength: envOperatorPrivateKey?.length ?? 0,
+      rpcUrl: envRpcUrl,
+    });
+
+    const config = getServerWithdrawalConfig();
+    const operatorPrivateKey = getWithdrawalOperatorPrivateKey();
+    const account = privateKeyToAccount(operatorPrivateKey);
+    vaultAddress = config.contractAddress;
+    operatorAddress = account.address;
+    const client = createPublicClient({
+      transport: http(config.rpcUrl),
+    });
+    const walletClient = createWalletClient({
+      account,
+      transport: http(config.rpcUrl),
+    });
+    const amount = parseUnits(input.netAmount.toFixed(config.decimals), config.decimals);
+    const requestId = makeWithdrawalRequestId(input.withdrawalId);
+
+    console.info("[withdraw.approve.debug]", {
+      step: "ENV",
+      envVaultPresent: Boolean(config.contractAddress),
+      envOperatorPrivateKeyPresent: Boolean(operatorPrivateKey),
+      envOperatorPrivateKeyLength: operatorPrivateKey.length,
+      operatorAddress: account.address,
+      vaultAddress: config.contractAddress,
+      rpcUrl: config.rpcUrl,
+    });
+
+    step = "READ_OWNER";
+    console.info("[withdraw.approve.debug]", { step, vaultAddress: config.contractAddress });
+    const owner = await client.readContract({
+      address: config.contractAddress,
+      abi: withdrawalAbi,
+      functionName: "owner",
+    });
+
+    step = "READ_OPERATOR_AUTH";
+    console.info("[withdraw.approve.debug]", { step, operatorAddress: account.address });
+    const isOperator = await client.readContract({
+      address: config.contractAddress,
+      abi: withdrawalAbi,
+      functionName: "operators",
+      args: [account.address],
+    });
+
+    step = "READ_OPERATOR_BNB_BALANCE";
+    console.info("[withdraw.approve.debug]", { step, operatorAddress: account.address });
+    const operatorBalance = await client.getBalance({ address: account.address });
+
+    step = "READ_USDT_TOKEN";
+    console.info("[withdraw.approve.debug]", { step, vaultAddress: config.contractAddress });
+    const vaultUsdtToken = await client.readContract({
+      address: config.contractAddress,
+      abi: withdrawalAbi,
+      functionName: "usdtToken",
+    });
+
+    step = "READ_VAULT_USDT_BALANCE";
+    console.info("[withdraw.approve.debug]", { step, vaultAddress: config.contractAddress, usdtToken: vaultUsdtToken });
     const vaultUsdtBalance = await client.readContract({
       address: vaultUsdtToken,
       abi: erc20BalanceAbi,
@@ -147,21 +222,28 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
     });
 
     if (!isAddressEqual(vaultUsdtToken, config.usdtTokenAddress)) {
-      throw new ApiError(500, "USDT token config does not match withdrawal vault.");
+      throw new ApiError(500, "USDT token config does not match withdrawal vault.", { step: "VALIDATE_USDT_TOKEN" });
     }
 
     if (!operatorAuthorized) {
-      throw new ApiError(409, "Withdrawal operator is not authorized on vault.");
+      throw new ApiError(409, "Withdrawal operator is not authorized on vault.", { step: "VALIDATE_OPERATOR_AUTH" });
     }
 
     if (operatorBalance <= BigInt(0)) {
-      throw new ApiError(409, "Operator wallet needs BNB for gas.");
+      throw new ApiError(409, "Operator wallet needs BNB for gas.", { step: "VALIDATE_OPERATOR_BNB" });
     }
 
     if (vaultUsdtBalance < amount) {
-      throw new ApiError(409, "Withdrawal vault has insufficient USDT.");
+      throw new ApiError(409, "Withdrawal vault has insufficient USDT.", { step: "VALIDATE_VAULT_USDT" });
     }
 
+    step = "SIMULATE_AUTHORIZE_USDT_WITHDRAWAL";
+    console.info("[withdraw.approve.debug]", {
+      step,
+      userWallet: input.walletAddress,
+      netAmountWei: amount.toString(),
+      requestId,
+    });
     await client.simulateContract({
       account: account.address,
       address: config.contractAddress,
@@ -170,6 +252,13 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       args: [input.walletAddress as Address, amount, requestId],
     });
 
+    step = "AUTHORIZE_USDT_WITHDRAWAL";
+    console.info("[withdraw.approve.debug]", {
+      step,
+      userWallet: input.walletAddress,
+      netAmountWei: amount.toString(),
+      requestId,
+    });
     const hash = await walletClient.writeContract({
       address: config.contractAddress,
       abi: withdrawalAbi,
@@ -179,9 +268,10 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
     });
     console.info("[withdraw.approve] authorizeUSDTWithdrawal txHash=", hash);
 
+    step = "WAIT_AUTHORIZE_RECEIPT";
     const receipt = await client.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") {
-      throw new ApiError(502, "USDT withdrawal authorization transaction failed.");
+      throw new ApiError(500, "USDT withdrawal authorization transaction failed.", { step });
     }
 
     return {
@@ -197,8 +287,9 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       withdrawalId: input.withdrawalId,
       userWallet: input.walletAddress,
       netAmount: input.netAmount,
-      vaultAddress: config.contractAddress,
-      operatorAddress: account.address,
+      vaultAddress,
+      operatorAddress,
+      step,
       message: error instanceof Error ? error.message : "unknown",
       stack: error instanceof Error ? error.stack : null,
     });
@@ -209,13 +300,13 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
 
     const message = error instanceof Error ? error.message.toLowerCase() : "";
     if (message.includes("unauthorized")) {
-      throw new ApiError(409, "Withdrawal operator is not authorized on vault.");
+      throw new ApiError(409, "Withdrawal operator is not authorized on vault.", { step });
     }
     if (message.includes("insufficient funds") || message.includes("exceeds the balance")) {
-      throw new ApiError(409, "Operator wallet needs BNB for gas.");
+      throw new ApiError(409, "Operator wallet needs BNB for gas.", { step });
     }
 
-    throw new ApiError(502, error instanceof Error ? error.message : "USDT withdrawal authorization failed.");
+    throw new ApiError(500, error instanceof Error ? error.message : "USDT withdrawal authorization failed.", { step });
   }
 }
 
