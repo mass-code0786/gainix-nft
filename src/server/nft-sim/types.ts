@@ -42,7 +42,7 @@ export interface UserRecord {
   capitalUnlockedAt: string | null;
   capitalTransferredAt: string | null;
   registrationBonusGiven: boolean;
-  referralCode: string | null;
+  referralCode: string;
   referredBy: string | null;
   referralCodeUsed: string | null;
   createdAt: string;

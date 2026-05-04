@@ -14,6 +14,10 @@ function roundAmount(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function createReferralCode(walletAddress: string) {
+  return walletAddress;
+}
+
 function toWalletResponse(wallet: {
   tradingWallet: number;
   withdrawalWallet: number;
@@ -147,6 +151,7 @@ export async function registerUser(input: RegisterInput) {
     const user = await tx.user.create({
       data: {
         walletAddress: input.walletAddress,
+        referralCode: createReferralCode(input.walletAddress),
         referredBy: sponsorUserId,
         referralCodeUsed,
         wallet: {

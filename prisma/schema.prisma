@@ -91,7 +91,7 @@ model User {
   capitalUnlockedAt DateTime?
   capitalTransferredAt DateTime?
   registrationBonusGiven Boolean      @default(false) @map("registration_bonus_given")
-  referralCode      String?           @unique
+  referralCode      String            @unique
   referredBy        String?
   referralCodeUsed  String?
   createdAt         DateTime          @default(now())

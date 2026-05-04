@@ -112,7 +112,7 @@ function normalizeState(state: NftSimState): NftSimState {
     dailySellCount: user.dailySellCount ?? 0,
     lastTradeResetAt: user.lastTradeResetAt ?? now,
     registrationBonusGiven: user.registrationBonusGiven ?? false,
-    referralCode: user.referralCode ?? null,
+    referralCode: user.referralCode ?? user.walletAddress,
     referredBy: user.referredBy ?? null,
     referralCodeUsed: user.referralCodeUsed ?? null,
   }));

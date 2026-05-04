@@ -243,8 +243,8 @@ function normalizeReferralCode(value: string | undefined | null) {
   return value?.trim() ?? "";
 }
 
-function createReferralCode(walletAddress: string, userId: string) {
-  return `GX-${walletAddress.slice(2, 8).toUpperCase()}-${userId.slice(-6).toUpperCase()}`;
+function createReferralCode(walletAddress: string) {
+  return walletAddress;
 }
 
 function findReferralUser(state: NftSimState, referralCode: string) {
@@ -2154,7 +2154,7 @@ export async function registerUser(input: RegisterUserInput) {
       capitalUnlockedAt: null,
       capitalTransferredAt: null,
       registrationBonusGiven: false,
-      referralCode: createReferralCode(walletAddress, userId),
+      referralCode: createReferralCode(walletAddress),
       referredBy: sponsorUserId,
       referralCodeUsed,
       createdAt: now,

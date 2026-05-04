@@ -1312,7 +1312,7 @@ export async function registerUser(input: RegisterUserInput) {
       capitalUnlockedAt: null,
       capitalTransferredAt: null,
       registrationBonusGiven: false,
-      referralCode: null,
+      referralCode: walletAddress,
       referredBy: sponsorUserId,
       referralCodeUsed: input.sponsorWalletAddress ?? null,
       createdAt: now,

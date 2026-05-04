@@ -18,16 +18,19 @@ function requestedNetwork(): string | undefined {
 }
 
 const isBscMainnet = requestedNetwork() === "bscMainnet";
+const isBscMainnetDeploy =
+  isBscMainnet &&
+  process.argv.some((arg) => arg.replace(/\\/g, "/").endsWith("scripts/deploy-mainnet.ts"));
 const rootMainnetEnvPath = path.resolve(__dirname, "../.env.mainnet");
 let deployerPrivateKey: string | undefined;
 
 if (isBscMainnet) {
   const result = loadEnv({ path: rootMainnetEnvPath, override: true });
   if (result.error) {
-    throw new Error(`BSC mainnet deployment requires root .env.mainnet at ${rootMainnetEnvPath}.`);
+    throw new Error(`BSC mainnet tasks require root .env.mainnet at ${rootMainnetEnvPath}.`);
   }
   deployerPrivateKey = result.parsed?.DEPLOYER_PRIVATE_KEY?.trim();
-  if (!result.parsed?.EXPECTED_DEPLOYER_ADDRESS?.trim()) {
+  if (isBscMainnetDeploy && !result.parsed?.EXPECTED_DEPLOYER_ADDRESS?.trim()) {
     throw new Error("BSC mainnet deployment requires EXPECTED_DEPLOYER_ADDRESS in root .env.mainnet.");
   }
 } else {
@@ -39,7 +42,7 @@ if (isBscMainnet) {
 
 const accounts = deployerPrivateKey ? [deployerPrivateKey] : [];
 
-if (isBscMainnet && accounts.length === 0) {
+if (isBscMainnetDeploy && accounts.length === 0) {
   throw new Error("BSC mainnet deployment requires DEPLOYER_PRIVATE_KEY in root .env.mainnet.");
 }
 
@@ -52,6 +55,9 @@ const config: HardhatUserConfig = {
         runs: 200,
       },
     },
+  },
+  etherscan: {
+    apiKey: process.env.BSCSCAN_API_KEY ?? "",
   },
   networks: {
     hardhat: {},
