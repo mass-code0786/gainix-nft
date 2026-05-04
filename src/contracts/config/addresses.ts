@@ -15,6 +15,11 @@ function envAddress(name: string, fallback?: string) {
   return (process.env[name]?.trim() ?? fallback ?? zeroAddress) as Address;
 }
 
+function envFirstAddress(names: string[], fallback?: string) {
+  const value = names.map((name) => process.env[name]?.trim()).find(Boolean);
+  return (value ?? fallback ?? zeroAddress) as Address;
+}
+
 function envOptionalNonZeroAddress(name: string) {
   const rawAddress = process.env[name]?.trim();
 
@@ -50,7 +55,11 @@ export const gainixContractAddresses: Record<number, GainixAddresses> = {
     nft: envOptionalNonZeroAddress("NEXT_PUBLIC_GAINIX_NFT_ADDRESS"),
     marketplace: envAddress("NEXT_PUBLIC_GAINIX_MARKETPLACE_ADDRESS"),
     botPass: envAddress("NEXT_PUBLIC_GAINIX_BOTPASS_ADDRESS"),
-    withdrawal: envAddress("NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS"),
+    withdrawal: envFirstAddress([
+      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
+      "WITHDRAWAL_VAULT_ADDRESS",
+    ]),
   },
 };
 
@@ -65,10 +74,14 @@ if (process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_CHAIN_ID ==
   assertProductionAddress("NEXT_PUBLIC_GAINIX_BOTPASS_ADDRESS", process.env.NEXT_PUBLIC_GAINIX_BOTPASS_ADDRESS, addresses.botPass);
   assertProductionAddress(
     "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-    process.env.NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS,
+    process.env.NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS ??
+      process.env.NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS ??
+      process.env.WITHDRAWAL_VAULT_ADDRESS,
     addresses.withdrawal,
   );
 }
+
+console.info("[withdraw.config] vaultAddress loaded", isValidNonZeroAddress(getGainixAddresses(contractActiveChain.id).withdrawal));
 
 export function getGainixAddresses(chainId: number = contractDefaultChain.id) {
   return gainixContractAddresses[chainId] ?? gainixContractAddresses[contractDefaultChain.id];

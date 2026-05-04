@@ -19,9 +19,23 @@ function requiredEnv(name: string) {
   return value;
 }
 
+function firstRequiredEnv(names: string[]) {
+  const name = names.find((key) => process.env[key]?.trim());
+  if (!name) {
+    throw new ApiError(500, `${names.join(" or ")} is not configured.`);
+  }
+
+  return process.env[name]!.trim();
+}
+
 export function getServerWithdrawalConfig() {
   return {
-    contractAddress: requiredEnv("WITHDRAWAL_CONTRACT_ADDRESS") as Address,
+    contractAddress: firstRequiredEnv([
+      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
+      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
+      "WITHDRAWAL_VAULT_ADDRESS",
+      "WITHDRAWAL_CONTRACT_ADDRESS",
+    ]) as Address,
     rpcUrl: requiredEnv("BSC_RPC_URL"),
     chainId: Number(requiredEnv("BSC_CHAIN_ID")),
     decimals: 18,
