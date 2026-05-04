@@ -1,34 +1,19 @@
 import { NextResponse } from "next/server";
-import { isAddress, zeroAddress } from "viem";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { withSecurityHeaders } from "@/server/api/http";
-
-function firstEnv(names: string[]) {
-  return names.map((name) => process.env[name]?.trim()).find(Boolean) ?? null;
-}
-
-function isConfiguredAddress(address: string | null | undefined) {
-  return Boolean(address && isAddress(address) && address.toLowerCase() !== zeroAddress);
-}
+import { resolveWithdrawalVaultAddress } from "@/server/services/withdrawal-config";
 
 export async function GET() {
-  const vaultAddress =
-    firstEnv([
-      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-      "WITHDRAWAL_VAULT_ADDRESS",
-      "WITHDRAWAL_CONTRACT_ADDRESS",
-    ]) ?? "";
-
-  const configured = isConfiguredAddress(vaultAddress);
+  const vaultAddress = resolveWithdrawalVaultAddress();
+  const configured = Boolean(vaultAddress);
 
   console.info("[withdraw.config] apiVaultAddress=", configured ? vaultAddress : "");
+  console.info("[withdraw.config] normalizedVaultAddress=", vaultAddress ?? "");
   console.info("[withdraw.config] configured=", configured);
 
   return withSecurityHeaders(
     NextResponse.json({
-      vaultAddress,
+      vaultAddress: vaultAddress ?? "",
       chainId: contractActiveChainId,
       configured,
     }),

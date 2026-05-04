@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createPublicClient, formatUnits, http, isAddress, parseUnits, zeroAddress, type Address } from "viem";
+import { createPublicClient, formatUnits, http, isAddress, parseUnits, type Address } from "viem";
 import { withdrawalAbi } from "@/contracts/abis/withdrawal.abi";
 import { contractActiveChainId } from "@/contracts/config/chain";
 import { withSecurityHeaders } from "@/server/api/http";
+import { firstEnv, resolveWithdrawalVaultAddress } from "@/server/services/withdrawal-config";
 
 const decimals = 18;
 const zero = BigInt(0);
@@ -16,28 +17,8 @@ const erc20BalanceAbi = [
   },
 ] as const;
 
-function firstEnv(names: string[]) {
-  return names.map((name) => process.env[name]?.trim()).find(Boolean) ?? null;
-}
-
-function resolveVaultAddress() {
-  return (
-    firstEnv([
-      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-      "WITHDRAWAL_VAULT_ADDRESS",
-      "WITHDRAWAL_CONTRACT_ADDRESS",
-    ]) ?? null
-  ) as Address | null;
-}
-
 function resolveRpcUrl() {
   return firstEnv(["BSC_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_RPC_URL"]) ?? "https://bsc-dataseed.binance.org";
-}
-
-function isConfiguredAddress(address: string | null | undefined) {
-  return Boolean(address && isAddress(address) && address.toLowerCase() !== zeroAddress);
 }
 
 function messageForStatus(claimable: bigint, vaultBalance: bigint, requestedAmount: bigint | null) {
@@ -73,8 +54,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const vaultAddress = resolveVaultAddress();
-  if (!isConfiguredAddress(vaultAddress)) {
+  const vaultAddress = resolveWithdrawalVaultAddress();
+  console.info("[withdraw.config] normalizedVaultAddress=", vaultAddress ?? "");
+  if (!vaultAddress) {
     return withSecurityHeaders(
       NextResponse.json({
         authorized: false,

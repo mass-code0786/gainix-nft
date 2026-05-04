@@ -17,6 +17,12 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { withdrawalAbi } from "@/contracts/abis/withdrawal.abi";
 import { ApiError } from "@/server/api/errors";
+import {
+  firstEnv,
+  normalizeEvmAddress,
+  resolveWithdrawalVaultAddress,
+  WITHDRAWAL_VAULT_ENV_NAMES,
+} from "@/server/services/withdrawal-config";
 
 const erc20BalanceAbi = [
   {
@@ -65,23 +71,26 @@ function firstRequiredEnv(names: string[], step: string) {
   return process.env[name]!.trim();
 }
 
-function firstOptionalEnv(names: string[]) {
+function firstOptionalEnv(names: readonly string[]) {
   ensureWithdrawalEnvLoaded();
-  const name = names.find((key) => process.env[key]?.trim());
-  return name ? process.env[name]!.trim() : null;
+  return firstEnv(names);
 }
 
 export function getServerWithdrawalConfig() {
-  const usdtTokenAddress = firstRequiredEnv(["USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS"], "ENV_USDT_TOKEN") as Address;
+  const usdtTokenAddress = normalizeEvmAddress(
+    firstRequiredEnv(["USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS"], "ENV_USDT_TOKEN"),
+  );
+  if (!usdtTokenAddress) {
+    throw new ApiError(500, "USDT token address is invalid.", { step: "ENV_USDT_TOKEN" });
+  }
+
+  const contractAddress = resolveWithdrawalVaultAddress();
+  if (!contractAddress) {
+    throw new ApiError(500, "Withdrawal vault address is invalid.", { step: "ENV_WITHDRAWAL_VAULT" });
+  }
 
   return {
-    contractAddress: firstRequiredEnv([
-      "WITHDRAWAL_VAULT_ADDRESS",
-      "WITHDRAWAL_CONTRACT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-    ], "ENV_WITHDRAWAL_VAULT") as Address,
+    contractAddress,
     rpcUrl: firstRequiredEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"], "ENV_RPC_URL"),
     chainId: Number(firstRequiredEnv(["BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID"], "ENV_CHAIN_ID")),
     usdtTokenAddress,
@@ -121,13 +130,7 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
   try {
     step = "ENV_CONFIG";
     ensureWithdrawalEnvLoaded();
-    const envVaultAddress = firstOptionalEnv([
-      "WITHDRAWAL_VAULT_ADDRESS",
-      "WITHDRAWAL_CONTRACT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
-      "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-    ]);
+    const envVaultAddress = firstOptionalEnv(WITHDRAWAL_VAULT_ENV_NAMES);
     const envOperatorPrivateKey = firstOptionalEnv([
       "WITHDRAWAL_OPERATOR_PRIVATE_KEY",
       "BACKEND_OPERATOR_PRIVATE_KEY",
@@ -167,6 +170,7 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       vaultAddress: config.contractAddress,
       rpcUrl: config.rpcUrl,
     });
+    console.info("[withdraw.config] normalizedVaultAddress=", config.contractAddress);
 
     step = "READ_OWNER";
     console.info("[withdraw.approve.debug]", { step, vaultAddress: config.contractAddress });
