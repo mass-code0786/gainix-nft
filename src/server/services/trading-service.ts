@@ -3967,6 +3967,11 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
   }
 
   const { user: pendingUser } = requireUser(current, { userId: pendingWithdrawal.userId });
+  console.info("[withdraw.approve]", {
+    withdrawalId: pendingWithdrawal.id,
+    userWallet: pendingUser.walletAddress,
+    netAmount: pendingWithdrawal.netAmount,
+  });
   const authorization = await authorizeUsdtWithdrawalOnChain({
     walletAddress: pendingUser.walletAddress,
     netAmount: pendingWithdrawal.netAmount,

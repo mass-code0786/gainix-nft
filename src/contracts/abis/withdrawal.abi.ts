@@ -21,6 +21,20 @@ export const withdrawalAbi = [
   {
     type: "function",
     stateMutability: "view",
+    name: "owner",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
+    name: "operators",
+    inputs: [{ name: "", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
     name: "usdtClaimable",
     inputs: [{ name: "", type: "address" }],
     outputs: [{ name: "", type: "uint256" }],

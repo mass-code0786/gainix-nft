@@ -2,6 +2,8 @@ import {
   createPublicClient,
   createWalletClient,
   decodeFunctionData,
+  formatEther,
+  formatUnits,
   http,
   isAddressEqual,
   parseUnits,
@@ -13,6 +15,16 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { withdrawalAbi } from "@/contracts/abis/withdrawal.abi";
 import { ApiError } from "@/server/api/errors";
+
+const erc20BalanceAbi = [
+  {
+    type: "function",
+    stateMutability: "view",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
 
 function requiredEnv(name: string) {
   const value = process.env[name];
@@ -38,16 +50,19 @@ function firstOptionalEnv(names: string[]) {
 }
 
 export function getServerWithdrawalConfig() {
+  const usdtTokenAddress = firstRequiredEnv(["USDT_TOKEN_ADDRESS", "NEXT_PUBLIC_USDT_TOKEN_ADDRESS"]) as Address;
+
   return {
     contractAddress: firstRequiredEnv([
+      "WITHDRAWAL_VAULT_ADDRESS",
+      "WITHDRAWAL_CONTRACT_ADDRESS",
       "NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_GAINIX_WITHDRAWAL_VAULT_ADDRESS",
       "NEXT_PUBLIC_WITHDRAWAL_CONTRACT_ADDRESS",
-      "WITHDRAWAL_VAULT_ADDRESS",
-      "WITHDRAWAL_CONTRACT_ADDRESS",
     ]) as Address,
-    rpcUrl: requiredEnv("BSC_RPC_URL"),
-    chainId: Number(requiredEnv("BSC_CHAIN_ID")),
+    rpcUrl: firstRequiredEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"]),
+    chainId: Number(firstRequiredEnv(["BSC_CHAIN_ID", "NEXT_PUBLIC_CHAIN_ID"])),
+    usdtTokenAddress,
     decimals: 18,
     confirmations: Number(process.env.BSC_WITHDRAWAL_CONFIRMATIONS ?? 1),
   };
@@ -89,23 +104,119 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
   const amount = parseUnits(input.netAmount.toFixed(config.decimals), config.decimals);
   const requestId = makeWithdrawalRequestId(input.withdrawalId);
 
-  const hash = await walletClient.writeContract({
-    address: config.contractAddress,
-    abi: withdrawalAbi,
-    functionName: "authorizeUSDTWithdrawal",
-    args: [input.walletAddress as Address, amount, requestId],
-    chain: null,
-  });
-  const receipt = await client.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") {
-    throw new ApiError(502, "USDT withdrawal authorization transaction failed.");
-  }
+  try {
+    const [owner, isOperator, operatorBalance, vaultUsdtToken] = await Promise.all([
+      client.readContract({
+        address: config.contractAddress,
+        abi: withdrawalAbi,
+        functionName: "owner",
+      }),
+      client.readContract({
+        address: config.contractAddress,
+        abi: withdrawalAbi,
+        functionName: "operators",
+        args: [account.address],
+      }),
+      client.getBalance({ address: account.address }),
+      client.readContract({
+        address: config.contractAddress,
+        abi: withdrawalAbi,
+        functionName: "usdtToken",
+      }),
+    ]);
+    const vaultUsdtBalance = await client.readContract({
+      address: vaultUsdtToken,
+      abi: erc20BalanceAbi,
+      functionName: "balanceOf",
+      args: [config.contractAddress],
+    });
+    const operatorAuthorized = isOperator || isAddressEqual(owner, account.address);
 
-  return {
-    txHash: hash.toLowerCase(),
-    requestId,
-    contractAddress: config.contractAddress.toLowerCase(),
-  };
+    console.info("[withdraw.approve]", {
+      withdrawalId: input.withdrawalId,
+      userWallet: input.walletAddress,
+      netAmount: input.netAmount,
+      netAmountWei: amount.toString(),
+      requestId,
+      vaultAddress: config.contractAddress,
+      operatorAddress: account.address,
+      operatorBnbBalance: formatEther(operatorBalance),
+      vaultUsdtToken,
+      configuredUsdtToken: config.usdtTokenAddress,
+      vaultUsdtBalance: formatUnits(vaultUsdtBalance, config.decimals),
+    });
+
+    if (!isAddressEqual(vaultUsdtToken, config.usdtTokenAddress)) {
+      throw new ApiError(500, "USDT token config does not match withdrawal vault.");
+    }
+
+    if (!operatorAuthorized) {
+      throw new ApiError(409, "Withdrawal operator is not authorized on vault.");
+    }
+
+    if (operatorBalance <= BigInt(0)) {
+      throw new ApiError(409, "Operator wallet needs BNB for gas.");
+    }
+
+    if (vaultUsdtBalance < amount) {
+      throw new ApiError(409, "Withdrawal vault has insufficient USDT.");
+    }
+
+    await client.simulateContract({
+      account: account.address,
+      address: config.contractAddress,
+      abi: withdrawalAbi,
+      functionName: "authorizeUSDTWithdrawal",
+      args: [input.walletAddress as Address, amount, requestId],
+    });
+
+    const hash = await walletClient.writeContract({
+      address: config.contractAddress,
+      abi: withdrawalAbi,
+      functionName: "authorizeUSDTWithdrawal",
+      args: [input.walletAddress as Address, amount, requestId],
+      chain: null,
+    });
+    console.info("[withdraw.approve] authorizeUSDTWithdrawal txHash=", hash);
+
+    const receipt = await client.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") {
+      throw new ApiError(502, "USDT withdrawal authorization transaction failed.");
+    }
+
+    return {
+      txHash: hash.toLowerCase(),
+      requestId,
+      contractAddress: config.contractAddress.toLowerCase(),
+      operatorAddress: account.address.toLowerCase(),
+      vaultUsdtBalance: formatUnits(vaultUsdtBalance, config.decimals),
+      operatorBnbBalance: formatEther(operatorBalance),
+    };
+  } catch (error) {
+    console.error("[withdraw.approve.error]", {
+      withdrawalId: input.withdrawalId,
+      userWallet: input.walletAddress,
+      netAmount: input.netAmount,
+      vaultAddress: config.contractAddress,
+      operatorAddress: account.address,
+      message: error instanceof Error ? error.message : "unknown",
+      stack: error instanceof Error ? error.stack : null,
+    });
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (message.includes("unauthorized")) {
+      throw new ApiError(409, "Withdrawal operator is not authorized on vault.");
+    }
+    if (message.includes("insufficient funds") || message.includes("exceeds the balance")) {
+      throw new ApiError(409, "Operator wallet needs BNB for gas.");
+    }
+
+    throw new ApiError(502, error instanceof Error ? error.message : "USDT withdrawal authorization failed.");
+  }
 }
 
 export async function verifyWithdrawalTransaction(input: {
