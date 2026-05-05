@@ -27,8 +27,47 @@ function isFakeSkippedBotAttempt(activity: BotAutomationActivity) {
   );
 }
 
+function lifecycleRank(activity: BotAutomationActivity) {
+  if (activity.action === "AUTO_BUY") return 0;
+  if (activity.action === "AUTO_LIST") return 1;
+  return 2;
+}
+
+function activityDisplayTime(activity: BotAutomationActivity) {
+  if (activity.action === "AUTO_BUY") {
+    return activity.tradeCreatedAt ?? activity.createdAt;
+  }
+
+  if (activity.action === "AUTO_LIST") {
+    return activity.listedAt ?? activity.createdAt;
+  }
+
+  return activity.soldAt ?? activity.createdAt;
+}
+
+function activityCycleKey(activity: BotAutomationActivity) {
+  return `${activity.botSubscriptionId}:${activity.nftId ?? activity.id}:${activity.tradeCreatedAt ?? ""}`;
+}
+
+function orderedTimeline(activity: BotAutomationActivity[]) {
+  return [...activity]
+    .filter((entry) => !isFakeSkippedBotAttempt(entry))
+    .sort((left, right) => {
+      const leftCycle = activityCycleKey(left);
+      const rightCycle = activityCycleKey(right);
+      const leftTime = new Date(left.tradeCreatedAt ?? left.createdAt).getTime();
+      const rightTime = new Date(right.tradeCreatedAt ?? right.createdAt).getTime();
+
+      if (leftCycle === rightCycle) {
+        return lifecycleRank(left) - lifecycleRank(right);
+      }
+
+      return leftTime - rightTime || lifecycleRank(left) - lifecycleRank(right);
+    });
+}
+
 export function BotActivityTimeline({ activity }: BotActivityTimelineProps) {
-  const visibleActivity = activity.filter((entry) => !isFakeSkippedBotAttempt(entry));
+  const visibleActivity = orderedTimeline(activity);
 
   return (
     <div className="section-shell lux-card space-y-4">
@@ -52,7 +91,7 @@ export function BotActivityTimeline({ activity }: BotActivityTimelineProps) {
             >
               <div className="space-y-1">
                 <p className="text-sm font-medium text-white">
-                  {new Date(entry.createdAt).toLocaleTimeString([], {
+                  {new Date(activityDisplayTime(entry)).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}{" "}

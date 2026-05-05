@@ -94,8 +94,8 @@ const BASE_DAILY_TRADE_LIMIT = 6;
 const TRADE_RESET_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const MANUAL_AUTO_SELL_DELAY_MIN_MINUTES = 60;
 const MANUAL_AUTO_SELL_DELAY_MAX_MINUTES = 120;
-const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 15;
-const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 40;
+const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 20;
+const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 30;
 const BOT_LIST_DELAY_MS = 300_000;
 const NO_SUITABLE_NFT_MESSAGE = "No suitable NFT available";
 const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
@@ -659,6 +659,33 @@ function toPublicTrade(state: NftSimState, trade: NftTradeRecord) {
     ...trade,
     nft,
     user,
+  };
+}
+
+function tradeForBotActivity(state: NftSimState, activity: BotActivityRecord) {
+  if (!activity.nftId) {
+    return null;
+  }
+
+  return state.nft_trades
+    .filter(
+      (trade) =>
+        trade.botSubscriptionId === activity.botSubscriptionId &&
+        trade.nftId === activity.nftId,
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+}
+
+function toPublicBotActivity(state: NftSimState, activity: BotActivityRecord) {
+  const trade = tradeForBotActivity(state, activity);
+
+  return {
+    ...activity,
+    tradeCreatedAt: trade?.createdAt ?? null,
+    listedAt: trade?.listedAt ?? null,
+    autoSellAt: trade?.autoSellAt ?? null,
+    soldAt: trade?.soldAt ?? null,
+    nft: activity.nftId ? state.nfts.find((entry) => entry.id === activity.nftId) ?? null : null,
   };
 }
 
@@ -1709,6 +1736,12 @@ function recordBotListActivity(
     profit: null,
     status: "WAITING",
   });
+  console.info("[bot.timeline] listed", {
+    userId,
+    subscriptionId: botSubscriptionId,
+    nftId,
+    amount,
+  });
 }
 
 function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
@@ -1729,8 +1762,13 @@ function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
     nft.id,
     nft.currentPrice,
   );
-  settleAutoSell(state, trade);
-  console.info(`[bot.sell] nftId=${nft.id} triggered after 5min`);
+  console.info("[bot.timeline] sell scheduled for", {
+    userId: trade.userId,
+    subscriptionId: trade.botSubscriptionId,
+    tradeId: trade.id,
+    nftId: nft.id,
+    autoSellAt: trade.autoSellAt,
+  });
   return true;
 }
 
@@ -2015,6 +2053,14 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
         profit,
         status: "COMPLETED",
       });
+      console.info("[bot.timeline] sold completed", {
+        userId: trade.userId,
+        subscriptionId: subscription.id,
+        tradeId: trade.id,
+        nftId: trade.nftId,
+        profit,
+        soldAt: now,
+      });
     }
   }
 
@@ -2267,6 +2313,13 @@ function executeBotCycleInternal(state: NftSimState) {
       amount: buyResult.trade.buyPrice,
       profit: null,
       status: "SUCCESS",
+    });
+    console.info("[bot.timeline] buy", {
+      userId: user.id,
+      subscriptionId: subscription.id,
+      tradeId: buyResult.trade.id,
+      nftId: buyResult.nft.id,
+      amount: buyResult.trade.buyPrice,
     });
     pushSafetyLog(state, {
       eventType: "BOT_BUY_IDEMPOTENCY",
@@ -3563,10 +3616,7 @@ export async function getBotSummary(selector: UserSelector) {
       .filter((item) => item.userId === user.id)
       .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => ({
-        ...item,
-        nft: item.nftId ? state.nfts.find((entry) => entry.id === item.nftId) ?? null : null,
-      }));
+      .map((item) => toPublicBotActivity(state, item));
     const currentProgress = subscriptions.find((item) => item.status === "active") ?? subscriptions[0] ?? null;
 
     return {
@@ -3605,10 +3655,7 @@ export async function getBotActivity(selector: UserSelector) {
       .filter((item) => item.userId === user.id)
       .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => ({
-        ...item,
-        nft: item.nftId ? state.nfts.find((entry) => entry.id === item.nftId) ?? null : null,
-      }));
+      .map((item) => toPublicBotActivity(state, item));
 
     return {
       user,

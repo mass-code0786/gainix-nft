@@ -188,6 +188,10 @@ export interface BotAutomationActivity {
   profit: number | null;
   status: "SUCCESS" | "WAITING" | "COMPLETED" | "SKIPPED";
   createdAt: string;
+  tradeCreatedAt?: string | null;
+  listedAt?: string | null;
+  autoSellAt?: string | null;
+  soldAt?: string | null;
   nft?: {
     id: string;
     tokenId: string;
