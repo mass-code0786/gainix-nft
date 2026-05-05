@@ -69,12 +69,10 @@ function metadataNumber(entry: WalletHistoryEntry, key: string) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function isGxnTokenLedgerRow(entry: WalletHistoryEntry, title: string) {
+function isGxnTokenRewardRow(entry: WalletHistoryEntry, title: string) {
   return (
-    entry.walletAffected === "GXN Token" ||
     entry.type === "GXN_TOKEN_REWARD" ||
-    entry.type === "GXN_TOKEN_DEDUCTION" ||
-    title.toLowerCase().includes("gxn token")
+    title.toLowerCase().includes("gxn token reward")
   );
 }
 
@@ -89,8 +87,8 @@ function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
   const title = entry.title ?? (typeof entry.metadata.title === "string" ? entry.metadata.title : historyLabels[entry.type]);
   const description = entry.description ?? (typeof entry.metadata.description === "string" ? entry.metadata.description : null);
   const statusDisplay = getWalletTransactionStatusDisplay(entry);
-  const isGxnTokenRow = isGxnTokenLedgerRow(entry, title);
-  const displayAmount = isGxnTokenRow
+  const isGxnTokenReward = isGxnTokenRewardRow(entry, title);
+  const displayAmount = isGxnTokenReward
     ? `${isDebit ? "-" : "+"}${formatGxnAmount(metadataNumber(entry, "gxnTokens") ?? entry.amount)} GXN`
     : `${isDebit ? "-" : "+"}${formatCurrency(entry.amount)}`;
   const txHash =
