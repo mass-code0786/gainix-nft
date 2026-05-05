@@ -38,10 +38,7 @@ import { authorizeUsdtWithdrawalOnChain } from "@/server/services/withdrawal-cha
 
 const MLM_LEVEL_PERCENTAGES = [20, 15, 10, 8, 5] as const;
 const GXN_WITHDRAWAL_DEDUCTION_PERCENT = 20;
-const ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY =
-  process.env.ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY === "true" ||
-  process.env.TEST_WITHDRAWAL_MODE === "true";
-const DAILY_WITHDRAWAL_LIMIT = Number(process.env.DAILY_WITHDRAWAL_LIMIT ?? 3);
+const DAILY_WITHDRAWAL_LIMIT = 3;
 const VIP_LEVELS = [
   { level: 1, selfPackageAmount: 100, payoutAmount: 30 },
   { level: 2, selfPackageAmount: 200, payoutAmount: 60 },
@@ -289,9 +286,12 @@ function isFailedWithdrawal(withdrawal: WithdrawalRecord) {
   return (
     payoutStatus === "FAILED" ||
     payoutStatus.endsWith("_FAILED") ||
+    payoutStatus.includes("REFUNDED") ||
     payoutStatus.includes("FAILED_REFUNDED") ||
     onChainStatus === "FAILED" ||
+    onChainStatus.includes("REFUNDED") ||
     status === "FAILED" ||
+    status.includes("REFUNDED") ||
     status.includes("FAILED_REFUNDED")
   );
 }
@@ -1600,6 +1600,41 @@ function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
   return true;
 }
 
+function checkWithdrawalApprovalSafety(
+  state: NftSimState,
+  payload: {
+    userId: string;
+    amount: number;
+    payoutType: string;
+    referenceId: string;
+  },
+) {
+  const amount = roundAmount(payload.amount);
+
+  if (amount <= 0) {
+    return false;
+  }
+
+  if (state.system_reserve.balance < amount) {
+    pushSafetyLog(state, {
+      eventType: "BLOCKED_PAYOUT",
+      userId: payload.userId,
+      amount,
+      reason: "Insufficient system reserve.",
+      metadata: {
+        payoutType: payload.payoutType,
+        referenceId: payload.referenceId,
+        reserveBalance: state.system_reserve.balance,
+        requiredReserve: amount,
+        availableReserve: state.system_reserve.balance,
+      },
+    });
+    return false;
+  }
+
+  return true;
+}
+
 function processDueBotListings(state: NftSimState, currentTime: Date) {
   const listedTradeIds: string[] = [];
 
@@ -2627,27 +2662,19 @@ export async function requestWithdrawal(input: WithdrawInput) {
       (item) => !isFailedWithdrawal(item),
     );
 
-    const dailyWithdrawalLimit =
-      Number.isFinite(DAILY_WITHDRAWAL_LIMIT) && DAILY_WITHDRAWAL_LIMIT > 0
-        ? Math.floor(DAILY_WITHDRAWAL_LIMIT)
-        : 3;
-
-    if (
-      !ALLOW_MULTIPLE_WITHDRAWALS_PER_DAY &&
-      activeTodaysWithdrawals.length >= dailyWithdrawalLimit
-    ) {
+    if (activeTodaysWithdrawals.length >= DAILY_WITHDRAWAL_LIMIT) {
       pushSafetyLog(state, {
         eventType: "BLOCKED_WITHDRAWAL",
         userId: user.id,
         amount,
-        reason: `Maximum ${dailyWithdrawalLimit} withdrawals per day allowed.`,
+        reason: "Maximum 3 withdrawals per day allowed.",
         metadata: {
-          dailyWithdrawalLimit,
+          dailyWithdrawalLimit: DAILY_WITHDRAWAL_LIMIT,
           withdrawalCountToday: activeTodaysWithdrawals.length,
           existingWithdrawalIds: activeTodaysWithdrawals.map((item) => item.id).join(","),
         },
       });
-      throw new ApiError(409, `Maximum ${dailyWithdrawalLimit} withdrawals per day allowed.`);
+      throw new ApiError(409, "Maximum 3 withdrawals per day allowed.");
     }
 
     const withdrawnToday = roundAmount(
@@ -3990,7 +4017,7 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
   }
 
   if (
-    !checkPayoutSafety(current, {
+    !checkWithdrawalApprovalSafety(current, {
       userId: pendingWithdrawal.userId,
       amount: pendingWithdrawal.netAmount,
       payoutType: "WITHDRAWAL_APPROVAL",
@@ -4038,7 +4065,7 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     }
 
     if (
-      !checkPayoutSafety(state, {
+      !checkWithdrawalApprovalSafety(state, {
         userId: withdrawal.userId,
         amount: withdrawal.netAmount,
         payoutType: "WITHDRAWAL_APPROVAL",
