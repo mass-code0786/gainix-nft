@@ -36,6 +36,7 @@ interface WalletResponse {
 
 interface WalletSummaryResponse {
   wallet: WalletResponse;
+  totalWithdrawn?: number | null;
   recentLedger: WalletHistoryEntry[];
   botSubscriptions: Array<{
     planName: string;
@@ -102,6 +103,7 @@ function buildHolding(item: NFTItem): PortfolioHolding {
 export function usePortfolio() {
   const { fullAddress, isConnected } = useWallet();
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
+  const [totalWithdrawn, setTotalWithdrawn] = useState(0);
   const [ownedNfts, setOwnedNfts] = useState<NFTItem[]>([]);
   const [recentLedger, setRecentLedger] = useState<WalletHistoryEntry[]>([]);
   const [activePlanName, setActivePlanName] = useState("No bot plan");
@@ -112,6 +114,7 @@ export function usePortfolio() {
   const refresh = useCallback(async (signal?: AbortSignal) => {
     if (!isConnected || !fullAddress) {
       setWallet(null);
+      setTotalWithdrawn(0);
       setOwnedNfts([]);
       setRecentLedger([]);
       setActivePlanName("No bot plan");
@@ -146,6 +149,7 @@ export function usePortfolio() {
       }
 
       setWallet(summaryResponse.wallet);
+      setTotalWithdrawn(summaryResponse.totalWithdrawn ?? 0);
       setRecentLedger(summaryResponse.recentLedger ?? []);
       setActivePlanName(
         summaryResponse.botSubscriptions.find((subscription) => subscription.status === "active")?.planName ??
@@ -162,6 +166,7 @@ export function usePortfolio() {
       }
       setError(loadError instanceof Error ? loadError.message : "Unable to load portfolio.");
       setWallet(null);
+      setTotalWithdrawn(0);
       setOwnedNfts([]);
       setRecentLedger([]);
     } finally {
@@ -207,6 +212,7 @@ export function usePortfolio() {
     activity: [],
     summary: {
       totalBalance: Number(totalPortfolioBalance.toFixed(2)),
+      totalWithdrawn: Number(totalWithdrawn.toFixed(2)),
       nftValue: Number(nftValue.toFixed(2)),
       liquidBnb: Number(liquidBalance.toFixed(2)),
       gxnTokenUsdValue: Number(gxnTokenUsdValue.toFixed(2)),

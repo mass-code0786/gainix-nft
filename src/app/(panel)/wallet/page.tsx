@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { CircleDollarSign, Clock3, Gem, WalletCards } from "lucide-react";
+import { ArrowDownToLine, CircleDollarSign, Clock3, Gem, WalletCards } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { SkeletonBlock } from "@/components/ui/skeleton-block";
 import { StatCard } from "@/components/ui/stat-card";
@@ -157,6 +157,7 @@ export default function WalletPage() {
             <StatCard label="Cash Balance" value={formatCurrency(summary.liquidBnb)} detail="Available now" icon={CircleDollarSign} tone="positive" />
             <StatCard label="GXN token value" value={formatCurrency(summary.gxnTokenUsdValue)} detail={`${(wallet?.gxnTokenBalance ?? 0).toLocaleString()} GXN`} icon={Gem} />
             <StatCard label="Collection value" value={formatCurrency(summary.nftValue)} detail="Held NFTs" icon={Gem} />
+            <StatCard label="TOTAL WITHDRAWN" value={formatCurrency(summary.totalWithdrawn)} detail="Successfully withdrawn" icon={ArrowDownToLine} tone="positive" />
           </>
         )}
       </div>

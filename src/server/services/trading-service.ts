@@ -1176,6 +1176,14 @@ function isFinalizedWithdrawal(withdrawal: WithdrawalRecord) {
   );
 }
 
+function isSuccessfulWithdrawal(withdrawal: WithdrawalRecord) {
+  return (
+    withdrawal.status === "completed" ||
+    withdrawal.payoutStatus === "PAID" ||
+    withdrawal.onChainStatus === "CONFIRMED"
+  );
+}
+
 function isAlreadyProcessedPayoutError(error: unknown) {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return message.includes("already processed");
@@ -3920,10 +3928,16 @@ export async function getWalletSummary(selector: UserSelector) {
       .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((item) => toPublicTrade(state, item));
+    const totalWithdrawn = roundAmount(
+      state.withdrawals
+        .filter((item) => item.userId === user.id && isSuccessfulWithdrawal(item))
+        .reduce((total, item) => total + item.netAmount, 0),
+    );
 
     return {
       user,
       wallet: toPublicWallet(wallet, user, state),
+      totalWithdrawn,
       incomeOverview: {
         totalIncome: sumAmounts(incomeEntries),
         nftTradingIncome: summarizeIncome(incomeEntries.filter(isNftTradingIncomeEntry), todayStart, weeklyStart, monthStart),
