@@ -142,6 +142,7 @@ interface BuyNftInput extends UserSelector {
   nftId: string;
   source?: "manual" | "bot";
   botSubscriptionId?: string | null;
+  cycleId?: string | null;
 }
 
 interface ListNftInput extends UserSelector {
@@ -663,6 +664,13 @@ function toPublicTrade(state: NftSimState, trade: NftTradeRecord) {
 }
 
 function tradeForBotActivity(state: NftSimState, activity: BotActivityRecord) {
+  if (activity.cycleId) {
+    const tradeByCycle = state.nft_trades.find((trade) => trade.cycleId === activity.cycleId);
+    if (tradeByCycle) {
+      return tradeByCycle;
+    }
+  }
+
   if (!activity.nftId) {
     return null;
   }
@@ -681,6 +689,7 @@ function toPublicBotActivity(state: NftSimState, activity: BotActivityRecord) {
 
   return {
     ...activity,
+    cycleId: activity.cycleId ?? trade?.cycleId ?? null,
     tradeCreatedAt: trade?.createdAt ?? null,
     listedAt: trade?.listedAt ?? null,
     autoSellAt: trade?.autoSellAt ?? null,
@@ -1662,6 +1671,7 @@ function buyNft(
     saleJobId: null,
     source: input.source ?? "manual",
     botSubscriptionId: input.botSubscriptionId ?? null,
+    cycleId: input.cycleId ?? null,
     createdAt: now,
   };
 
@@ -1726,6 +1736,7 @@ function recordBotListActivity(
   botSubscriptionId: string,
   nftId: string,
   amount: number,
+  cycleId: string | null,
 ) {
   pushBotActivity(state, {
     userId,
@@ -1735,6 +1746,13 @@ function recordBotListActivity(
     amount,
     profit: null,
     status: "WAITING",
+    cycleId,
+  });
+  console.info("[bot.cycle] list", {
+    userId,
+    subscriptionId: botSubscriptionId,
+    nftId,
+    cycleId,
   });
   console.info("[bot.timeline] listed", {
     userId,
@@ -1761,6 +1779,7 @@ function triggerDelayedBotList(state: NftSimState, trade: NftTradeRecord) {
     trade.botSubscriptionId,
     nft.id,
     nft.currentPrice,
+    trade.cycleId,
   );
   console.info("[bot.timeline] sell scheduled for", {
     userId: trade.userId,
@@ -2052,6 +2071,14 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
         amount: sellPrice,
         profit,
         status: "COMPLETED",
+        cycleId: trade.cycleId,
+      });
+      console.info("[bot.cycle] sell", {
+        userId: trade.userId,
+        subscriptionId: subscription.id,
+        tradeId: trade.id,
+        nftId: trade.nftId,
+        cycleId: trade.cycleId,
       });
       console.info("[bot.timeline] sold completed", {
         userId: trade.userId,
@@ -2219,8 +2246,9 @@ function executeBotCycleInternal(state: NftSimState) {
       continue;
     }
 
-    const cycleId = `${subscription.id}:${subscription.completedBuyTrades + 1}`;
-    const idempotencyKey = `bot_buy:${user.id}:${cycleId}`;
+    const cycleSequence = `${subscription.id}:${subscription.completedBuyTrades + 1}`;
+    const cycleId = makeId("cycle");
+    const idempotencyKey = `bot_buy:${user.id}:${cycleSequence}`;
     const duplicateBuy = state.safety_logs.some(
       (item) =>
         item.eventType === "BOT_BUY_IDEMPOTENCY" &&
@@ -2295,6 +2323,7 @@ function executeBotCycleInternal(state: NftSimState) {
         userId: user.id,
         source: "bot",
         botSubscriptionId: subscription.id,
+        cycleId,
       });
     } finally {
       activeBotBuyUserIds.delete(user.id);
@@ -2313,13 +2342,22 @@ function executeBotCycleInternal(state: NftSimState) {
       amount: buyResult.trade.buyPrice,
       profit: null,
       status: "SUCCESS",
+      cycleId,
     });
     console.info("[bot.timeline] buy", {
       userId: user.id,
       subscriptionId: subscription.id,
       tradeId: buyResult.trade.id,
       nftId: buyResult.nft.id,
+      cycleId,
       amount: buyResult.trade.buyPrice,
+    });
+    console.info("[bot.cycle] created", {
+      userId: user.id,
+      subscriptionId: subscription.id,
+      tradeId: buyResult.trade.id,
+      nftId: buyResult.nft.id,
+      cycleId,
     });
     pushSafetyLog(state, {
       eventType: "BOT_BUY_IDEMPOTENCY",

@@ -61,36 +61,12 @@ function formatDate(date: string) {
   });
 }
 
-function stringField(activity: BotAutomationActivity, key: string) {
-  const value = (activity as unknown as Record<string, unknown>)[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-function eventCycleKey(activity: BotAutomationActivity) {
-  const explicitKey =
-    stringField(activity, "botTradeId") ??
-    stringField(activity, "nftTradeId") ??
-    stringField(activity, "listingId") ??
-    stringField(activity, "relatedTradeId") ??
-    stringField(activity, "cycleId");
-
-  if (explicitKey) {
-    return explicitKey;
-  }
-
-  if (activity.botSubscriptionId && activity.nftId && activity.tradeCreatedAt) {
-    return `${activity.botSubscriptionId}:${activity.nftId}:${activity.tradeCreatedAt}`;
-  }
-
-  return null;
-}
-
 function groupEventsByCycle(events: BotAutomationActivity[]) {
   const map = new Map<string, BotAutomationActivity[]>();
   const ungrouped: BotAutomationActivity[] = [];
 
   for (const event of events) {
-    const key = eventCycleKey(event);
+    const key = event.cycleId;
 
     if (!key) {
       ungrouped.push(event);
@@ -100,9 +76,46 @@ function groupEventsByCycle(events: BotAutomationActivity[]) {
     map.set(key, [...(map.get(key) ?? []), event]);
   }
 
+  const fallbackGroups = groupLegacyEventsByTimestamp(ungrouped);
+
   return {
-    cycles: Array.from(map.values()),
-    ungrouped,
+    cycles: [...Array.from(map.values()), ...fallbackGroups.cycles],
+    ungrouped: fallbackGroups.ungrouped,
+  };
+}
+
+function legacyEventKey(activity: BotAutomationActivity) {
+  return `${activity.userId}:${activity.nft?.name ?? activity.nftId ?? "System NFT"}`;
+}
+
+function groupLegacyEventsByTimestamp(events: BotAutomationActivity[]) {
+  const sorted = [...events].sort(
+    (a, b) => new Date(activityDisplayTime(a)).getTime() - new Date(activityDisplayTime(b)).getTime(),
+  );
+  const cycles: BotAutomationActivity[][] = [];
+  const ungrouped: BotAutomationActivity[] = [];
+  const windowMs = 5 * 60 * 1000;
+
+  for (const event of sorted) {
+    const eventTime = new Date(activityDisplayTime(event)).getTime();
+    const key = legacyEventKey(event);
+    const cycle = cycles.find((items) => {
+      const anchor = items[0];
+      const anchorTime = new Date(activityDisplayTime(anchor)).getTime();
+      return legacyEventKey(anchor) === key && Math.abs(eventTime - anchorTime) <= windowMs;
+    });
+
+    if (cycle) {
+      cycle.push(event);
+      continue;
+    }
+
+    cycles.push([event]);
+  }
+
+  return {
+    cycles: cycles.filter((items) => items.length > 1),
+    ungrouped: [...ungrouped, ...cycles.filter((items) => items.length === 1).flat()],
   };
 }
 

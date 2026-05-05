@@ -261,6 +261,7 @@ async function buildState(db: DbClient) {
       saleJobId: item.saleJobId,
       source: normalizeTradeSource(item.source),
       botSubscriptionId: item.botSubscriptionId,
+      cycleId: (item as { cycleId?: string | null }).cycleId ?? null,
       createdAt: item.createdAt.toISOString(),
     })),
     wallets: wallets.map<WalletRecord>((item) => ({
@@ -334,6 +335,7 @@ async function buildState(db: DbClient) {
       amount: item.amount,
       profit: item.profit,
       status: item.status as BotActivityRecord["status"],
+      cycleId: (item as { cycleId?: string | null }).cycleId ?? null,
       createdAt: item.createdAt.toISOString(),
     })),
     withdrawals: withdrawals.map<WithdrawalRecord>((item) => ({
@@ -547,6 +549,7 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         saleJobId: item.saleJobId,
         source: item.source.toUpperCase() as "MANUAL" | "BOT",
         botSubscriptionId: item.botSubscriptionId,
+        cycleId: item.cycleId,
         createdAt: new Date(item.createdAt),
         updatedAt: item.soldAt ? new Date(item.soldAt) : new Date(item.createdAt),
       })),
@@ -595,6 +598,7 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         amount: item.amount,
         profit: item.profit,
         status: item.status,
+        cycleId: item.cycleId,
         createdAt: new Date(item.createdAt),
       })),
     });

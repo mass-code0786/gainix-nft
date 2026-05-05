@@ -183,6 +183,7 @@ export interface BotAutomationActivity {
   userId: string;
   botSubscriptionId: string;
   nftId: string | null;
+  cycleId: string | null;
   action: "AUTO_BUY" | "AUTO_LIST" | "AUTO_SELL";
   amount: number;
   profit: number | null;

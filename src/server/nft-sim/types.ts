@@ -80,6 +80,7 @@ export interface NftTradeRecord {
   saleJobId: string | null;
   source: TradeSource;
   botSubscriptionId: string | null;
+  cycleId: string | null;
   createdAt: string;
 }
 
@@ -159,6 +160,7 @@ export interface BotActivityRecord {
   amount: number;
   profit: number | null;
   status: "SUCCESS" | "WAITING" | "COMPLETED" | "SKIPPED";
+  cycleId: string | null;
   createdAt: string;
 }
 

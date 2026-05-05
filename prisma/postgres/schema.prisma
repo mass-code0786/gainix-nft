@@ -176,6 +176,7 @@ model NFTTrade {
   saleJobId         String?
   source            TradeSource      @default(MANUAL)
   botSubscriptionId String?
+  cycleId           String?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   nft               NFT              @relation(fields: [nftId], references: [id], onDelete: Cascade)
@@ -186,6 +187,7 @@ model NFTTrade {
   @@index([nftId, createdAt])
   @@index([status, createdAt])
   @@index([source, createdAt])
+  @@index([cycleId])
   @@map("nft_trades")
 }
 
@@ -294,6 +296,7 @@ model BotActivity {
   amount            Float
   profit            Float?
   status            BotActivityStatus
+  cycleId           String?
   createdAt         DateTime          @default(now())
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   botSubscription   BotSubscription   @relation(fields: [botSubscriptionId], references: [id], onDelete: Cascade)
@@ -302,6 +305,7 @@ model BotActivity {
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([action, createdAt])
+  @@index([cycleId])
   @@map("bot_activity")
 }
 
