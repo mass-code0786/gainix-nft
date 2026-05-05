@@ -64,11 +64,35 @@ function bscScanTxUrl(hash: string) {
   return `https://bscscan.com/tx/${hash}`;
 }
 
+function metadataNumber(entry: WalletHistoryEntry, key: string) {
+  const value = entry.metadata[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function isGxnTokenLedgerRow(entry: WalletHistoryEntry, title: string) {
+  return (
+    entry.walletAffected === "GXN Token" ||
+    entry.type === "GXN_TOKEN_REWARD" ||
+    entry.type === "GXN_TOKEN_DEDUCTION" ||
+    title.toLowerCase().includes("gxn token")
+  );
+}
+
+function formatGxnAmount(amount: number) {
+  return amount.toLocaleString(undefined, {
+    maximumFractionDigits: 4,
+  });
+}
+
 function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
   const isDebit = debitTypes.has(entry.type);
   const title = entry.title ?? (typeof entry.metadata.title === "string" ? entry.metadata.title : historyLabels[entry.type]);
   const description = entry.description ?? (typeof entry.metadata.description === "string" ? entry.metadata.description : null);
   const statusDisplay = getWalletTransactionStatusDisplay(entry);
+  const isGxnTokenRow = isGxnTokenLedgerRow(entry, title);
+  const displayAmount = isGxnTokenRow
+    ? `${isDebit ? "-" : "+"}${formatGxnAmount(metadataNumber(entry, "gxnTokens") ?? entry.amount)} GXN`
+    : `${isDebit ? "-" : "+"}${formatCurrency(entry.amount)}`;
   const txHash =
     entry.withdrawalTxHash ??
     entry.payoutTxHash ??
@@ -105,8 +129,7 @@ function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
           </p>
         </div>
         <div className={`shrink-0 text-right font-display text-lg font-semibold ${isDebit ? "text-rose-200" : "text-emerald-200"}`}>
-          {isDebit ? "-" : "+"}
-          {formatCurrency(entry.amount)}
+          {displayAmount}
         </div>
       </div>
     </div>
