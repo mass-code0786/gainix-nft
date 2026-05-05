@@ -753,6 +753,24 @@ function safeProgressCount(value: number | null | undefined) {
 function botSubscriptionProgress(state: NftSimState | null, subscription: BotSubscriptionRecord) {
   const buyLimit = safeProgressCount(subscription.totalBuyTrades);
   const sellLimit = safeProgressCount(subscription.totalSellTrades);
+  const linkedBotTrades = state
+    ? state.nft_trades.filter(
+        (item) =>
+          item.userId === subscription.userId &&
+          item.source === "bot" &&
+          item.botSubscriptionId === subscription.id,
+      )
+    : [];
+  const lifetimeBotTrades = state
+    ? state.nft_trades.filter(
+        (item) =>
+          item.userId === subscription.userId &&
+          item.source === "bot",
+      )
+    : [];
+  const tradeSource = linkedBotTrades.length > 1 ? linkedBotTrades : lifetimeBotTrades;
+  const tradeBuyCount = tradeSource.length;
+  const tradeSellCount = tradeSource.filter((item) => item.status === "auto_sold").length;
   const completedActivities = state
     ? state.bot_activity.filter(
         (item) =>
@@ -761,12 +779,12 @@ function botSubscriptionProgress(state: NftSimState | null, subscription: BotSub
           (item.status === "SUCCESS" || item.status === "COMPLETED"),
       )
     : [];
-  const totalBuyTradesCompleted = state
-    ? completedActivities.filter((item) => item.action === "AUTO_BUY").length
-    : safeProgressCount(subscription.completedBuyTrades);
-  const totalSellTradesCompleted = state
-    ? completedActivities.filter((item) => item.action === "AUTO_SELL").length
-    : safeProgressCount(subscription.completedSellTrades);
+  const activityBuyCount = completedActivities.filter((item) => item.action === "AUTO_BUY").length;
+  const activitySellCount = completedActivities.filter((item) => item.action === "AUTO_SELL").length;
+  const storedBuyCount = safeProgressCount(subscription.completedBuyTrades);
+  const storedSellCount = safeProgressCount(subscription.completedSellTrades);
+  const totalBuyTradesCompleted = Math.max(tradeBuyCount, activityBuyCount, storedBuyCount);
+  const totalSellTradesCompleted = Math.max(tradeSellCount, activitySellCount, storedSellCount);
   const remainingTrades =
     Math.max(0, buyLimit - totalBuyTradesCompleted) +
     Math.max(0, sellLimit - totalSellTradesCompleted);
@@ -790,7 +808,7 @@ function botSubscriptionProgress(state: NftSimState | null, subscription: BotSub
 }
 
 function logBotProgress(subscription: BotSubscriptionRecord, progress: ReturnType<typeof botSubscriptionProgress>) {
-  console.info("[bot.progress]", {
+  console.info("[bot.progress.api]", {
     subscriptionId: subscription.id,
     userId: subscription.userId,
     completedBuys: progress.totalBuyTradesCompleted,

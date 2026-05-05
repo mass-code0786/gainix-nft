@@ -13,6 +13,12 @@ interface BotStatusResponse {
   plans: BotAutomationPlan[];
   subscriptions: BotAutomationSubscription[];
   activeSubscriptions: number;
+  totalBuyTradesCompleted?: number;
+  totalSellTradesCompleted?: number;
+  buyLimit?: number;
+  sellLimit?: number;
+  remainingTrades?: number;
+  progressPercent?: number;
   todayBotProfit: number;
   totalBotProfit: number;
   latestActivity: BotAutomationActivity | null;
@@ -61,6 +67,7 @@ export function useBotSubscription() {
           return;
         }
 
+        console.log("[bot.ui.api]", payload);
         setPlans(payload.plans ?? []);
         setSubscriptions(payload.subscriptions ?? []);
         setTimeline(payload.activity ?? []);
@@ -110,9 +117,21 @@ export function useBotSubscription() {
 
     const progressPercent = Number(activeSubscription.progressPercent);
 
-    return Number.isFinite(progressPercent)
+    const progress = Number.isFinite(progressPercent)
       ? Math.min(100, Math.max(0, Math.floor(progressPercent)))
       : 0;
+    console.log("[bot.progress.ui]", {
+      subscriptionId: activeSubscription.id,
+      userId: activeSubscription.userId,
+      totalBuyTradesCompleted: activeSubscription.totalBuyTradesCompleted,
+      totalSellTradesCompleted: activeSubscription.totalSellTradesCompleted,
+      buyLimit: activeSubscription.buyLimit,
+      sellLimit: activeSubscription.sellLimit,
+      remainingTrades: activeSubscription.remainingTrades,
+      progressPercent: progress,
+    });
+
+    return progress;
   }, [activeSubscription]);
 
   return {
@@ -135,6 +154,7 @@ export function useBotSubscription() {
         `/api/bot/summary?walletAddress=${fullAddress}`,
       );
 
+      console.log("[bot.ui.api]", payload);
       setPlans(payload.plans ?? []);
       setSubscriptions(payload.subscriptions ?? []);
       setTimeline(payload.activity ?? []);
