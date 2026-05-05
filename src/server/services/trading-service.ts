@@ -1169,6 +1169,48 @@ function isApprovedWithdrawalStatus(status: WithdrawalRecord["status"]) {
   return status === "approved" || status === "approved_pending_tx" || status === "completed";
 }
 
+function isFinalizedWithdrawal(withdrawal: WithdrawalRecord) {
+  return (
+    withdrawal.status === "completed" ||
+    (withdrawal.payoutStatus === "PAID" && withdrawal.onChainStatus === "CONFIRMED")
+  );
+}
+
+function isAlreadyProcessedPayoutError(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("already processed");
+}
+
+function finalizePaidWithdrawal(
+  state: NftSimState,
+  withdrawal: WithdrawalRecord,
+  txHash?: string | null,
+) {
+  const wasFinalized = isFinalizedWithdrawal(withdrawal);
+  const normalizedTxHash = txHash?.toLowerCase() ?? withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash ?? null;
+
+  if (!wasFinalized) {
+    state.system_reserve.balance = roundAmount(
+      state.system_reserve.balance - withdrawal.netAmount,
+    );
+    state.system_reserve.updatedAt = nowIso();
+  }
+
+  withdrawal.status = "completed";
+  withdrawal.approvedAt = withdrawal.approvedAt ?? nowIso();
+  withdrawal.payoutStatus = "PAID";
+  withdrawal.onChainStatus = "CONFIRMED";
+  withdrawal.payoutTxHash = normalizedTxHash;
+  withdrawal.withdrawalTxHash = normalizedTxHash;
+
+  return {
+    message: "Withdrawal approved and paid on-chain.",
+    withdrawal,
+    authorizationTxHash: normalizedTxHash,
+    payoutTxHash: normalizedTxHash,
+  };
+}
+
 function checkPayoutSafety(
   state: NftSimState,
   payload: {
@@ -4012,6 +4054,15 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     throw new ApiError(404, "Withdrawal request not found.");
   }
 
+  if (isFinalizedWithdrawal(pendingWithdrawal)) {
+    return {
+      message: "Withdrawal already paid on-chain.",
+      withdrawal: pendingWithdrawal,
+      authorizationTxHash: pendingWithdrawal.payoutTxHash ?? pendingWithdrawal.withdrawalTxHash,
+      payoutTxHash: pendingWithdrawal.payoutTxHash ?? pendingWithdrawal.withdrawalTxHash,
+    };
+  }
+
   if (pendingWithdrawal.status !== "requested") {
     throw new ApiError(409, "Withdrawal request is already processed.");
   }
@@ -4041,6 +4092,17 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
       withdrawalId: pendingWithdrawal.id,
     });
   } catch (error) {
+    if (isAlreadyProcessedPayoutError(error)) {
+      return withStoreTransaction(async (state) => {
+        const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
+        if (!withdrawal) {
+          throw new ApiError(404, "Withdrawal request not found.");
+        }
+
+        return finalizePaidWithdrawal(state, withdrawal);
+      });
+    }
+
     await withStoreTransaction(async (state) => {
       const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
       if (withdrawal && withdrawal.status === "requested") {
@@ -4072,6 +4134,10 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
       throw new ApiError(404, "Withdrawal request not found.");
     }
 
+    if (isFinalizedWithdrawal(withdrawal)) {
+      return finalizePaidWithdrawal(state, withdrawal, authorization.txHash);
+    }
+
     if (withdrawal.status !== "requested") {
       throw new ApiError(409, "Withdrawal request is already processed.");
     }
@@ -4087,24 +4153,7 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
       throw new ApiError(409, "Withdrawal approval blocked by safety controls.");
     }
 
-    state.system_reserve.balance = roundAmount(
-      state.system_reserve.balance - withdrawal.netAmount,
-    );
-    state.system_reserve.updatedAt = nowIso();
-
-    withdrawal.status = "completed";
-    withdrawal.approvedAt = nowIso();
-    withdrawal.payoutTxHash = authorization.txHash;
-    withdrawal.withdrawalTxHash = authorization.txHash;
-    withdrawal.payoutStatus = "PAID";
-    withdrawal.onChainStatus = "CONFIRMED";
-
-    return {
-      message: "Withdrawal approved and paid on-chain.",
-      withdrawal,
-      authorizationTxHash: authorization.txHash,
-      payoutTxHash: authorization.txHash,
-    };
+    return finalizePaidWithdrawal(state, withdrawal, authorization.txHash);
   });
 }
 
