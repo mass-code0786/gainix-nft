@@ -212,7 +212,7 @@ function safeWithdrawalErrorMessage(error: unknown) {
     lowerMessage.includes("reverted") ||
     lowerMessage.includes("unable to decode")
   ) {
-    return "Withdrawal is not authorized yet. Please wait for admin approval.";
+    return "Withdrawal is not authorized yet. Please wait for blockchain verification.";
   }
 
   return "Withdrawal failed. Please try again later.";
@@ -530,7 +530,7 @@ function WalletActionModal({
               netAmount,
               createdAt: new Date().toISOString(),
             });
-            setSuccess("Withdrawal request submitted. Waiting for admin approval.");
+            setSuccess("Withdrawal request submitted. Waiting for blockchain verification.");
             return;
           }
 
@@ -686,18 +686,18 @@ function WalletActionModal({
                       <span>Status</span>
                       <span className="text-amber-200">
                         {withdrawalFlowState === "REQUEST_SUBMITTED"
-                          ? "Pending Approval"
+                          ? "Blockchain Verification"
                           : withdrawalFlowState === "PROCESSING_PAYMENT"
                             ? "Processing Payment"
                             : withdrawalFlowState === "WITHDRAWN"
                               ? "Completed"
                               : withdrawalFlowState === "FAILED"
                                 ? "Failed"
-                                : "Pending Approval"}
+                                : "Blockchain Verification"}
                       </span>
                     </div>
                     {withdrawalFlowState === "REQUEST_SUBMITTED" ? (
-                      <div className="mt-2 text-amber-100">Pending Approval</div>
+                      <div className="mt-2 text-amber-100">Blockchain Verification</div>
                     ) : null}
                     {withdrawalFlowState === "PROCESSING_PAYMENT" ? (
                       <div className="mt-2 text-amber-100">Processing Payment</div>
@@ -775,7 +775,7 @@ function WalletActionModal({
                       ? "Completed"
                       : withdrawalFlowState === "PROCESSING_PAYMENT"
                         ? "Processing Payment"
-                        : "Pending Approval"
+                        : "Blockchain Verification"
                     : "Submit Withdrawal Request"
                   : title)}
           </button>

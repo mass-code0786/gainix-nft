@@ -81,7 +81,7 @@ export function HeroActionButtons() {
 
   async function startRegistrationFlow() {
     if (isReferralMissing) {
-      setStatusMessage("Valid referral link required to register.");
+      setStatusMessage("Referral link required.");
       setStatusTone("warning");
       return;
     }
@@ -256,8 +256,6 @@ export function HeroActionButtons() {
           Wallet: {walletAddress ?? "--"}
         </p>
         <p className="mt-1">Status: {walletStatusLabel}</p>
-        <p className="mt-2">Registration is allowed only via referral link.</p>
-        {isReferralMissing ? <p className="mt-2">Valid referral link required to register.</p> : null}
         {statusMessage ? <p className="mt-2">{statusMessage}</p> : null}
         {!statusMessage && registrationError ? <p className="mt-2">{registrationError}</p> : null}
       </div>
