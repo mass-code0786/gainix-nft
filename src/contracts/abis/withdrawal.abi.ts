@@ -49,6 +49,13 @@ export const withdrawalAbi = [
   {
     type: "function",
     stateMutability: "view",
+    name: "processed",
+    inputs: [{ name: "requestId", type: "bytes32" }],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
     name: "usdtWithdrawalRequests",
     inputs: [{ name: "requestId", type: "bytes32" }],
     outputs: [{ name: "", type: "bool" }],
@@ -71,6 +78,17 @@ export const withdrawalAbi = [
     inputs: [
       { name: "user", type: "address" },
       { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    stateMutability: "nonpayable",
+    name: "payoutUSDT",
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "requestId", type: "bytes32" },
     ],
     outputs: [],
   },
@@ -112,6 +130,16 @@ export const withdrawalAbi = [
       { indexed: true, name: "user", type: "address" },
       { indexed: false, name: "amount", type: "uint256" },
       { indexed: false, name: "timestamp", type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    anonymous: false,
+    name: "PayoutExecuted",
+    inputs: [
+      { indexed: true, name: "user", type: "address" },
+      { indexed: false, name: "amount", type: "uint256" },
+      { indexed: true, name: "requestId", type: "bytes32" },
     ],
   },
   {

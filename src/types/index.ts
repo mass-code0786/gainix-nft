@@ -319,7 +319,7 @@ export interface AdminWithdrawalRecord {
   gxnDeductionAmount: number;
   gxnTokens: number;
   netAmount: number;
-  status: "requested" | "approved" | "approved_pending_tx";
+  status: "requested" | "approved" | "approved_pending_tx" | "completed";
   approvedAt: string | null;
   payoutTxHash: string | null;
   payoutStatus: string;

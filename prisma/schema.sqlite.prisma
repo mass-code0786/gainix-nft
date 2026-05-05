@@ -68,6 +68,7 @@ enum WithdrawalStatus {
   REQUESTED
   APPROVED
   APPROVED_PENDING_TX
+  COMPLETED
 }
 
 enum DepositStatus {

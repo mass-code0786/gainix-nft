@@ -20,7 +20,13 @@ function requestedNetwork(): string | undefined {
 const isBscMainnet = requestedNetwork() === "bscMainnet";
 const isBscMainnetDeploy =
   isBscMainnet &&
-  process.argv.some((arg) => arg.replace(/\\/g, "/").endsWith("scripts/deploy-mainnet.ts"));
+  process.argv.some((arg) => {
+    const normalizedArg = arg.replace(/\\/g, "/");
+    return (
+      normalizedArg.endsWith("scripts/deploy-mainnet.ts") ||
+      normalizedArg.endsWith("scripts/deploy-withdrawal-vault-mainnet.ts")
+    );
+  });
 const rootMainnetEnvPath = path.resolve(__dirname, "../.env.mainnet");
 let deployerPrivateKey: string | undefined;
 

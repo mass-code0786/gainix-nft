@@ -72,6 +72,7 @@ async function main() {
   requiredEnv("BSCSCAN_API_KEY");
 
   const initialOwner = requiredAddress("INITIAL_OWNER");
+  const withdrawalOperator = requiredAddressFrom(["WITHDRAWAL_OPERATOR_ADDRESS", "BACKEND_OPERATOR_WALLET", "OPERATOR_WALLET", "EXPECTED_DEPLOYER_ADDRESS"]);
   const feeRecipient = requiredAddress("MARKETPLACE_FEE_RECIPIENT");
   const botPassTreasury = requiredAddress("BOTPASS_TREASURY");
   const usdtToken = requiredAddressFrom(["NEXT_PUBLIC_USDT_TOKEN_ADDRESS", "USDT_TOKEN_ADDRESS"]);
@@ -114,7 +115,7 @@ async function main() {
   await verifyContract(
     "contracts/GainixWithdrawalVault.sol:GainixWithdrawalVault",
     requiredAddressFrom(["NEXT_PUBLIC_WITHDRAWAL_VAULT_ADDRESS", "WITHDRAWAL_VAULT_ADDRESS", "WITHDRAWAL_CONTRACT_ADDRESS"]),
-    [initialOwner, usdtToken],
+    [initialOwner, withdrawalOperator, usdtToken],
   );
 }
 

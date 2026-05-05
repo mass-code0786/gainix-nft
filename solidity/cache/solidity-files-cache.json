@@ -919,8 +919,8 @@
       ]
     },
     "C:\\Gainix\\Gainix NFT\\solidity\\contracts\\GainixWithdrawalVault.sol": {
-      "lastModificationDate": 1777896993247,
-      "contentHash": "96f131b5133b096cd81f46645e4c0373",
+      "lastModificationDate": 1777974220894,
+      "contentHash": "f469c6a1c159c382577966f86abfac50",
       "sourceName": "contracts/GainixWithdrawalVault.sol",
       "solcConfig": {
         "version": "0.8.26",

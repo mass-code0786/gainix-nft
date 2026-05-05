@@ -54,6 +54,7 @@ async function main() {
   verifyExpectedDeployer();
 
   const initialOwner = requiredAddress("INITIAL_OWNER");
+  const withdrawalOperator = requiredAddressFrom(["WITHDRAWAL_OPERATOR_ADDRESS", "BACKEND_OPERATOR_WALLET", "OPERATOR_WALLET", "EXPECTED_DEPLOYER_ADDRESS"]);
   const feeRecipient = requiredAddress("MARKETPLACE_FEE_RECIPIENT");
   const botPassTreasury = requiredAddress("BOTPASS_TREASURY");
 
@@ -85,6 +86,7 @@ async function main() {
   console.log("Chain ID:", network.config.chainId);
   console.log("Deployer:", deployer.address);
   console.log("Initial owner/admin:", initialOwner);
+  console.log("Withdrawal operator:", withdrawalOperator);
   console.log("Marketplace fee recipient:", feeRecipient);
   console.log("BotPass treasury:", botPassTreasury);
   if (platformTreasury) {
@@ -108,7 +110,7 @@ async function main() {
 
   const usdtToken = requiredAddressFrom(["NEXT_PUBLIC_USDT_TOKEN_ADDRESS", "USDT_TOKEN_ADDRESS"]);
   const withdrawalVaultFactory = await ethers.getContractFactory("GainixWithdrawalVault");
-  const withdrawalVault = await withdrawalVaultFactory.deploy(initialOwner, usdtToken);
+  const withdrawalVault = await withdrawalVaultFactory.deploy(initialOwner, withdrawalOperator, usdtToken);
   await withdrawalVault.waitForDeployment();
   const withdrawalVaultAddress = await withdrawalVault.getAddress();
 

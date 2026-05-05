@@ -34,23 +34,29 @@ export interface GainixWithdrawalVaultInterface extends Interface {
       | "owner"
       | "pause"
       | "paused"
+      | "payoutUSDT"
       | "pendingOwner"
+      | "processed"
+      | "recoverERC20"
       | "renounceOwnership"
       | "setOperator"
       | "transferOwnership"
       | "unpause"
       | "usdtClaimable"
       | "usdtToken"
+      | "usdtWithdrawalRequests"
       | "withdraw"
       | "withdrawUSDT"
   ): FunctionFragment;
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "ERC20Recovered"
       | "OperatorUpdated"
       | "OwnershipTransferStarted"
       | "OwnershipTransferred"
       | "Paused"
+      | "PayoutExecuted"
       | "USDTWithdrawalAuthorized"
       | "USDTWithdrawalExecuted"
       | "Unpaused"
@@ -83,8 +89,20 @@ export interface GainixWithdrawalVaultInterface extends Interface {
   encodeFunctionData(functionFragment: "pause", values?: undefined): string;
   encodeFunctionData(functionFragment: "paused", values?: undefined): string;
   encodeFunctionData(
+    functionFragment: "payoutUSDT",
+    values: [AddressLike, BigNumberish, BytesLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "pendingOwner",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "processed",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "recoverERC20",
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "renounceOwnership",
@@ -104,6 +122,10 @@ export interface GainixWithdrawalVaultInterface extends Interface {
     values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "usdtToken", values?: undefined): string;
+  encodeFunctionData(
+    functionFragment: "usdtWithdrawalRequests",
+    values: [BytesLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "withdraw",
     values: [AddressLike, BigNumberish]
@@ -130,8 +152,14 @@ export interface GainixWithdrawalVaultInterface extends Interface {
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "pause", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "paused", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "payoutUSDT", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "pendingOwner",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(functionFragment: "processed", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "recoverERC20",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -152,11 +180,33 @@ export interface GainixWithdrawalVaultInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "usdtToken", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "usdtWithdrawalRequests",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "withdrawUSDT",
     data: BytesLike
   ): Result;
+}
+
+export namespace ERC20RecoveredEvent {
+  export type InputTuple = [
+    token: AddressLike,
+    to: AddressLike,
+    amount: BigNumberish
+  ];
+  export type OutputTuple = [token: string, to: string, amount: bigint];
+  export interface OutputObject {
+    token: string;
+    to: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace OperatorUpdatedEvent {
@@ -203,6 +253,24 @@ export namespace PausedEvent {
   export type OutputTuple = [account: string];
   export interface OutputObject {
     account: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace PayoutExecutedEvent {
+  export type InputTuple = [
+    user: AddressLike,
+    amount: BigNumberish,
+    requestId: BytesLike
+  ];
+  export type OutputTuple = [user: string, amount: bigint, requestId: string];
+  export interface OutputObject {
+    user: string;
+    amount: bigint;
+    requestId: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -374,7 +442,21 @@ export interface GainixWithdrawalVault extends BaseContract {
 
   paused: TypedContractMethod<[], [boolean], "view">;
 
+  payoutUSDT: TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish, requestId: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+
   pendingOwner: TypedContractMethod<[], [string], "view">;
+
+  processed: TypedContractMethod<[arg0: BytesLike], [boolean], "view">;
+
+  recoverERC20: TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
   renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
@@ -395,6 +477,12 @@ export interface GainixWithdrawalVault extends BaseContract {
   usdtClaimable: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   usdtToken: TypedContractMethod<[], [string], "view">;
+
+  usdtWithdrawalRequests: TypedContractMethod<
+    [arg0: BytesLike],
+    [boolean],
+    "view"
+  >;
 
   withdraw: TypedContractMethod<
     [user: AddressLike, amount: BigNumberish],
@@ -445,8 +533,25 @@ export interface GainixWithdrawalVault extends BaseContract {
     nameOrSignature: "paused"
   ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
+    nameOrSignature: "payoutUSDT"
+  ): TypedContractMethod<
+    [user: AddressLike, amount: BigNumberish, requestId: BytesLike],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "pendingOwner"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "processed"
+  ): TypedContractMethod<[arg0: BytesLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "recoverERC20"
+  ): TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "renounceOwnership"
   ): TypedContractMethod<[], [void], "nonpayable">;
@@ -470,6 +575,9 @@ export interface GainixWithdrawalVault extends BaseContract {
     nameOrSignature: "usdtToken"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "usdtWithdrawalRequests"
+  ): TypedContractMethod<[arg0: BytesLike], [boolean], "view">;
+  getFunction(
     nameOrSignature: "withdraw"
   ): TypedContractMethod<
     [user: AddressLike, amount: BigNumberish],
@@ -484,6 +592,13 @@ export interface GainixWithdrawalVault extends BaseContract {
     "nonpayable"
   >;
 
+  getEvent(
+    key: "ERC20Recovered"
+  ): TypedContractEvent<
+    ERC20RecoveredEvent.InputTuple,
+    ERC20RecoveredEvent.OutputTuple,
+    ERC20RecoveredEvent.OutputObject
+  >;
   getEvent(
     key: "OperatorUpdated"
   ): TypedContractEvent<
@@ -511,6 +626,13 @@ export interface GainixWithdrawalVault extends BaseContract {
     PausedEvent.InputTuple,
     PausedEvent.OutputTuple,
     PausedEvent.OutputObject
+  >;
+  getEvent(
+    key: "PayoutExecuted"
+  ): TypedContractEvent<
+    PayoutExecutedEvent.InputTuple,
+    PayoutExecutedEvent.OutputTuple,
+    PayoutExecutedEvent.OutputObject
   >;
   getEvent(
     key: "USDTWithdrawalAuthorized"
@@ -556,6 +678,17 @@ export interface GainixWithdrawalVault extends BaseContract {
   >;
 
   filters: {
+    "ERC20Recovered(address,address,uint256)": TypedContractEvent<
+      ERC20RecoveredEvent.InputTuple,
+      ERC20RecoveredEvent.OutputTuple,
+      ERC20RecoveredEvent.OutputObject
+    >;
+    ERC20Recovered: TypedContractEvent<
+      ERC20RecoveredEvent.InputTuple,
+      ERC20RecoveredEvent.OutputTuple,
+      ERC20RecoveredEvent.OutputObject
+    >;
+
     "OperatorUpdated(address,bool)": TypedContractEvent<
       OperatorUpdatedEvent.InputTuple,
       OperatorUpdatedEvent.OutputTuple,
@@ -598,6 +731,17 @@ export interface GainixWithdrawalVault extends BaseContract {
       PausedEvent.InputTuple,
       PausedEvent.OutputTuple,
       PausedEvent.OutputObject
+    >;
+
+    "PayoutExecuted(address,uint256,bytes32)": TypedContractEvent<
+      PayoutExecutedEvent.InputTuple,
+      PayoutExecutedEvent.OutputTuple,
+      PayoutExecutedEvent.OutputObject
+    >;
+    PayoutExecuted: TypedContractEvent<
+      PayoutExecutedEvent.InputTuple,
+      PayoutExecutedEvent.OutputTuple,
+      PayoutExecutedEvent.OutputObject
     >;
 
     "USDTWithdrawalAuthorized(address,uint256,bytes32)": TypedContractEvent<

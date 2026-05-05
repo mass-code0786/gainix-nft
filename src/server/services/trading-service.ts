@@ -1166,7 +1166,7 @@ function dailyPayoutTotal(state: NftSimState, dayStart: Date, userId?: string) {
 }
 
 function isApprovedWithdrawalStatus(status: WithdrawalRecord["status"]) {
-  return status === "approved" || status === "approved_pending_tx";
+  return status === "approved" || status === "approved_pending_tx" || status === "completed";
 }
 
 function checkPayoutSafety(
@@ -4033,11 +4033,23 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     userWallet: pendingUser.walletAddress,
     netAmount: pendingWithdrawal.netAmount,
   });
-  const authorization = await authorizeUsdtWithdrawalOnChain({
-    walletAddress: pendingUser.walletAddress,
-    netAmount: pendingWithdrawal.netAmount,
-    withdrawalId: pendingWithdrawal.id,
-  });
+  let authorization: Awaited<ReturnType<typeof authorizeUsdtWithdrawalOnChain>>;
+  try {
+    authorization = await authorizeUsdtWithdrawalOnChain({
+      walletAddress: pendingUser.walletAddress,
+      netAmount: pendingWithdrawal.netAmount,
+      withdrawalId: pendingWithdrawal.id,
+    });
+  } catch (error) {
+    await withStoreTransaction(async (state) => {
+      const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
+      if (withdrawal && withdrawal.status === "requested") {
+        withdrawal.payoutStatus = "FAILED";
+        withdrawal.onChainStatus = "FAILED";
+      }
+    });
+    throw error;
+  }
 
   return withStoreTransaction(async (state) => {
     if (state.admin_settings.systemStopped) {
@@ -4080,15 +4092,18 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     );
     state.system_reserve.updatedAt = nowIso();
 
-    withdrawal.status = "approved_pending_tx";
+    withdrawal.status = "completed";
     withdrawal.approvedAt = nowIso();
     withdrawal.payoutTxHash = authorization.txHash;
-    withdrawal.payoutStatus = "PENDING_TX";
+    withdrawal.withdrawalTxHash = authorization.txHash;
+    withdrawal.payoutStatus = "PAID";
+    withdrawal.onChainStatus = "CONFIRMED";
 
     return {
-      message: "Withdrawal approved and authorized on-chain for USDT claim.",
+      message: "Withdrawal approved and paid on-chain.",
       withdrawal,
       authorizationTxHash: authorization.txHash,
+      payoutTxHash: authorization.txHash,
     };
   });
 }

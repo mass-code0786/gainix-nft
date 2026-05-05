@@ -100,15 +100,10 @@ export function getServerWithdrawalConfig() {
 }
 
 function getWithdrawalOperatorPrivateKey() {
-  const privateKey = firstOptionalEnv([
-    "WITHDRAWAL_OPERATOR_PRIVATE_KEY",
-    "BACKEND_OPERATOR_PRIVATE_KEY",
-    "OPERATOR_PRIVATE_KEY",
-    "DEPLOYER_PRIVATE_KEY",
-  ]);
+  const privateKey = firstOptionalEnv(["WITHDRAWAL_OPERATOR_PRIVATE_KEY"]);
 
   if (!privateKey) {
-    throw new ApiError(500, "Withdrawal operator private key is not configured.", { step: "ENV_OPERATOR_PRIVATE_KEY" });
+    throw new ApiError(500, "WITHDRAWAL_OPERATOR_PRIVATE_KEY is not configured.", { step: "ENV_OPERATOR_PRIVATE_KEY" });
   }
 
   return (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Hex;
@@ -133,9 +128,6 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
     const envVaultAddress = firstOptionalEnv(WITHDRAWAL_VAULT_ENV_NAMES);
     const envOperatorPrivateKey = firstOptionalEnv([
       "WITHDRAWAL_OPERATOR_PRIVATE_KEY",
-      "BACKEND_OPERATOR_PRIVATE_KEY",
-      "OPERATOR_PRIVATE_KEY",
-      "DEPLOYER_PRIVATE_KEY",
     ]);
     const envRpcUrl = firstOptionalEnv(["BSC_RPC_URL", "BSC_MAINNET_RPC_URL", "NEXT_PUBLIC_BSC_MAINNET_RPC_URL"]);
     console.info("[withdraw.approve.debug]", {
@@ -172,14 +164,6 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
     });
     console.info("[withdraw.config] normalizedVaultAddress=", config.contractAddress);
 
-    step = "READ_OWNER";
-    console.info("[withdraw.approve.debug]", { step, vaultAddress: config.contractAddress });
-    const owner = await client.readContract({
-      address: config.contractAddress,
-      abi: withdrawalAbi,
-      functionName: "owner",
-    });
-
     step = "READ_OPERATOR_AUTH";
     console.info("[withdraw.approve.debug]", { step, operatorAddress: account.address });
     const isOperator = await client.readContract({
@@ -209,7 +193,6 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       functionName: "balanceOf",
       args: [config.contractAddress],
     });
-    const operatorAuthorized = isOperator || isAddressEqual(owner, account.address);
 
     console.info("[withdraw.approve]", {
       withdrawalId: input.withdrawalId,
@@ -229,7 +212,7 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       throw new ApiError(500, "USDT token config does not match withdrawal vault.", { step: "VALIDATE_USDT_TOKEN" });
     }
 
-    if (!operatorAuthorized) {
+    if (!isOperator) {
       throw new ApiError(409, "Withdrawal operator is not authorized on vault.", { step: "VALIDATE_OPERATOR_AUTH" });
     }
 
@@ -241,7 +224,7 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       throw new ApiError(409, "Withdrawal vault has insufficient USDT.", { step: "VALIDATE_VAULT_USDT" });
     }
 
-    step = "SIMULATE_AUTHORIZE_USDT_WITHDRAWAL";
+    step = "SIMULATE_PAYOUT_USDT";
     console.info("[withdraw.approve.debug]", {
       step,
       userWallet: input.walletAddress,
@@ -252,11 +235,11 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
       account: account.address,
       address: config.contractAddress,
       abi: withdrawalAbi,
-      functionName: "authorizeUSDTWithdrawal",
+      functionName: "payoutUSDT",
       args: [input.walletAddress as Address, amount, requestId],
     });
 
-    step = "AUTHORIZE_USDT_WITHDRAWAL";
+    step = "PAYOUT_USDT";
     console.info("[withdraw.approve.debug]", {
       step,
       userWallet: input.walletAddress,
@@ -266,16 +249,18 @@ export async function authorizeUsdtWithdrawalOnChain(input: {
     const hash = await walletClient.writeContract({
       address: config.contractAddress,
       abi: withdrawalAbi,
-      functionName: "authorizeUSDTWithdrawal",
+      functionName: "payoutUSDT",
       args: [input.walletAddress as Address, amount, requestId],
       chain: null,
     });
-    console.info("[withdraw.approve] authorizeUSDTWithdrawal txHash=", hash);
+    console.log("[approve] payout tx:", hash);
+    console.log("[approve] user:", input.walletAddress);
+    console.log("[approve] amount:", amount.toString());
 
-    step = "WAIT_AUTHORIZE_RECEIPT";
+    step = "WAIT_PAYOUT_RECEIPT";
     const receipt = await client.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") {
-      throw new ApiError(500, "USDT withdrawal authorization transaction failed.", { step });
+      throw new ApiError(500, "USDT payout transaction failed.", { step });
     }
 
     return {

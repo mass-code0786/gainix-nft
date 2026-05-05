@@ -610,7 +610,7 @@ async function replaceState(tx: DbClient, state: NftSimState) {
         gxnDeductionAmount: item.gxnDeductionAmount,
         gxnTokens: item.gxnTokens,
         netAmount: item.netAmount,
-        status: item.status.toUpperCase() as "REQUESTED" | "APPROVED" | "APPROVED_PENDING_TX",
+        status: item.status.toUpperCase() as never,
         approvedAt: item.approvedAt ? new Date(item.approvedAt) : null,
         payoutTxHash: item.payoutTxHash,
         payoutStatus: item.payoutStatus,
