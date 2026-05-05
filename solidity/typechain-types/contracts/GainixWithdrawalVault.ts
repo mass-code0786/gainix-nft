@@ -42,6 +42,7 @@ export interface GainixWithdrawalVaultInterface extends Interface {
       | "setOperator"
       | "transferOwnership"
       | "unpause"
+      | "usdt"
       | "usdtClaimable"
       | "usdtToken"
       | "usdtWithdrawalRequests"
@@ -117,6 +118,7 @@ export interface GainixWithdrawalVaultInterface extends Interface {
     values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "unpause", values?: undefined): string;
+  encodeFunctionData(functionFragment: "usdt", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "usdtClaimable",
     values: [AddressLike]
@@ -175,6 +177,7 @@ export interface GainixWithdrawalVaultInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "unpause", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "usdt", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "usdtClaimable",
     data: BytesLike
@@ -474,6 +477,8 @@ export interface GainixWithdrawalVault extends BaseContract {
 
   unpause: TypedContractMethod<[], [void], "nonpayable">;
 
+  usdt: TypedContractMethod<[], [string], "view">;
+
   usdtClaimable: TypedContractMethod<[arg0: AddressLike], [bigint], "view">;
 
   usdtToken: TypedContractMethod<[], [string], "view">;
@@ -568,6 +573,9 @@ export interface GainixWithdrawalVault extends BaseContract {
   getFunction(
     nameOrSignature: "unpause"
   ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "usdt"
+  ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "usdtClaimable"
   ): TypedContractMethod<[arg0: AddressLike], [bigint], "view">;

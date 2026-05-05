@@ -12,6 +12,7 @@ import {GainixErrors} from "./libraries/GainixErrors.sol";
 /// @title GainixWithdrawalVault
 /// @notice Withdrawal vault. Operators can authorize or directly pay USDT withdrawal amounts.
 contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
+    address public immutable usdt;
     IERC20 public immutable usdtToken;
 
     mapping(address => bool) public operators;
@@ -40,6 +41,7 @@ contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
         if (initialOwner == address(0)) revert GainixErrors.ZeroAddress();
         if (initialOperator == address(0)) revert GainixErrors.ZeroAddress();
         if (initialUsdtToken == address(0)) revert GainixErrors.ZeroAddress();
+        usdt = initialUsdtToken;
         usdtToken = IERC20(initialUsdtToken);
         operators[initialOperator] = true;
         emit OperatorUpdated(initialOperator, true);
@@ -106,15 +108,16 @@ contract GainixWithdrawalVault is Ownable2Step, ReentrancyGuard, Pausable {
     }
 
     function payoutUSDT(address user, uint256 amount, bytes32 requestId) external onlyOperatorOrOwner nonReentrant whenNotPaused {
-        require(user != address(0), "Zero address");
+        require(user != address(0), "Invalid user");
         require(amount > 0, "Invalid amount");
         require(!processed[requestId], "Already processed");
+
         processed[requestId] = true;
 
-        require(usdtToken.balanceOf(address(this)) >= amount, "Insufficient USDT");
+        require(IERC20(usdt).balanceOf(address(this)) >= amount, "Insufficient USDT");
 
-        bool sent = usdtToken.transfer(user, amount);
-        require(sent, "USDT transfer failed");
+        bool success = IERC20(usdt).transfer(user, amount);
+        require(success, "Transfer failed");
 
         emit PayoutExecuted(user, amount, requestId);
     }

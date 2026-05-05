@@ -49,6 +49,13 @@ export const withdrawalAbi = [
   {
     type: "function",
     stateMutability: "view",
+    name: "usdt",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    stateMutability: "view",
     name: "processed",
     inputs: [{ name: "requestId", type: "bytes32" }],
     outputs: [{ name: "", type: "bool" }],
