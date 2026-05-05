@@ -400,7 +400,7 @@ function WalletActionModal({
     }
 
     if (action === "withdraw" && amount < MIN_WITHDRAWAL_AMOUNT) {
-      return `Minimum withdrawal is $${MIN_WITHDRAWAL_AMOUNT}.`;
+      return `Minimum withdrawal amount is $${MIN_WITHDRAWAL_AMOUNT}`;
     }
 
     if (action === "withdraw" && amount > withdrawalWallet) {

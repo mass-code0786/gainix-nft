@@ -1,4 +1,4 @@
-const FALLBACK_MIN_WITHDRAWAL_AMOUNT = 1;
+const FALLBACK_MIN_WITHDRAWAL_AMOUNT = 10;
 
 function parseConfiguredAmount(value: string | undefined) {
   if (!value) {

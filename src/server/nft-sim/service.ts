@@ -1632,7 +1632,7 @@ export async function requestWithdrawal(input: WithdrawInput) {
     const feePercent = state.admin_settings.withdrawalFeePercent;
 
     if (amount < minimum) {
-      throw new ApiError(400, `Minimum withdrawal is $${minimum}.`);
+      throw new ApiError(400, `Minimum withdrawal amount is $${minimum}`);
     }
 
     if (wallet.withdrawalWallet < amount) {
