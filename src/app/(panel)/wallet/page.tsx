@@ -7,6 +7,7 @@ import { SkeletonBlock } from "@/components/ui/skeleton-block";
 import { StatCard } from "@/components/ui/stat-card";
 import { WalletActionPanel } from "@/components/wallet/wallet-action-panel";
 import { useWalletSummary } from "@/hooks/useWalletSummary";
+import { getWalletTransactionStatusDisplay } from "@/lib/wallet/transaction-status";
 import {
   type WalletHistoryCategory,
   type WalletHistoryEntry,
@@ -54,10 +55,25 @@ const historyFilters: Array<{ key: WalletHistoryFilter; label: string }> = [
   { key: "BONUS", label: "Bonus" },
 ];
 
+function metadataString(entry: WalletHistoryEntry, key: string) {
+  const value = entry.metadata[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function bscScanTxUrl(hash: string) {
+  return `https://bscscan.com/tx/${hash}`;
+}
+
 function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
   const isDebit = debitTypes.has(entry.type);
   const title = entry.title ?? (typeof entry.metadata.title === "string" ? entry.metadata.title : historyLabels[entry.type]);
   const description = entry.description ?? (typeof entry.metadata.description === "string" ? entry.metadata.description : null);
+  const statusDisplay = getWalletTransactionStatusDisplay(entry);
+  const txHash =
+    entry.withdrawalTxHash ??
+    entry.payoutTxHash ??
+    metadataString(entry, "withdrawalTxHash") ??
+    metadataString(entry, "payoutTxHash");
 
   return (
     <div className="rounded-[22px] border border-white/10 bg-[linear-gradient(160deg,rgba(22,9,11,0.9),rgba(8,8,12,0.96))] p-4">
@@ -69,10 +85,20 @@ function WalletHistoryRow({ entry }: { entry: WalletHistoryEntry }) {
             <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
               {entry.walletAffected}
             </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1">
-              {entry.status}
+            <span className={`rounded-full border px-2 py-1 ${statusDisplay.className}`}>
+              {statusDisplay.label}
             </span>
           </div>
+          {txHash ? (
+            <a
+              className="mt-2 inline-flex text-xs font-medium text-emerald-200 underline decoration-emerald-200/40 underline-offset-4"
+              href={bscScanTxUrl(txHash)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View on BscScan
+            </a>
+          ) : null}
           <p className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
             <Clock3 className="h-3.5 w-3.5" />
             {new Date(entry.createdAt).toLocaleString()}

@@ -38,10 +38,14 @@ export interface WalletHistoryEntry {
   category: WalletHistoryCategory;
   amount: number;
   createdAt: string;
-  status: "Completed" | "Requested" | "Approved" | "Approved Pending TX" | "Active";
+  status: "Completed" | "Requested" | "Approved" | "Approved Pending TX" | "Active" | string;
+  payoutStatus?: string | null;
+  onChainStatus?: "PENDING" | "CONFIRMED" | "FAILED" | string | null;
+  payoutTxHash?: string | null;
+  withdrawalTxHash?: string | null;
   walletAffected: "Trading Wallet" | "Withdrawal Wallet" | "Income Wallet" | "GXN Token";
   referenceId: string | null;
-  metadata: Record<string, string | number | boolean | null>;
+  metadata: Record<string, string | number | boolean | null | undefined>;
 }
 
 interface WalletHistoryResponse {

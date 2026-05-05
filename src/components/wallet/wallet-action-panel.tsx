@@ -13,6 +13,7 @@ import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "w
 import { useWalletAuth } from "@/hooks/useWalletAuth";
 import { ApiRequestError, fetchJson } from "@/lib/api/client";
 import { MIN_WITHDRAWAL_AMOUNT } from "@/config/withdrawal";
+import { getWalletTransactionStatusDisplay } from "@/lib/wallet/transaction-status";
 import {
   erc20TransferAbi,
   USDT_DECIMALS,
@@ -257,6 +258,9 @@ function WalletActionModal({
   const netAmount = action === "withdraw" ? Number((amount - feeAmount - gxnDeductionAmount).toFixed(2)) : amount;
   const title = action === "deposit" ? "Deposit" : action === "withdraw" ? "Withdraw" : "Transfer capital";
   const depositConfigReady = isValidUsdtPaymentConfig(depositConfig);
+  const withdrawalStatusDisplay = pendingWithdrawal
+    ? getWalletTransactionStatusDisplay(pendingWithdrawal)
+    : null;
 
   useEffect(() => {
     if (action !== "withdraw" || !walletAddress || !pendingWithdrawal) {
@@ -283,6 +287,7 @@ function WalletActionModal({
 
         if (
           latestWithdrawal.onChainStatus === "CONFIRMED" ||
+          latestWithdrawal.payoutStatus === "PAID" ||
           latestWithdrawal.status === "completed" ||
           latestWithdrawal.status === "approved"
         ) {
@@ -684,16 +689,15 @@ function WalletActionModal({
                   <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs leading-5 text-zinc-300">
                     <div className="flex items-center justify-between gap-3">
                       <span>Status</span>
-                      <span className="text-amber-200">
-                        {withdrawalFlowState === "REQUEST_SUBMITTED"
-                          ? "Blockchain Verification"
-                          : withdrawalFlowState === "PROCESSING_PAYMENT"
-                            ? "Processing Payment"
-                            : withdrawalFlowState === "WITHDRAWN"
-                              ? "Completed"
+                      <span className={`rounded-full border px-2 py-0.5 ${withdrawalStatusDisplay?.className ?? "border-amber-400/20 bg-amber-500/10 text-amber-200"}`}>
+                        {withdrawalStatusDisplay?.label ??
+                          (withdrawalFlowState === "WITHDRAWN"
+                            ? "Confirmed"
+                            : withdrawalFlowState === "PROCESSING_PAYMENT"
+                              ? "Processing"
                               : withdrawalFlowState === "FAILED"
                                 ? "Failed"
-                                : "Blockchain Verification"}
+                                : "Requested")}
                       </span>
                     </div>
                     {withdrawalFlowState === "REQUEST_SUBMITTED" ? (
@@ -703,7 +707,7 @@ function WalletActionModal({
                       <div className="mt-2 text-amber-100">Processing Payment</div>
                     ) : null}
                     {withdrawalFlowState === "WITHDRAWN" ? (
-                      <div className="mt-2 text-emerald-200">Completed</div>
+                      <div className="mt-2 text-emerald-200">Confirmed</div>
                     ) : null}
                     {txHash ? (
                       <div className="mt-2 flex items-center justify-between gap-3">
