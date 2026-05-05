@@ -44,6 +44,10 @@ async function readApiError(response: Response) {
   }
 }
 
+function safeCounter(value: number | null | undefined) {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value ?? 0)) : 0;
+}
+
 export default function BotSubscriptionPage() {
   const { fullAddress, isConnected } = useWallet();
   const walletAuth = useWalletAuth(fullAddress);
@@ -146,17 +150,17 @@ export default function BotSubscriptionPage() {
           }
           completedBuyTrades={
             activeSubscription
-              ? `${activeSubscription.completedBuyTrades} / ${activeSubscription.totalBuyTrades}`
+              ? `${safeCounter(activeSubscription.totalBuyTradesCompleted)} / ${safeCounter(activeSubscription.buyLimit)}`
               : "0 / 0"
           }
           completedSellTrades={
             activeSubscription
-              ? `${activeSubscription.completedSellTrades} / ${activeSubscription.totalSellTrades}`
+              ? `${safeCounter(activeSubscription.totalSellTradesCompleted)} / ${safeCounter(activeSubscription.sellLimit)}`
               : "0 / 0"
           }
           remainingTrades={
             activeSubscription
-              ? `${activeSubscription.remainingBuyTrades + activeSubscription.remainingSellTrades}`
+              ? `${safeCounter(activeSubscription.remainingTrades)}`
               : "0"
           }
           progress={progress}

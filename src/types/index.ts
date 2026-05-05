@@ -158,6 +158,12 @@ export interface BotAutomationSubscription {
   totalSellTrades: number;
   completedBuyTrades: number;
   completedSellTrades: number;
+  totalBuyTradesCompleted: number;
+  totalSellTradesCompleted: number;
+  buyLimit: number;
+  sellLimit: number;
+  remainingTrades: number;
+  progressPercent: number;
   completedCycles: number;
   remainingBuyTrades: number;
   remainingSellTrades: number;

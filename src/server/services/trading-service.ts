@@ -746,17 +746,83 @@ function toPublicSettings(settings: AdminSettingsRecord) {
   };
 }
 
-function toPublicBotSubscription(subscription: BotSubscriptionRecord) {
-  const totalCycles = Math.min(subscription.totalBuyTrades, subscription.totalSellTrades);
+function safeProgressCount(value: number | null | undefined) {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value ?? 0)) : 0;
+}
+
+function botSubscriptionProgress(state: NftSimState | null, subscription: BotSubscriptionRecord) {
+  const buyLimit = safeProgressCount(subscription.totalBuyTrades);
+  const sellLimit = safeProgressCount(subscription.totalSellTrades);
+  const completedActivities = state
+    ? state.bot_activity.filter(
+        (item) =>
+          item.userId === subscription.userId &&
+          item.botSubscriptionId === subscription.id &&
+          (item.status === "SUCCESS" || item.status === "COMPLETED"),
+      )
+    : [];
+  const totalBuyTradesCompleted = state
+    ? completedActivities.filter((item) => item.action === "AUTO_BUY").length
+    : safeProgressCount(subscription.completedBuyTrades);
+  const totalSellTradesCompleted = state
+    ? completedActivities.filter((item) => item.action === "AUTO_SELL").length
+    : safeProgressCount(subscription.completedSellTrades);
+  const remainingTrades =
+    Math.max(0, buyLimit - totalBuyTradesCompleted) +
+    Math.max(0, sellLimit - totalSellTradesCompleted);
+  const totalLimit = buyLimit + sellLimit;
+  const progressPercent =
+    totalLimit > 0
+      ? Math.min(
+          100,
+          Math.floor(((totalBuyTradesCompleted + totalSellTradesCompleted) / totalLimit) * 100),
+        )
+      : 0;
+
+  return {
+    totalBuyTradesCompleted,
+    totalSellTradesCompleted,
+    buyLimit,
+    sellLimit,
+    remainingTrades,
+    progressPercent,
+  };
+}
+
+function logBotProgress(subscription: BotSubscriptionRecord, progress: ReturnType<typeof botSubscriptionProgress>) {
+  console.info("[bot.progress]", {
+    subscriptionId: subscription.id,
+    userId: subscription.userId,
+    completedBuys: progress.totalBuyTradesCompleted,
+    completedSells: progress.totalSellTradesCompleted,
+    buyLimit: progress.buyLimit,
+    sellLimit: progress.sellLimit,
+    remainingTrades: progress.remainingTrades,
+    progressPercent: progress.progressPercent,
+  });
+}
+
+function toPublicBotSubscription(subscription: BotSubscriptionRecord, state: NftSimState | null = null, shouldLogProgress = false) {
+  const progress = botSubscriptionProgress(state, subscription);
+  const totalCycles = Math.min(progress.buyLimit, progress.sellLimit);
   const completedCycles = Math.min(
-    subscription.completedBuyTrades,
-    subscription.completedSellTrades,
+    progress.totalBuyTradesCompleted,
+    progress.totalSellTradesCompleted,
   );
+
+  if (shouldLogProgress) {
+    logBotProgress(subscription, progress);
+  }
 
   return {
     ...subscription,
+    completedBuyTrades: progress.totalBuyTradesCompleted,
+    completedSellTrades: progress.totalSellTradesCompleted,
+    remainingBuyTrades: Math.max(0, progress.buyLimit - progress.totalBuyTradesCompleted),
+    remainingSellTrades: Math.max(0, progress.sellLimit - progress.totalSellTradesCompleted),
     totalCycles,
     completedCycles,
+    ...progress,
   };
 }
 
@@ -2516,7 +2582,7 @@ export async function buyBotSubscription(input: BuyBotInput) {
       message: "Bot subscription activated.",
       user,
       wallet: toPublicWallet(wallet, user, state),
-      subscription: toPublicBotSubscription(subscription),
+      subscription: toPublicBotSubscription(subscription, state),
       uplineIncome,
       settings: toPublicSettings(state.admin_settings),
     };
@@ -3256,7 +3322,7 @@ export async function getTradesHistory(selector: UserSelector) {
     const subscriptions = state.bot_subscriptions
       .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => toPublicBotSubscription(item));
+      .map((item) => toPublicBotSubscription(item, state));
 
     return {
       user,
@@ -3419,7 +3485,7 @@ export async function getBotStatus(selector: UserSelector) {
     const subscriptions = state.bot_subscriptions
       .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => toPublicBotSubscription(item));
+      .map((item) => toPublicBotSubscription(item, state, true));
     const todayStart = startOfToday(new Date());
     const botProfitEntries = state.income_ledger.filter(
       (item) =>
@@ -3432,6 +3498,7 @@ export async function getBotStatus(selector: UserSelector) {
         .filter((item) => item.userId === user.id)
         .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+    const currentProgress = subscriptions.find((item) => item.status === "active") ?? subscriptions[0] ?? null;
 
     return {
       user,
@@ -3442,6 +3509,12 @@ export async function getBotStatus(selector: UserSelector) {
       })),
       subscriptions,
       activeSubscriptions: subscriptions.filter((item) => item.status === "active").length,
+      totalBuyTradesCompleted: currentProgress?.totalBuyTradesCompleted ?? 0,
+      totalSellTradesCompleted: currentProgress?.totalSellTradesCompleted ?? 0,
+      buyLimit: currentProgress?.buyLimit ?? 0,
+      sellLimit: currentProgress?.sellLimit ?? 0,
+      remainingTrades: currentProgress?.remainingTrades ?? 0,
+      progressPercent: currentProgress?.progressPercent ?? 0,
       todayBotProfit: sumAmounts(
         botProfitEntries.filter((item) => new Date(item.createdAt) >= todayStart),
       ),
@@ -3460,7 +3533,7 @@ export async function getBotSummary(selector: UserSelector) {
     const subscriptions = state.bot_subscriptions
       .filter((item) => item.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => toPublicBotSubscription(item));
+      .map((item) => toPublicBotSubscription(item, state, true));
     const todayStart = startOfToday(new Date());
     const botProfitEntries = state.income_ledger.filter(
       (item) =>
@@ -3476,6 +3549,7 @@ export async function getBotSummary(selector: UserSelector) {
         ...item,
         nft: item.nftId ? state.nfts.find((entry) => entry.id === item.nftId) ?? null : null,
       }));
+    const currentProgress = subscriptions.find((item) => item.status === "active") ?? subscriptions[0] ?? null;
 
     return {
       user,
@@ -3486,6 +3560,12 @@ export async function getBotSummary(selector: UserSelector) {
       })),
       subscriptions,
       activeSubscriptions: subscriptions.filter((item) => item.status === "active").length,
+      totalBuyTradesCompleted: currentProgress?.totalBuyTradesCompleted ?? 0,
+      totalSellTradesCompleted: currentProgress?.totalSellTradesCompleted ?? 0,
+      buyLimit: currentProgress?.buyLimit ?? 0,
+      sellLimit: currentProgress?.sellLimit ?? 0,
+      remainingTrades: currentProgress?.remainingTrades ?? 0,
+      progressPercent: currentProgress?.progressPercent ?? 0,
       todayBotProfit: sumAmounts(
         botProfitEntries.filter((item) => new Date(item.createdAt) >= todayStart),
       ),
@@ -3857,7 +3937,7 @@ export async function activateBotByAdmin(input: AdminActivateBotInput) {
       return {
         message: "Bot activated by admin.",
         user,
-        subscription: toPublicBotSubscription(existingSubscription),
+        subscription: toPublicBotSubscription(existingSubscription, state, true),
       };
     }
 
@@ -3889,7 +3969,7 @@ export async function activateBotByAdmin(input: AdminActivateBotInput) {
     return {
       message: "Bot activated by admin.",
       user,
-      subscription: toPublicBotSubscription(subscription),
+      subscription: toPublicBotSubscription(subscription, state, true),
     };
   });
 }
@@ -3957,7 +4037,7 @@ export async function getWalletSummary(selector: UserSelector) {
       botSubscriptions: state.bot_subscriptions
         .filter((item) => item.userId === user.id)
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .map((item) => toPublicBotSubscription(item)),
+        .map((item) => toPublicBotSubscription(item, state)),
     };
   });
 }

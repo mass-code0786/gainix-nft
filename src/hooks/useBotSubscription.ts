@@ -108,10 +108,11 @@ export function useBotSubscription() {
       return 0;
     }
 
-    const total = activeSubscription.totalCycles;
-    const completed = activeSubscription.completedCycles;
+    const progressPercent = Number(activeSubscription.progressPercent);
 
-    return total > 0 ? Math.min(Math.round((completed / total) * 100), 100) : 0;
+    return Number.isFinite(progressPercent)
+      ? Math.min(100, Math.max(0, Math.floor(progressPercent)))
+      : 0;
   }, [activeSubscription]);
 
   return {
