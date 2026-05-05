@@ -68,6 +68,7 @@ export function useBotSubscription() {
         }
 
         console.log("[bot.ui.api]", payload);
+        console.log("[bot.timeline.api]", payload.activity?.length ?? 0);
         setPlans(payload.plans ?? []);
         setSubscriptions(payload.subscriptions ?? []);
         setTimeline(payload.activity ?? []);
@@ -155,6 +156,7 @@ export function useBotSubscription() {
       );
 
       console.log("[bot.ui.api]", payload);
+      console.log("[bot.timeline.api]", payload.activity?.length ?? 0);
       setPlans(payload.plans ?? []);
       setSubscriptions(payload.subscriptions ?? []);
       setTimeline(payload.activity ?? []);
