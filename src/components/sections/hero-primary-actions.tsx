@@ -68,7 +68,6 @@ export function HeroActionButtons() {
   const [statusTone, setStatusTone] = useState<"default" | "warning" | "success">("default");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const referralCode = searchParams.get("ref")?.trim() ?? "";
-  const isReferralMissing = !referralCode;
   const walletStatusLabel = !hasMounted
     ? "Connect Wallet"
     : isConnected
@@ -76,16 +75,10 @@ export function HeroActionButtons() {
         ? "Checking registration..."
         : isRegistered
           ? "Registered"
-          : "Not registered"
+          : "Ready"
       : "Not connected";
 
   async function startRegistrationFlow() {
-    if (isReferralMissing) {
-      setStatusMessage("Referral link required.");
-      setStatusTone("warning");
-      return;
-    }
-
     if (!walletAddress) {
       setStatusMessage("Connect your wallet before starting registration.");
       setStatusTone("warning");
@@ -127,8 +120,9 @@ export function HeroActionButtons() {
         setStatusTone("success");
         router.push("/dashboard");
       } else {
-        setStatusMessage("Please register first.");
-        setStatusTone("warning");
+        setStatusMessage("Wallet connected. Creating your account.");
+        setStatusTone("default");
+        void startRegistrationFlow();
       }
 
       setPendingAction(null);
@@ -157,7 +151,7 @@ export function HeroActionButtons() {
         return;
       }
 
-      setStatusMessage("Open your wallet to connect. We will verify your registration right after connection.");
+      setStatusMessage("Open your wallet to connect. Your account will be ready automatically.");
       setStatusTone("default");
       setPendingAction("connect");
       openConnectModal();
@@ -177,8 +171,7 @@ export function HeroActionButtons() {
       return;
     }
 
-    setStatusMessage("Please register first.");
-    setStatusTone("warning");
+    void startRegistrationFlow();
   }
 
   function handleRegisterNow() {
@@ -224,7 +217,7 @@ export function HeroActionButtons() {
       <button
         type="button"
         onClick={handleRegisterNow}
-        disabled={isSubmitting || isCheckingRegistration || isReferralMissing}
+        disabled={isSubmitting || isCheckingRegistration}
         className={`secondary-button w-full rounded-xl px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-70 ${
           !isRegistered ? "border-red-400/25 bg-red-500/10 text-red-100 hover:bg-red-500/15" : ""
         }`}
@@ -234,11 +227,11 @@ export function HeroActionButtons() {
       </button>
 
       <label className="block text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
-        Referral
+        Referral optional
         <input
           value={referralCode}
           readOnly
-          placeholder="Referral link required"
+          placeholder="No referral applied"
           className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-sm normal-case tracking-normal text-zinc-100 outline-none placeholder:text-zinc-600"
         />
       </label>

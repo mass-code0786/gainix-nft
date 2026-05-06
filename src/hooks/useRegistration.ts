@@ -8,7 +8,7 @@ interface UseRegistrationResult {
   isCheckingRegistration: boolean;
   registrationError: string | null;
   refreshRegistration: () => Promise<void>;
-  registerWallet: (referralCode: string) => Promise<{ message: string }>;
+  registerWallet: (referralCode?: string) => Promise<{ message: string }>;
 }
 
 export function useRegistration(walletAddress?: string | null, isConnected = false): UseRegistrationResult {
@@ -25,19 +25,38 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
     }
 
     let isCancelled = false;
+    const connectedWalletAddress = walletAddress;
+
+    async function autoRegisterWallet(referralCode?: string) {
+      return fetchJson<{ message: string }>("/api/register", {
+        method: "POST",
+        body: JSON.stringify({
+          walletAddress: connectedWalletAddress,
+          ...(referralCode ? { ref: referralCode } : {}),
+        }),
+      });
+    }
 
     async function checkRegistration() {
       setIsCheckingRegistration(true);
       setRegistrationError(null);
 
       try {
-        await fetchJson(`/api/wallet?walletAddress=${walletAddress}`);
+        await fetchJson(`/api/wallet?walletAddress=${connectedWalletAddress}`);
         if (!isCancelled) {
           setIsRegistered(true);
         }
       } catch {
-        if (!isCancelled) {
-          setIsRegistered(false);
+        try {
+          await autoRegisterWallet();
+          if (!isCancelled) {
+            setIsRegistered(true);
+          }
+        } catch (error) {
+          if (!isCancelled) {
+            setIsRegistered(false);
+            setRegistrationError(error instanceof Error ? error.message : "Unable to register wallet.");
+          }
         }
       } finally {
         if (!isCancelled) {
@@ -67,13 +86,17 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
       await fetchJson(`/api/wallet?walletAddress=${walletAddress}`);
       setIsRegistered(true);
     } catch {
-      setIsRegistered(false);
+      await fetchJson("/api/register", {
+        method: "POST",
+        body: JSON.stringify({ walletAddress }),
+      });
+      setIsRegistered(true);
     } finally {
       setIsCheckingRegistration(false);
     }
   }
 
-  async function registerWallet(referralCode: string) {
+  async function registerWallet(referralCode?: string) {
     if (!walletAddress) {
       throw new Error("Connect a wallet before registering.");
     }
@@ -83,7 +106,7 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
       method: "POST",
       body: JSON.stringify({
         walletAddress,
-        ref: referralCode,
+        ...(referralCode ? { ref: referralCode } : {}),
       }),
     });
 

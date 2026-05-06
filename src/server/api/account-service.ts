@@ -100,18 +100,15 @@ async function createMlmRelations(
 export async function registerUser(input: RegisterInput) {
   const result = await prisma.$transaction(async (tx) => {
     const referralCodeUsed = input.ref?.trim() ?? "";
-    if (!referralCodeUsed) {
-      throw new ApiError(400, "Invalid or missing referral code");
-    }
 
     const existingUser = await tx.user.findUnique({
       where: { walletAddress: input.walletAddress },
       include: { wallet: true },
     });
     if (existingUser) {
-      if (!existingUser.wallet) {
-        throw new ApiError(404, "User wallet not found.");
-      }
+      const wallet = existingUser.wallet ?? await tx.wallet.create({
+        data: { userId: existingUser.id },
+      });
 
       return {
         message: "User already registered.",
@@ -121,42 +118,45 @@ export async function registerUser(input: RegisterInput) {
           createdAt: existingUser.createdAt.toISOString(),
         },
         wallet: toWalletResponse({
-          ...existingUser.wallet,
+          ...wallet,
           user: {
             id: existingUser.id,
             walletAddress: existingUser.walletAddress,
           },
         }),
         sponsorUserId: null,
+        isRegistered: true,
       };
     }
 
-    const sponsor = await tx.user.findFirst({
-      where: {
-        OR: [
-          { referralCode: referralCodeUsed },
-          { id: referralCodeUsed },
-          { walletAddress: referralCodeUsed.toLowerCase() },
-        ],
-      },
-    });
-    if (!sponsor) {
-      throw new ApiError(400, "Invalid or missing referral code");
+    const sponsor = referralCodeUsed
+      ? await tx.user.findFirst({
+          where: {
+            OR: [
+              { referralCode: referralCodeUsed },
+              { id: referralCodeUsed },
+              { walletAddress: referralCodeUsed.toLowerCase() },
+            ],
+          },
+        })
+      : null;
+    if (referralCodeUsed && !sponsor) {
+      throw new ApiError(400, "Invalid referral code");
     }
-    if (sponsor.walletAddress.toLowerCase() === input.walletAddress) {
+    if (sponsor && sponsor.walletAddress.toLowerCase() === input.walletAddress) {
       throw new ApiError(409, "Self-referral is not allowed.");
     }
-    const sponsorUserId = sponsor.id;
+    const sponsorUserId = sponsor?.id ?? null;
 
-    const user = await tx.user.create({
-      data: {
+    const user = await tx.user.upsert({
+      where: { walletAddress: input.walletAddress },
+      update: {},
+      create: {
         walletAddress: input.walletAddress,
         referralCode: createReferralCode(input.walletAddress),
         referredBy: sponsorUserId,
         referralCodeUsed,
-        wallet: {
-          create: {},
-        },
+        wallet: { create: {} },
       },
       include: {
         wallet: true,
@@ -180,6 +180,7 @@ export async function registerUser(input: RegisterInput) {
         },
       }),
       sponsorUserId,
+      isRegistered: true,
     };
   });
 

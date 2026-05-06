@@ -108,7 +108,6 @@ const LEGACY_DEMO_MARKETPLACE_PRICES_BY_TOKEN_ID = new Map([
 let botExecutionRunning = false;
 const scheduledBotListTradeIds = new Set<string>();
 const activeBotBuyUserIds = new Set<string>();
-const isReferralRequired = true;
 
 type BotPlanId = keyof typeof BOT_PLANS;
 type BotPlan = (typeof BOT_PLANS)[BotPlanId];
@@ -2396,20 +2395,25 @@ export async function registerUser(input: RegisterUserInput) {
     }
 
     const referralCodeUsed = normalizeReferralCode(input.ref);
-    if (isReferralRequired && !referralCodeUsed) {
-      throw new ApiError(400, "Invalid or missing referral code");
-    }
 
     const existingUser = state.users.find(
       (item) => normalizeWalletAddress(item.walletAddress) === walletAddress,
     );
     if (existingUser) {
-      throw new ApiError(409, "Wallet is already registered.");
+      const existingWallet = requireWallet(state, existingUser.id);
+
+      return {
+        message: "User already registered.",
+        user: existingUser,
+        sponsorUserId: existingUser.referredBy ?? null,
+        wallet: toPublicWallet(existingWallet, existingUser, state),
+        isRegistered: true,
+      };
     }
 
     const sponsor = referralCodeUsed ? findReferralUser(state, referralCodeUsed) : null;
-    if (isReferralRequired && !sponsor) {
-      throw new ApiError(400, "Invalid or missing referral code");
+    if (referralCodeUsed && !sponsor) {
+      throw new ApiError(400, "Invalid referral code");
     }
 
     if (sponsor && normalizeWalletAddress(sponsor.walletAddress) === walletAddress) {
@@ -2452,6 +2456,7 @@ export async function registerUser(input: RegisterUserInput) {
       user,
       sponsorUserId,
       wallet: toPublicWallet(wallet, user, state),
+      isRegistered: true,
     };
   });
 }

@@ -10,6 +10,7 @@ import { writeAuditLog } from "@/server/api/audit";
 import { errorResponse, successResponse } from "@/server/api/http";
 import { rateLimit, rateLimitRules } from "@/server/api/rate-limit";
 import { authVerifyInputSchema } from "@/server/api/validation";
+import { registerUser } from "@/server/services/trading-service";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     walletAddress = input.walletAddress;
 
     await verifyWalletSignature(input.walletAddress, input.signature);
+    await registerUser({ walletAddress: input.walletAddress });
     const configuredRole = getServerConfiguredWalletRole(input.walletAddress);
     const hasOnChainAdminAccess = isPrivilegedRole(configuredRole)
       ? false
