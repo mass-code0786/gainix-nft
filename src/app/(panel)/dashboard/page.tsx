@@ -181,14 +181,21 @@ function ActivePlanCard({
   isRunning: boolean;
 }) {
   return (
-    <div className="rounded-[22px] border border-white/10 bg-black/25 p-3 text-center sm:p-4">
-      <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-xs sm:tracking-[0.16em]">
-        Active Plan
-      </p>
-      <p className="mt-2 whitespace-normal break-words font-display text-xl font-bold leading-tight text-white">
-        {formatActivePlanAmount(price)}
-      </p>
-      {isRunning ? <p className="mt-1 text-xs text-zinc-400 sm:text-sm">Running</p> : null}
+    <div className="rounded-[22px] border border-white/10 bg-black/25 p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase leading-4 tracking-[0.12em] text-zinc-500 sm:text-xs sm:tracking-[0.16em]">
+            Active Plan
+          </p>
+          <p className="mt-2 whitespace-normal break-words font-display text-[1.15rem] font-semibold leading-tight text-white sm:text-2xl">
+            {formatActivePlanAmount(price)}
+          </p>
+          {isRunning ? <p className="mt-1 truncate text-xs text-zinc-400 sm:text-sm">Running</p> : null}
+        </div>
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-red-400/25 bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.28),transparent_45%),linear-gradient(145deg,rgba(127,29,29,0.28),rgba(8,8,12,0.88))] text-red-100 shadow-[0_0_26px_rgba(239,68,68,0.22)] sm:h-10 sm:w-10 sm:rounded-2xl">
+          <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
+        </div>
+      </div>
     </div>
   );
 }
