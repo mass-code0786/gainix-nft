@@ -8,7 +8,7 @@ interface BotActivityTimelineProps {
 
 function formatActionLabel(activity: BotAutomationActivity) {
   if (activity.action === "AUTO_SELL" && typeof activity.profit === "number") {
-    return `Auto Sold${activity.profit > 0 ? ` - Profit ${formatCurrency(activity.profit)}` : ""}`;
+    return `Auto Sold - Profit ${formatCurrency(activity.profit)}`;
   }
 
   if (activity.action === "AUTO_LIST") {
@@ -16,27 +16,6 @@ function formatActionLabel(activity: BotAutomationActivity) {
   }
 
   return "Auto Bought NFT";
-}
-
-function isFakeSkippedBotAttempt(activity: BotAutomationActivity) {
-  return (
-    activity.status === "SKIPPED" &&
-    activity.amount === 0 &&
-    formatActionLabel(activity).includes("Auto Bought NFT") &&
-    (activity.nft?.name ?? activity.nftId ?? "System NFT") === "System NFT"
-  );
-}
-
-function getBotEventOrder(type: string | null | undefined) {
-  if (!type) return 99;
-
-  const t = type.toLowerCase();
-
-  if (t.includes("buy")) return 1;
-  if (t.includes("list")) return 2;
-  if (t.includes("sell") || t.includes("profit")) return 3;
-
-  return 99;
 }
 
 function activityDisplayTime(activity: BotAutomationActivity) {
@@ -58,103 +37,19 @@ function formatDate(date: string) {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
-}
-
-function groupEventsByCycle(events: BotAutomationActivity[]) {
-  const map = new Map<string, BotAutomationActivity[]>();
-  const ungrouped: BotAutomationActivity[] = [];
-
-  for (const event of events) {
-    const key = event.cycleId;
-
-    if (!key) {
-      ungrouped.push(event);
-      continue;
-    }
-
-    map.set(key, [...(map.get(key) ?? []), event]);
-  }
-
-  const fallbackGroups = groupLegacyEventsByTimestamp(ungrouped);
-
-  return {
-    cycles: [...Array.from(map.values()), ...fallbackGroups.cycles],
-    ungrouped: fallbackGroups.ungrouped,
-  };
-}
-
-function legacyEventKey(activity: BotAutomationActivity) {
-  return `${activity.userId}:${activity.nft?.name ?? activity.nftId ?? "System NFT"}`;
-}
-
-function groupLegacyEventsByTimestamp(events: BotAutomationActivity[]) {
-  const sorted = [...events].sort(
-    (a, b) => new Date(activityDisplayTime(a)).getTime() - new Date(activityDisplayTime(b)).getTime(),
-  );
-  const cycles: BotAutomationActivity[][] = [];
-  const ungrouped: BotAutomationActivity[] = [];
-  const windowMs = 5 * 60 * 1000;
-
-  for (const event of sorted) {
-    const eventTime = new Date(activityDisplayTime(event)).getTime();
-    const key = legacyEventKey(event);
-    const cycle = cycles.find((items) => {
-      const anchor = items[0];
-      const anchorTime = new Date(activityDisplayTime(anchor)).getTime();
-      return legacyEventKey(anchor) === key && Math.abs(eventTime - anchorTime) <= windowMs;
-    });
-
-    if (cycle) {
-      cycle.push(event);
-      continue;
-    }
-
-    cycles.push([event]);
-  }
-
-  return {
-    cycles: cycles.filter((items) => items.length > 1),
-    ungrouped: [...ungrouped, ...cycles.filter((items) => items.length === 1).flat()],
-  };
-}
-
-function sortCycles(cycles: BotAutomationActivity[][]) {
-  return [...cycles].sort((a, b) => {
-    const maxA = Math.max(...a.map((event) => new Date(activityDisplayTime(event)).getTime()));
-    const maxB = Math.max(...b.map((event) => new Date(activityDisplayTime(event)).getTime()));
-    return maxB - maxA;
-  });
-}
-
-function sortCycleEvents(events: BotAutomationActivity[]) {
-  return [...events].sort((a, b) => {
-    const orderDiff = getBotEventOrder(a.action) - getBotEventOrder(b.action);
-
-    if (orderDiff !== 0) return orderDiff;
-
-    return new Date(activityDisplayTime(a)).getTime() - new Date(activityDisplayTime(b)).getTime();
+    hour12: true,
   });
 }
 
 function orderedTimeline(activity: BotAutomationActivity[]) {
-  const events = activity.filter((entry) => !isFakeSkippedBotAttempt(entry));
-  const { cycles, ungrouped } = groupEventsByCycle(events);
+  const tradeIds = new Set(activity.map((entry) => entry.tradeId ?? entry.cycleId ?? entry.id.split(":")[0]));
 
-  console.log("[bot.timeline.ui]", cycles.length);
+  console.log("[bot.history.ui]", {
+    renderRows: activity.length,
+    groupedCycles: tradeIds.size,
+  });
 
-  if (cycles.length === 0) {
-    return [...ungrouped].sort(
-      (a, b) => new Date(activityDisplayTime(b)).getTime() - new Date(activityDisplayTime(a)).getTime(),
-    );
-  }
-
-  return [
-    ...sortCycles(cycles).flatMap((cycle) => sortCycleEvents(cycle)),
-    ...ungrouped.sort(
-      (a, b) => new Date(activityDisplayTime(b)).getTime() - new Date(activityDisplayTime(a)).getTime(),
-    ),
-  ];
+  return activity;
 }
 
 export function BotActivityTimeline({ activity }: BotActivityTimelineProps) {

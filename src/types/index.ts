@@ -181,13 +181,14 @@ export interface BotAutomationSubscription {
 export interface BotAutomationActivity {
   id: string;
   userId: string;
+  tradeId?: string;
   botSubscriptionId: string;
   nftId: string | null;
   cycleId: string | null;
   action: "AUTO_BUY" | "AUTO_LIST" | "AUTO_SELL";
   amount: number;
   profit: number | null;
-  status: "SUCCESS" | "WAITING" | "COMPLETED" | "SKIPPED";
+  status: "SUCCESS" | "WAITING" | "LISTED" | "COMPLETED" | "SKIPPED";
   createdAt: string;
   tradeCreatedAt?: string | null;
   listedAt?: string | null;

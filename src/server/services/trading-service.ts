@@ -697,6 +697,101 @@ function toPublicBotActivity(state: NftSimState, activity: BotActivityRecord) {
   };
 }
 
+function botTradeEventTime(trade: NftTradeRecord) {
+  return trade.soldAt ?? trade.listedAt ?? trade.createdAt;
+}
+
+type BotTradeTimelineRow = {
+  id: string;
+  userId: string;
+  tradeId: string;
+  botSubscriptionId: string;
+  nftId: string | null;
+  cycleId: string | null;
+  action: "AUTO_BUY" | "AUTO_LIST" | "AUTO_SELL";
+  amount: number;
+  profit: number | null;
+  status: "SUCCESS" | "WAITING" | "LISTED" | "COMPLETED";
+  createdAt: string;
+  tradeCreatedAt: string | null;
+  listedAt: string | null;
+  autoSellAt: string | null;
+  soldAt: string | null;
+  nft: NftRecord | null;
+};
+
+function botTradeCycleRows(state: NftSimState, trade: NftTradeRecord) {
+  const nft = state.nfts.find((entry) => entry.id === trade.nftId) ?? null;
+  const common = {
+    userId: trade.userId,
+    tradeId: trade.id,
+    botSubscriptionId: trade.botSubscriptionId ?? "",
+    nftId: trade.nftId,
+    cycleId: trade.cycleId,
+    tradeCreatedAt: trade.createdAt,
+    listedAt: trade.listedAt,
+    autoSellAt: trade.autoSellAt,
+    soldAt: trade.soldAt,
+    nft,
+  };
+  const listedAt = trade.listedAt ?? trade.createdAt;
+  const rows: BotTradeTimelineRow[] = [
+    {
+      ...common,
+      id: `${trade.id}:buy`,
+      action: "AUTO_BUY" as const,
+      amount: trade.buyPrice,
+      profit: null,
+      status: "SUCCESS" as const,
+      createdAt: trade.createdAt,
+    },
+    {
+      ...common,
+      id: `${trade.id}:list`,
+      action: "AUTO_LIST" as const,
+      amount: trade.buyPrice,
+      profit: null,
+      status: trade.soldAt ? ("LISTED" as const) : ("WAITING" as const),
+      createdAt: listedAt,
+      listedAt,
+    },
+  ];
+
+  const completedTradeStatuses = new Set(["auto_sold", "sold", "completed"]);
+  if (trade.soldAt || completedTradeStatuses.has(String(trade.status).toLowerCase())) {
+    rows.push({
+      ...common,
+      id: `${trade.id}:sell`,
+      action: "AUTO_SELL" as const,
+      amount: trade.sellPrice ?? trade.buyPrice,
+      profit: trade.profit ?? 0,
+      status: "COMPLETED" as const,
+      createdAt: trade.soldAt ?? listedAt,
+      soldAt: trade.soldAt ?? listedAt,
+    });
+  }
+
+  return rows;
+}
+
+function buildBotTradeTimeline(state: NftSimState, userId: string) {
+  const trades = state.nft_trades
+    .filter((trade) => trade.userId === userId && trade.source === "bot")
+    .sort((a, b) => new Date(botTradeEventTime(b)).getTime() - new Date(botTradeEventTime(a)).getTime());
+  const timelineRows = trades.flatMap((trade) => botTradeCycleRows(state, trade));
+
+  console.log("[bot.history.api]", {
+    tradeCount: trades.length,
+    timelineRows: timelineRows.length,
+    tradeIds: trades.map((trade) => trade.id),
+  });
+
+  return {
+    trades,
+    timelineRows,
+  };
+}
+
 function toPublicNft(state: NftSimState, nft: NftRecord) {
   const owner = nft.ownerUserId
     ? state.users.find((item) => item.id === nft.ownerUserId) ?? null
@@ -3659,11 +3754,10 @@ export async function getBotSummary(selector: UserSelector) {
         (item.type === "BOT_TRADING_INCOME" ||
           (item.type === "NFT_TRADING_INCOME" && sourceTradeIsBot(state, item))),
     );
-    const activity = state.bot_activity
-      .filter((item) => item.userId === user.id)
-      .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => toPublicBotActivity(state, item));
+    const { timelineRows: activity } = buildBotTradeTimeline(state, user.id);
+    const latestActivity = [...activity].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0] ?? null;
     const currentProgress = subscriptions.find((item) => item.status === "active") ?? subscriptions[0] ?? null;
 
     return {
@@ -3685,7 +3779,7 @@ export async function getBotSummary(selector: UserSelector) {
         botProfitEntries.filter((item) => new Date(item.createdAt) >= todayStart),
       ),
       totalBotProfit: sumAmounts(botProfitEntries),
-      latestActivity: activity[0] ?? null,
+      latestActivity,
       activity,
       totalActivity: activity.length,
     };
@@ -3698,11 +3792,7 @@ export async function getBotActivity(selector: UserSelector) {
 
   return withStoreTransaction(async (state) => {
     const { user } = requireUser(state, selector);
-    const activity = state.bot_activity
-      .filter((item) => item.userId === user.id)
-      .filter((item) => !(item.status === "SKIPPED" && item.action === "AUTO_BUY" && item.amount === 0 && item.nftId === null))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((item) => toPublicBotActivity(state, item));
+    const { timelineRows: activity } = buildBotTradeTimeline(state, user.id);
 
     return {
       user,

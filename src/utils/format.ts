@@ -67,11 +67,25 @@ export function getChangeTone(value: number) {
 }
 
 export function getStatusTone(status: string) {
-  if (status === "Completed" || status === "Processed" || status === "Executed" || status === "Active") {
+  const normalizedStatus = status.toLowerCase();
+
+  if (
+    normalizedStatus === "completed" ||
+    normalizedStatus === "processed" ||
+    normalizedStatus === "executed" ||
+    normalizedStatus === "active" ||
+    normalizedStatus === "success"
+  ) {
     return "text-emerald-300 bg-emerald-500/10 border-emerald-500/20";
   }
 
-  if (status === "Pending" || status === "Queued" || status === "Processing") {
+  if (
+    normalizedStatus === "pending" ||
+    normalizedStatus === "queued" ||
+    normalizedStatus === "processing" ||
+    normalizedStatus === "waiting" ||
+    normalizedStatus === "listed"
+  ) {
     return "text-amber-300 bg-amber-500/10 border-amber-500/20";
   }
 

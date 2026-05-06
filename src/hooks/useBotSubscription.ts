@@ -68,7 +68,11 @@ export function useBotSubscription() {
         }
 
         console.log("[bot.ui.api]", payload);
-        console.log("[bot.timeline.api]", payload.activity?.length ?? 0);
+        console.log("[bot.history.api]", {
+          tradeCount: new Set((payload.activity ?? []).map((entry) => entry.tradeId ?? entry.cycleId ?? entry.id.split(":")[0])).size,
+          timelineRows: payload.activity?.length ?? 0,
+          tradeIds: Array.from(new Set((payload.activity ?? []).map((entry) => entry.tradeId ?? entry.cycleId ?? entry.id.split(":")[0]))),
+        });
         setPlans(payload.plans ?? []);
         setSubscriptions(payload.subscriptions ?? []);
         setTimeline(payload.activity ?? []);
@@ -156,7 +160,11 @@ export function useBotSubscription() {
       );
 
       console.log("[bot.ui.api]", payload);
-      console.log("[bot.timeline.api]", payload.activity?.length ?? 0);
+      console.log("[bot.history.api]", {
+        tradeCount: new Set((payload.activity ?? []).map((entry) => entry.tradeId ?? entry.cycleId ?? entry.id.split(":")[0])).size,
+        timelineRows: payload.activity?.length ?? 0,
+        tradeIds: Array.from(new Set((payload.activity ?? []).map((entry) => entry.tradeId ?? entry.cycleId ?? entry.id.split(":")[0]))),
+      });
       setPlans(payload.plans ?? []);
       setSubscriptions(payload.subscriptions ?? []);
       setTimeline(payload.activity ?? []);
