@@ -2400,7 +2400,11 @@ export async function registerUser(input: RegisterUserInput) {
       (item) => normalizeWalletAddress(item.walletAddress) === walletAddress,
     );
     if (existingUser) {
-      const existingWallet = requireWallet(state, existingUser.id);
+      let existingWallet = state.wallets.find((item) => item.userId === existingUser.id);
+      if (!existingWallet) {
+        existingWallet = createUserWallet(nowIso(), existingUser.id);
+        state.wallets.push(existingWallet);
+      }
 
       return {
         message: "User already registered.",
