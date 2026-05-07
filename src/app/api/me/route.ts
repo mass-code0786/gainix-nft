@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { requireWalletSession } from "@/server/api/auth";
 import { errorResponse, successResponse } from "@/server/api/http";
+import { prisma } from "@/server/api/prisma";
 import { walletQuerySchema } from "@/server/api/validation";
 import { ensureTradingRuntime } from "@/server/services/runtime";
-import { getWalletBalances } from "@/server/services/trading-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,16 +14,29 @@ export async function GET(request: NextRequest) {
     const session = request.nextUrl.searchParams.get("walletAddress")
       ? null
       : requireWalletSession(request);
-    const walletAddress = request.nextUrl.searchParams.get("walletAddress") ?? session?.walletAddress;
-    const result = await getWalletBalances(
-      walletQuerySchema.parse({
-        walletAddress,
-      }),
-    );
+    const input = walletQuerySchema.parse({
+      walletAddress: request.nextUrl.searchParams.get("walletAddress") ?? session?.walletAddress,
+    });
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: input.walletAddress! },
+    });
+
+    console.log("[me]", {
+      walletAddress: input.walletAddress,
+      isRegistered: Boolean(user),
+    });
+
+    if (!user) {
+      return successResponse({
+        success: true,
+        isRegistered: false,
+        user: null,
+      });
+    }
 
     return successResponse({
-      user: result.user,
-      wallet: result.wallet,
+      success: true,
+      user,
       isRegistered: true,
     });
   } catch (error) {

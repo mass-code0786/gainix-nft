@@ -25,38 +25,21 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
     }
 
     let isCancelled = false;
-    const connectedWalletAddress = walletAddress;
-
-    async function autoRegisterWallet(referralCode?: string) {
-      return fetchJson<{ message: string }>("/api/register", {
-        method: "POST",
-        body: JSON.stringify({
-          walletAddress: connectedWalletAddress,
-          ...(referralCode ? { ref: referralCode } : {}),
-        }),
-      });
-    }
-
     async function checkRegistration() {
       setIsCheckingRegistration(true);
       setRegistrationError(null);
 
       try {
-        await fetchJson(`/api/wallet?walletAddress=${connectedWalletAddress}`);
+        const result = await fetchJson<{ isRegistered: boolean; user: unknown | null }>(
+          `/api/me?walletAddress=${walletAddress}`,
+        );
         if (!isCancelled) {
-          setIsRegistered(true);
+          setIsRegistered(result.isRegistered);
         }
-      } catch {
-        try {
-          await autoRegisterWallet();
-          if (!isCancelled) {
-            setIsRegistered(true);
-          }
-        } catch (error) {
-          if (!isCancelled) {
-            setIsRegistered(false);
-            setRegistrationError(error instanceof Error ? error.message : "Unable to register wallet.");
-          }
+      } catch (error) {
+        if (!isCancelled) {
+          setIsRegistered(false);
+          setRegistrationError(error instanceof Error ? error.message : "Unable to check registration.");
         }
       } finally {
         if (!isCancelled) {
@@ -83,14 +66,13 @@ export function useRegistration(walletAddress?: string | null, isConnected = fal
     setRegistrationError(null);
 
     try {
-      await fetchJson(`/api/wallet?walletAddress=${walletAddress}`);
-      setIsRegistered(true);
-    } catch {
-      await fetchJson("/api/register", {
-        method: "POST",
-        body: JSON.stringify({ walletAddress }),
-      });
-      setIsRegistered(true);
+      const result = await fetchJson<{ isRegistered: boolean; user: unknown | null }>(
+        `/api/me?walletAddress=${walletAddress}`,
+      );
+      setIsRegistered(result.isRegistered);
+    } catch (error) {
+      setIsRegistered(false);
+      setRegistrationError(error instanceof Error ? error.message : "Unable to check registration.");
     } finally {
       setIsCheckingRegistration(false);
     }

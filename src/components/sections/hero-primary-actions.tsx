@@ -1,7 +1,7 @@
 "use client";
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { UserPlus, Wallet2 } from "lucide-react";
 import { useRegistration } from "@/hooks/useRegistration";
@@ -63,7 +63,6 @@ export function HeroActionButtons() {
   } = useRegistration(walletAddress, isConnected);
   const isRegistered = hasMounted ? liveIsRegistered : false;
   const isCheckingRegistration = hasMounted ? liveIsCheckingRegistration : false;
-  const [pendingAction, setPendingAction] = useState<"connect" | "register" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"default" | "warning" | "success">("default");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,7 +74,7 @@ export function HeroActionButtons() {
         ? "Checking registration..."
         : isRegistered
           ? "Registered"
-          : "Ready"
+          : "Not Registered"
       : "Not connected";
 
   async function startRegistrationFlow() {
@@ -109,32 +108,6 @@ export function HeroActionButtons() {
     }
   }
 
-  useEffect(() => {
-    if (!hasMounted || !pendingAction || !isConnected || !walletAddress || isCheckingRegistration || isWalletHydrating || isSubmitting) {
-      return;
-    }
-
-    if (pendingAction === "connect") {
-      if (isRegistered) {
-        setStatusMessage("Wallet verified. Redirecting to dashboard.");
-        setStatusTone("success");
-        router.push("/dashboard");
-      } else {
-        setStatusMessage("Wallet connected. Creating your account.");
-        setStatusTone("default");
-        void startRegistrationFlow();
-      }
-
-      setPendingAction(null);
-      return;
-    }
-
-    if (pendingAction === "register") {
-      setPendingAction(null);
-      void startRegistrationFlow();
-    }
-  }, [hasMounted, pendingAction, isConnected, walletAddress, isCheckingRegistration, isWalletHydrating, isSubmitting, isRegistered, router]);
-
   function handleConnectWallet() {
     if (!hasMounted) {
       return;
@@ -151,9 +124,8 @@ export function HeroActionButtons() {
         return;
       }
 
-      setStatusMessage("Open your wallet to connect. Your account will be ready automatically.");
+      setStatusMessage("Open your wallet to connect.");
       setStatusTone("default");
-      setPendingAction("connect");
       openConnectModal();
       return;
     }
@@ -164,14 +136,8 @@ export function HeroActionButtons() {
       return;
     }
 
-    if (isRegistered) {
-      setStatusMessage("Wallet verified. Redirecting to dashboard.");
-      setStatusTone("success");
-      router.push("/dashboard");
-      return;
-    }
-
-    void startRegistrationFlow();
+    setStatusMessage(isRegistered ? "Wallet connected and registered." : "Wallet connected. Status: Not Registered.");
+    setStatusTone(isRegistered ? "success" : "warning");
   }
 
   function handleRegisterNow() {
@@ -190,9 +156,8 @@ export function HeroActionButtons() {
         return;
       }
 
-      setStatusMessage("Connect your wallet first. Registration will start automatically once the wallet is connected.");
+      setStatusMessage("Connect your wallet first, then click Register Now.");
       setStatusTone("default");
-      setPendingAction("register");
       openConnectModal();
       return;
     }

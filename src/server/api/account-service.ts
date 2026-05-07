@@ -148,10 +148,8 @@ export async function registerUser(input: RegisterInput) {
     }
     const sponsorUserId = sponsor?.id ?? null;
 
-    const user = await tx.user.upsert({
-      where: { walletAddress: input.walletAddress },
-      update: {},
-      create: {
+    const user = await tx.user.create({
+      data: {
         walletAddress: input.walletAddress,
         referralCode: createReferralCode(input.walletAddress),
         referredBy: sponsorUserId,

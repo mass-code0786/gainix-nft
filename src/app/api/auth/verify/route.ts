@@ -8,9 +8,9 @@ import {
 import { getServerConfiguredWalletRole, isPrivilegedRole } from "@/lib/auth/wallet-role";
 import { writeAuditLog } from "@/server/api/audit";
 import { errorResponse, successResponse } from "@/server/api/http";
+import { prisma } from "@/server/api/prisma";
 import { rateLimit, rateLimitRules } from "@/server/api/rate-limit";
 import { authVerifyInputSchema } from "@/server/api/validation";
-import { registerUser } from "@/server/services/trading-service";
 
 export const runtime = "nodejs";
 
@@ -24,7 +24,13 @@ export async function POST(request: NextRequest) {
     walletAddress = input.walletAddress;
 
     await verifyWalletSignature(input.walletAddress, input.signature);
-    await registerUser({ walletAddress: input.walletAddress });
+    const user = await prisma.user.findUnique({
+      where: { walletAddress: input.walletAddress },
+    });
+    console.log("[verify]", {
+      walletAddress: input.walletAddress,
+      isRegistered: Boolean(user),
+    });
     const configuredRole = getServerConfiguredWalletRole(input.walletAddress);
     const hasOnChainAdminAccess = isPrivilegedRole(configuredRole)
       ? false
@@ -32,9 +38,17 @@ export async function POST(request: NextRequest) {
     const role = isPrivilegedRole(configuredRole)
       ? configuredRole
       : hasOnChainAdminAccess
-        ? "admin"
-        : "user";
-    const response = successResponse({ walletAddress: input.walletAddress, verified: true, role });
+      ? "admin"
+      : "user";
+    const response = successResponse({
+      success: true,
+      walletAddress: input.walletAddress,
+      verified: true,
+      walletVerified: true,
+      isRegistered: Boolean(user),
+      user,
+      role,
+    });
     setSessionCookie(response, createSessionToken(input.walletAddress, role));
     await writeAuditLog(request, {
       walletAddress,
