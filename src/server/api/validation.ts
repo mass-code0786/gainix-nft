@@ -64,12 +64,26 @@ export const registerInputSchema = z.object({
   ref: z.string().trim().optional(),
 });
 
-export const walletQuerySchema = z
-  .object({
-    userId: optionalStringSchema,
-    walletAddress: walletAddressSchema.optional(),
-  })
+const walletQueryBaseSchema = z.object({
+  userId: optionalStringSchema,
+  walletAddress: walletAddressSchema.optional(),
+});
+
+const walletQueryRequiresSelector = (value: z.infer<typeof walletQueryBaseSchema>) => Boolean(value.userId || value.walletAddress);
+
+export const walletQuerySchema = walletQueryBaseSchema
   .refine((value) => Boolean(value.userId || value.walletAddress), {
+    message: "Provide either userId or walletAddress.",
+    path: ["walletAddress"],
+  });
+
+export const teamLevelMembersQuerySchema = walletQueryBaseSchema
+  .extend({
+    level: z.coerce.number().int("level must be an integer.").min(1, "level must be from 1 to 5.").max(5, "level must be from 1 to 5."),
+    page: z.coerce.number().int("page must be an integer.").min(1, "page must be at least 1.").optional(),
+    pageSize: z.coerce.number().int("pageSize must be an integer.").min(1, "pageSize must be at least 1.").max(50, "pageSize cannot exceed 50.").optional(),
+  })
+  .refine(walletQueryRequiresSelector, {
     message: "Provide either userId or walletAddress.",
     path: ["walletAddress"],
   });
@@ -195,6 +209,7 @@ export const payoutControlInputSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 export type WalletQueryInput = z.infer<typeof walletQuerySchema>;
+export type TeamLevelMembersQueryInput = z.infer<typeof teamLevelMembersQuerySchema>;
 export type DepositInput = z.infer<typeof depositInputSchema>;
 export type DepositVerifyInput = z.infer<typeof depositVerifyInputSchema>;
 export type WalletAmountMutationInput = z.infer<typeof walletAmountMutationInputSchema>;

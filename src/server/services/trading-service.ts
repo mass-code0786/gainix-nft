@@ -3689,6 +3689,61 @@ export async function getTeamSummary(selector: UserSelector) {
   });
 }
 
+export async function getTeamLevelMembers(
+  selector: UserSelector,
+  options: { level: number; page?: number; pageSize?: number },
+) {
+  await ensureStoreInitialized();
+  await processTradingEngineTick();
+
+  return withStoreTransaction(async (state) => {
+    const { user } = requireUser(state, selector);
+    const level = Math.min(5, Math.max(1, Math.floor(options.level)));
+    const page = Math.max(1, Math.floor(options.page ?? 1));
+    const pageSize = Math.min(50, Math.max(1, Math.floor(options.pageSize ?? 20)));
+    const offset = (page - 1) * pageSize;
+    const relations = state.mlm_tree
+      .filter((item) => item.ancestorUserId === user.id && item.level === level)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const members = relations
+      .slice(offset, offset + pageSize)
+      .map((relation) => {
+        const member = state.users.find((entry) => entry.id === relation.userId);
+        if (!member) {
+          return null;
+        }
+
+        const activeBotSubscriptions = state.bot_subscriptions.filter(
+          (subscription) => subscription.userId === member.id && subscription.status === "active",
+        );
+        const botAmount = roundAmount(
+          activeBotSubscriptions.reduce((total, subscription) => total + subscription.price, 0),
+        );
+        const isActive = member.selfPackageAmount > 0 || botAmount > 0;
+
+        return {
+          walletAddress: member.walletAddress,
+          joinedAt: member.createdAt,
+          packageAmount: member.selfPackageAmount,
+          botAmount,
+          status: isActive ? "Active" : "Inactive",
+          level,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+    return {
+      success: true,
+      level,
+      total: relations.length,
+      page,
+      pageSize,
+      hasMore: offset + members.length < relations.length,
+      members,
+    };
+  });
+}
+
 export async function getBotStatus(selector: UserSelector) {
   await ensureStoreInitialized();
   await processTradingEngineTick();
