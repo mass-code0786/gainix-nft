@@ -46,6 +46,10 @@ export function useTeamLevelMembers(level: number) {
       }
 
       if (nextPage === 1) {
+        setMembers([]);
+        setTotal(0);
+        setPage(1);
+        setHasMore(false);
         setIsLoading(true);
       } else {
         setIsLoadingMore(true);
@@ -53,8 +57,9 @@ export function useTeamLevelMembers(level: number) {
       setError(null);
 
       try {
+        console.info("[team.level.fetch]", { level });
         const response = await fetchJson<TeamLevelMembersResponse>(
-          `/api/team/level-members?walletAddress=${fullAddress}&level=${level}&page=${nextPage}&pageSize=${PAGE_SIZE}`,
+          `/api/team/level-members?walletAddress=${encodeURIComponent(fullAddress)}&level=${level}&page=${nextPage}&pageSize=${PAGE_SIZE}`,
           { signal },
         );
 

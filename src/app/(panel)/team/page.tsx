@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { ChangeEvent, useCallback, useState } from "react";
 import { Crown, Loader2, Share2, Users } from "lucide-react";
 import { AnimatedPage } from "@/components/ui/animated-page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,7 +11,13 @@ import { useTeamSummary } from "@/hooks/useTeamSummary";
 import { formatUsdt } from "@/utils/format";
 import { formatWallet } from "@/utils/format";
 
-const TEAM_LEVELS = [1, 2, 3, 4, 5] as const;
+const TEAM_LEVEL_OPTIONS = [
+  { value: 1, label: "Level 1" },
+  { value: 2, label: "Level 2" },
+  { value: 3, label: "Level 3" },
+  { value: 4, label: "Level 4" },
+  { value: 5, label: "Level 5" },
+] as const;
 
 function formatJoinedDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -43,6 +49,16 @@ export default function TeamPage() {
   const [selectedLevel, setSelectedLevel] = useState(1);
   const { data, isLoading, error } = useTeamSummary();
   const levelMembers = useTeamLevelMembers(selectedLevel);
+  const handleLevelSelect = useCallback((level: number) => {
+    console.info("[team.level.select]", { selectedLevel: level });
+    setSelectedLevel(level);
+  }, []);
+  const handleLevelDropdownChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      handleLevelSelect(Number(event.target.value));
+    },
+    [handleLevelSelect],
+  );
   const royalty = data?.royalty ?? null;
   const progress = royalty?.currentRequirementProgress ?? null;
   const teamOverview = {
@@ -236,30 +252,30 @@ export default function TeamPage() {
 
           <select
             value={selectedLevel}
-            onChange={(event) => setSelectedLevel(Number(event.target.value))}
+            onChange={handleLevelDropdownChange}
             className="w-full rounded-2xl border border-red-400/20 bg-black/50 px-4 py-3 text-sm font-semibold text-white outline-none ring-0 transition focus:border-amber-300/60 sm:hidden"
             aria-label="Select team level"
           >
-            {TEAM_LEVELS.map((level) => (
-              <option key={level} value={level} className="bg-zinc-950">
-                Level {level}
+            {TEAM_LEVEL_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} className="bg-zinc-950 text-white">
+                {option.label}
               </option>
             ))}
           </select>
 
-          <div className="hidden rounded-2xl border border-white/10 bg-black/25 p-1 backdrop-blur-xl sm:flex">
-            {TEAM_LEVELS.map((level) => (
+          <div className="flex overflow-x-auto rounded-2xl border border-white/10 bg-black/25 p-1 backdrop-blur-xl">
+            {TEAM_LEVEL_OPTIONS.map((option) => (
               <button
-                key={level}
+                key={option.value}
                 type="button"
-                onClick={() => setSelectedLevel(level)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                  selectedLevel === level
+                onClick={() => handleLevelSelect(option.value)}
+                className={`shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  selectedLevel === option.value
                     ? "bg-gradient-to-r from-red-600/80 to-amber-500/80 text-white shadow-[0_0_20px_rgba(239,68,68,0.18)]"
                     : "text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
                 }`}
               >
-                Level {level}
+                {option.label}
               </button>
             ))}
           </div>
