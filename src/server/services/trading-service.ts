@@ -1722,7 +1722,7 @@ function buyNft(
   if (paymentSplit.tradingDebit > 0) {
     pushWalletLedger(state, {
       userId: user.id,
-      type: "NFT_BUY_DEBIT",
+      type: "NFT_BUY_TRADING_DEBIT",
       amount: paymentSplit.tradingDebit,
       referenceId: nft.id,
       metadata: {
@@ -1738,7 +1738,7 @@ function buyNft(
   if (paymentSplit.incomeDebit > 0) {
     pushWalletLedger(state, {
       userId: user.id,
-      type: "NFT_BUY_DEBIT",
+      type: "NFT_BUY_WITHDRAWAL_DEBIT",
       amount: paymentSplit.incomeDebit,
       referenceId: nft.id,
       metadata: {
@@ -1756,6 +1756,9 @@ function buyNft(
     nftId: nft.id,
     userId: user.id,
     buyPrice,
+    tradingWalletUsed: paymentSplit.tradingDebit,
+    withdrawalWalletUsed: paymentSplit.incomeDebit,
+    totalBuyAmount: buyPrice,
     sellPrice: null,
     profit: null,
     status: "bought",
@@ -1768,6 +1771,14 @@ function buyNft(
     cycleId: input.cycleId ?? null,
     createdAt: now,
   };
+
+  console.info("[nft.buy.funding]", {
+    tradeId: trade.id,
+    nftId: nft.id,
+    tradingWalletUsed: trade.tradingWalletUsed,
+    withdrawalWalletUsed: trade.withdrawalWalletUsed,
+    totalBuyAmount: trade.totalBuyAmount,
+  });
 
   nft.ownerUserId = user.id;
   nft.status = "owned";
@@ -2065,7 +2076,14 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
   }
 
   const now = nowIso();
-  const principalReturn = roundAmount(trade.buyPrice);
+  const storedTradingPrincipal = roundAmount(trade.tradingWalletUsed);
+  const storedWithdrawalPrincipal = roundAmount(trade.withdrawalWalletUsed);
+  const hasStoredFundingBreakdown = roundAmount(storedTradingPrincipal + storedWithdrawalPrincipal) > 0;
+  const tradingPrincipalReturn = hasStoredFundingBreakdown
+    ? storedTradingPrincipal
+    : roundAmount(trade.buyPrice);
+  const withdrawalPrincipalReturn = hasStoredFundingBreakdown ? storedWithdrawalPrincipal : 0;
+  const principalReturn = roundAmount(tradingPrincipalReturn + withdrawalPrincipalReturn);
   const isBotTrade = trade.source === "bot";
   const sellPrice = isBotTrade
     ? applyPercentIncrease(trade.buyPrice, randomBotProfitPercent(state))
@@ -2084,40 +2102,91 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
       });
   const relistUpdate = priceAfterMarketBuy(state, sellPrice);
 
-  wallet.tradingWallet = roundAmount(wallet.tradingWallet + principalReturn);
-  wallet.withdrawalWallet = roundAmount(wallet.withdrawalWallet + profit);
+  wallet.tradingWallet = roundAmount(wallet.tradingWallet + tradingPrincipalReturn);
+  wallet.withdrawalWallet = roundAmount(
+    wallet.withdrawalWallet + withdrawalPrincipalReturn + profit,
+  );
   user.totalSellCount += 1;
   user.dailySellCount += 1;
   wallet.updatedAt = now;
   refreshCapitalUnlock(user, wallet);
 
-  pushWalletLedger(state, {
-    userId: trade.userId,
-    type: "NFT_SELL_PRINCIPAL_RETURN",
-    amount: principalReturn,
-    referenceId: trade.saleJobId,
-    metadata: {
-      nftId: trade.nftId,
-      tradeId: trade.id,
-      sellCount: user.totalSellCount,
-      dailySellCount: user.dailySellCount,
-      dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
-      tradingWalletAfter: wallet.tradingWallet,
-      tradeSource: trade.source,
-    },
+  const sharedPrincipalMetadata = {
+    nftId: trade.nftId,
+    tradeId: trade.id,
+    sellCount: user.totalSellCount,
+    dailySellCount: user.dailySellCount,
+    dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
+    tradingWalletUsed: tradingPrincipalReturn,
+    withdrawalWalletUsed: withdrawalPrincipalReturn,
+    totalBuyAmount: trade.totalBuyAmount || trade.buyPrice,
+    tradeSource: trade.source,
+  };
+
+  if (tradingPrincipalReturn > 0) {
+    pushWalletLedger(state, {
+      userId: trade.userId,
+      type: "NFT_SELL_TRADING_PRINCIPAL_RETURN",
+      amount: tradingPrincipalReturn,
+      referenceId: trade.saleJobId,
+      metadata: {
+        ...sharedPrincipalMetadata,
+        title: "NFT Trading Wallet Principal Return",
+        description: `Trading Wallet principal returned $${tradingPrincipalReturn}`,
+        sourceWallet: "TRADING",
+        walletAffected: "Trading Wallet",
+        tradingWalletAfter: wallet.tradingWallet,
+      },
+    });
+  }
+
+  if (withdrawalPrincipalReturn > 0) {
+    pushWalletLedger(state, {
+      userId: trade.userId,
+      type: "NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN",
+      amount: withdrawalPrincipalReturn,
+      referenceId: trade.saleJobId,
+      metadata: {
+        ...sharedPrincipalMetadata,
+        title: "NFT Withdrawal Wallet Principal Return",
+        description: `Withdrawal Wallet principal returned $${withdrawalPrincipalReturn}`,
+        sourceWallet: "WITHDRAWAL",
+        walletAffected: "Withdrawal Wallet",
+        withdrawalWalletAfter: wallet.withdrawalWallet,
+      },
+    });
+  }
+
+  console.info("[nft.sell.return]", {
+    tradeId: trade.id,
+    tradingWalletUsed: tradingPrincipalReturn,
+    withdrawalWalletUsed: withdrawalPrincipalReturn,
+    tradingWalletCredit: tradingPrincipalReturn,
+    withdrawalWalletPrincipalCredit: withdrawalPrincipalReturn,
+    tradingWalletAfter: wallet.tradingWallet,
+    withdrawalWalletAfter: wallet.withdrawalWallet,
   });
 
   if (profit > 0) {
     pushWalletLedger(state, {
       userId: trade.userId,
-      type: isBotTrade ? "BOT_TRADING_PROFIT" : "NFT_TRADING_PROFIT",
+      type: "NFT_TRADING_PROFIT",
       amount: profit,
       referenceId: trade.saleJobId,
       metadata: {
         nftId: trade.nftId,
         tradeId: trade.id,
+        tradeSource: trade.source,
+        walletAffected: "Withdrawal Wallet",
         withdrawalWalletAfter: wallet.withdrawalWallet,
       },
+    });
+
+    console.info("[nft.sell.profit]", {
+      tradeId: trade.id,
+      profit,
+      withdrawalWalletCredit: profit,
+      withdrawalWalletAfter: wallet.withdrawalWallet,
     });
 
     pushIncomeLedger(state, {
@@ -3299,7 +3368,11 @@ export async function getWalletBalances(selector: UserSelector) {
 const WALLET_HISTORY_TYPES = new Set<WalletLedgerRecord["type"]>([
   "DEPOSIT_TO_TRADING",
   "NFT_BUY_DEBIT",
+  "NFT_BUY_TRADING_DEBIT",
+  "NFT_BUY_WITHDRAWAL_DEBIT",
   "NFT_SELL_PRINCIPAL_RETURN",
+  "NFT_SELL_TRADING_PRINCIPAL_RETURN",
+  "NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN",
   "NFT_TRADING_PROFIT",
   "BOT_PURCHASE_UPLINE_INCOME",
   "BOT_TRADING_PROFIT",
@@ -3319,6 +3392,8 @@ function walletAffectedForLedgerType(type: WalletLedgerRecord["type"]) {
     type === "DEPOSIT_TO_TRADING" ||
     type === "NFT_BUY_DEBIT" ||
     type === "NFT_SELL_PRINCIPAL_RETURN" ||
+    type === "NFT_BUY_TRADING_DEBIT" ||
+    type === "NFT_SELL_TRADING_PRINCIPAL_RETURN" ||
     type === "BOT_PURCHASE_DEBIT"
   ) {
     return "Trading Wallet";
@@ -3359,7 +3434,11 @@ function statusForLedgerEntry(state: NftSimState, entry: WalletLedgerRecord) {
 function categoryForLedgerEntry(type: WalletLedgerRecord["type"]) {
   if (
     type === "NFT_BUY_DEBIT" ||
+    type === "NFT_BUY_TRADING_DEBIT" ||
+    type === "NFT_BUY_WITHDRAWAL_DEBIT" ||
     type === "NFT_SELL_PRINCIPAL_RETURN" ||
+    type === "NFT_SELL_TRADING_PRINCIPAL_RETURN" ||
+    type === "NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN" ||
     type === "NFT_TRADING_PROFIT"
   ) {
     return "NFT_TRADING";

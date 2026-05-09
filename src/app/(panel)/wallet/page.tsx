@@ -19,7 +19,11 @@ import { formatCurrency } from "@/utils/format";
 const historyLabels: Record<WalletHistoryType, string> = {
   DEPOSIT_TO_TRADING: "Deposit",
   NFT_BUY_DEBIT: "NFT Buy Debit",
+  NFT_BUY_TRADING_DEBIT: "NFT Buy Trading Debit",
+  NFT_BUY_WITHDRAWAL_DEBIT: "NFT Buy Withdrawal Debit",
   NFT_SELL_PRINCIPAL_RETURN: "Principal Return",
+  NFT_SELL_TRADING_PRINCIPAL_RETURN: "Trading Principal Return",
+  NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN: "Withdrawal Principal Return",
   BOT_PURCHASE: "Bot Subscription Purchased",
   NFT_TRADING_PROFIT: "Trading Profit",
   BOT_PURCHASE_UPLINE_INCOME: "Bot Income",
@@ -36,6 +40,8 @@ const historyLabels: Record<WalletHistoryType, string> = {
 
 const debitTypes = new Set<WalletHistoryType>([
   "NFT_BUY_DEBIT",
+  "NFT_BUY_TRADING_DEBIT",
+  "NFT_BUY_WITHDRAWAL_DEBIT",
   "BOT_PURCHASE",
   "WITHDRAWAL_REQUEST",
   "WITHDRAWAL_FEE",

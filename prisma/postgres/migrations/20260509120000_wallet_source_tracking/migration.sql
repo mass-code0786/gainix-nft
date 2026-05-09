@@ -1,0 +1,19 @@
+ALTER TYPE "WalletLedgerType" ADD VALUE IF NOT EXISTS 'NFT_BUY_TRADING_DEBIT';
+ALTER TYPE "WalletLedgerType" ADD VALUE IF NOT EXISTS 'NFT_BUY_WITHDRAWAL_DEBIT';
+ALTER TYPE "WalletLedgerType" ADD VALUE IF NOT EXISTS 'NFT_SELL_TRADING_PRINCIPAL_RETURN';
+ALTER TYPE "WalletLedgerType" ADD VALUE IF NOT EXISTS 'NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN';
+
+ALTER TABLE "nft_trades" ADD COLUMN IF NOT EXISTS "tradingWalletUsed" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "nft_trades" ADD COLUMN IF NOT EXISTS "withdrawalWalletUsed" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "nft_trades" ADD COLUMN IF NOT EXISTS "totalBuyAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+UPDATE "nft_trades"
+SET
+  "tradingWalletUsed" = CASE
+    WHEN "tradingWalletUsed" = 0 AND "withdrawalWalletUsed" = 0 THEN "buyPrice"
+    ELSE "tradingWalletUsed"
+  END,
+  "totalBuyAmount" = CASE
+    WHEN "totalBuyAmount" = 0 THEN "buyPrice"
+    ELSE "totalBuyAmount"
+  END;

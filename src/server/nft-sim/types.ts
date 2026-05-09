@@ -12,7 +12,11 @@ export type IncomeLedgerType =
 export type WalletLedgerType =
   | "DEPOSIT_TO_TRADING"
   | "NFT_BUY_DEBIT"
+  | "NFT_BUY_TRADING_DEBIT"
+  | "NFT_BUY_WITHDRAWAL_DEBIT"
   | "NFT_SELL_PRINCIPAL_RETURN"
+  | "NFT_SELL_TRADING_PRINCIPAL_RETURN"
+  | "NFT_SELL_WITHDRAWAL_PRINCIPAL_RETURN"
   | "NFT_TRADING_PROFIT"
   | "LEVEL_INCOME"
   | "BOT_PURCHASE_UPLINE_INCOME"
@@ -71,6 +75,9 @@ export interface NftTradeRecord {
   nftId: string;
   userId: string;
   buyPrice: number;
+  tradingWalletUsed: number;
+  withdrawalWalletUsed: number;
+  totalBuyAmount: number;
   sellPrice: number | null;
   profit: number | null;
   status: TradeStatus;

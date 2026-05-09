@@ -28,6 +28,9 @@ type BackendTradeRecord = {
   nftId: string;
   userId: string;
   buyPrice: number;
+  tradingWalletUsed: number;
+  withdrawalWalletUsed: number;
+  totalBuyAmount: number;
   sellPrice: number | null;
   profit: number | null;
   status: "bought" | "listed" | "auto_sold";
