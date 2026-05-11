@@ -3819,6 +3819,7 @@ export async function getTeamLevelMembers(
         const botAmount = roundAmount(
           activeBotSubscriptions.reduce((total, subscription) => total + subscription.price, 0),
         );
+        const memberWallet = state.wallets.find((wallet) => wallet.userId === member.id);
         const isActive = member.selfPackageAmount > 0 || botAmount > 0;
 
         return {
@@ -3826,6 +3827,7 @@ export async function getTeamLevelMembers(
           joinedAt: member.createdAt,
           packageAmount: member.selfPackageAmount,
           botAmount,
+          tradingWallet: roundAmount(memberWallet?.tradingWallet ?? 0),
           status: isActive ? "Active" : "Inactive",
           level,
         };

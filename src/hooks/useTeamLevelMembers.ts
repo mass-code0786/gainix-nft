@@ -9,6 +9,7 @@ export interface TeamLevelMember {
   joinedAt: string;
   packageAmount: number;
   botAmount: number;
+  tradingWallet: number;
   status: "Active" | "Inactive";
   level: number;
 }

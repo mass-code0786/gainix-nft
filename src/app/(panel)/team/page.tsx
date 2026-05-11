@@ -209,7 +209,6 @@ export default function TeamPage() {
       <div className="section-shell">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="muted-label">Team Members</p>
             <h2 className="mt-2 font-display text-2xl font-semibold text-white">
               Level {selectedLevel} Members ({levelMembers.total})
             </h2>
@@ -296,8 +295,8 @@ export default function TeamPage() {
                   <p className="mt-1 font-semibold text-white">{formatJoinedDate(member.joinedAt)}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <p className="text-xs text-zinc-500">Registration</p>
-                  <p className="mt-1 font-semibold text-white">Registered</p>
+                  <p className="text-xs text-zinc-500">Trading Wallet</p>
+                  <p className="mt-1 font-semibold text-white">{formatUsdt(member.tradingWallet)}</p>
                 </div>
               </div>
             </div>
