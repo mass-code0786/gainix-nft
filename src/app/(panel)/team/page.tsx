@@ -207,44 +207,9 @@ export default function TeamPage() {
       </div>
 
       <div className="section-shell">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="muted-label">Members</p>
-            <h2 className="mt-2 font-display text-2xl font-semibold text-white">Direct Referral Members</h2>
-          </div>
-          <span className="rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1 text-xs font-semibold text-amber-100">
-            {data?.directCount ?? 0}
-          </span>
-        </div>
-        <div className="mt-5 space-y-3">
-          {(data?.directs ?? []).map((member) => (
-            <div key={member.id} className="rounded-3xl border border-white/10 bg-black/20 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-white">Direct Referral</p>
-                  <p className="mt-1 text-sm text-zinc-500">{formatWallet(member.walletAddress)}</p>
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300">
-                  Active
-                </span>
-              </div>
-              <p className="mt-3 text-sm text-zinc-400">
-                Joined {new Date(member.createdAt).toLocaleDateString()} | 1 wallet connection
-              </p>
-            </div>
-          ))}
-          {!isLoading && (data?.directs.length ?? 0) === 0 ? (
-            <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-              No direct team members yet.
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="section-shell">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="muted-label">Indirect Team Members</p>
+            <p className="muted-label">Team Members</p>
             <h2 className="mt-2 font-display text-2xl font-semibold text-white">
               Level {selectedLevel} Members ({levelMembers.total})
             </h2>
