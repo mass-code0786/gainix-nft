@@ -36,6 +36,10 @@ const BOT_AUTO_SELL_DELAY_MIN_MINUTES = 20;
 const BOT_AUTO_SELL_DELAY_MAX_MINUTES = 30;
 const BOT_LIST_DELAY_MS = 300_000;
 const NO_SUITABLE_NFT_MESSAGE = "No suitable NFT available";
+const SELL_EXECUTION_TYPES = {
+  BOT_AUTO_SELL: "BOT_AUTO_SELL",
+  MANUAL_SELL: "MANUAL_SELL",
+} as const;
 
 let botExecutionRunning = false;
 const scheduledBotListTradeIds = new Set<string>();
@@ -244,6 +248,7 @@ function dailyTradeCountsFromTrades(state: NftSimState, userId: string, currentT
     dailySellCount: state.nft_trades.filter(
       (trade) =>
         trade.userId === userId &&
+        trade.source === "bot" &&
         trade.status === "auto_sold" &&
         Boolean(trade.soldAt) &&
         new Date(trade.soldAt as string) >= todayStart,
@@ -285,6 +290,12 @@ function assertDailyTradeLimit(state: NftSimState, user: UserRecord, side: "buy"
   if (!canUseDailyTrade(state, user, side)) {
     throw new ApiError(429, "Daily trading limit reached");
   }
+}
+
+function sellExecutionTypeForTrade(trade: NftTradeRecord) {
+  return trade.source === "bot"
+    ? SELL_EXECUTION_TYPES.BOT_AUTO_SELL
+    : SELL_EXECUTION_TYPES.MANUAL_SELL;
 }
 
 function refreshCapitalUnlock(wallet: WalletRecord) {
@@ -807,7 +818,9 @@ function listNft(
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
-  assertDailyTradeLimit(state, user, "sell");
+  if (trade.source === "bot") {
+    assertDailyTradeLimit(state, user, "sell");
+  }
 
   if (trade.status === "listed") {
     throw new ApiError(409, "NFT is already listed.");
@@ -1021,13 +1034,17 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
     return null;
   }
 
-  if (!canUseDailyTrade(state, user, "sell")) {
+  const isBotTrade = trade.source === "bot";
+  const sellExecutionType = sellExecutionTypeForTrade(trade);
+
+  if (isBotTrade && !canUseDailyTrade(state, user, "sell")) {
     logBotSchedulerSkip("Daily limit reached. Bot will resume after reset.", {
       userId: trade.userId,
       subscriptionId: trade.botSubscriptionId,
       tradeId: trade.id,
       nftId: trade.nftId,
       tradeSource: trade.source,
+      sellExecutionType,
       side: "sell",
       dailySellCount: user.dailySellCount,
       dailySellLimit: tradeLimitsForUser(user).dailySellLimit,
@@ -1044,7 +1061,6 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
     : roundAmount(trade.buyPrice);
   const withdrawalPrincipalReturn = hasStoredFundingBreakdown ? storedWithdrawalPrincipal : 0;
   const principalReturn = roundAmount(tradingPrincipalReturn + withdrawalPrincipalReturn);
-  const isBotTrade = trade.source === "bot";
   const sellPrice = isBotTrade
     ? applyPercentIncrease(trade.buyPrice, randomBotProfitPercent(state))
     : roundAmount(nft.currentPrice);
@@ -1060,7 +1076,9 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
   );
   wallet.sellCount += 1;
   user.totalSellCount += 1;
-  user.dailySellCount += 1;
+  if (isBotTrade) {
+    user.dailySellCount += 1;
+  }
   wallet.updatedAt = now;
   refreshCapitalUnlock(wallet);
 
@@ -1081,6 +1099,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
         walletAffected: "Trading Wallet",
         tradingWalletAfter: wallet.tradingWallet,
         tradeSource: trade.source,
+        sellExecutionType,
       },
     });
   }
@@ -1102,6 +1121,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
         walletAffected: "Withdrawal Wallet",
         withdrawalWalletAfter: wallet.withdrawalWallet,
         tradeSource: trade.source,
+        sellExecutionType,
       },
     });
   }
@@ -1115,6 +1135,8 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
       metadata: {
         nftId: trade.nftId,
         tradeId: trade.id,
+        tradeSource: trade.source,
+        sellExecutionType,
         withdrawalWalletAfter: wallet.withdrawalWallet,
       },
     });
@@ -1191,6 +1213,7 @@ function settleAutoSell(state: NftSimState, trade: NftTradeRecord) {
     profit,
     levelDistributions,
     tradeSource: trade.source,
+    sellExecutionType,
   };
 }
 
