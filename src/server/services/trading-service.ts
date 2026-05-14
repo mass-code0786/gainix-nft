@@ -1401,6 +1401,14 @@ function isFinalizedWithdrawal(withdrawal: WithdrawalRecord) {
   );
 }
 
+function isIdempotentPaidWithdrawal(withdrawal: WithdrawalRecord) {
+  return (
+    withdrawal.status === "completed" ||
+    withdrawal.payoutStatus === "PAID" ||
+    withdrawal.onChainStatus === "CONFIRMED"
+  );
+}
+
 function isSuccessfulWithdrawal(withdrawal: WithdrawalRecord) {
   return (
     withdrawal.status === "completed" ||
@@ -1409,9 +1417,23 @@ function isSuccessfulWithdrawal(withdrawal: WithdrawalRecord) {
   );
 }
 
+function isRetryableWithdrawalApproval(withdrawal: WithdrawalRecord) {
+  return (
+    withdrawal.status === "requested" ||
+    withdrawal.status === "approved_pending_tx" ||
+    withdrawal.payoutStatus === "FAILED" ||
+    withdrawal.onChainStatus === "FAILED" ||
+    withdrawal.onChainStatus === "PENDING"
+  );
+}
+
+function isAdminActionableWithdrawal(withdrawal: WithdrawalRecord) {
+  return isRetryableWithdrawalApproval(withdrawal) && !isIdempotentPaidWithdrawal(withdrawal);
+}
+
 function isAlreadyProcessedPayoutError(error: unknown) {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return message.includes("already processed");
+  return message.includes("already processed") || message.includes("alreadyprocessed") || message.includes("already_processed");
 }
 
 function finalizePaidWithdrawal(
@@ -1430,14 +1452,14 @@ function finalizePaidWithdrawal(
   }
 
   withdrawal.status = "completed";
-  withdrawal.approvedAt = withdrawal.approvedAt ?? nowIso();
+  withdrawal.approvedAt = nowIso();
   withdrawal.payoutStatus = "PAID";
   withdrawal.onChainStatus = "CONFIRMED";
   withdrawal.payoutTxHash = normalizedTxHash;
   withdrawal.withdrawalTxHash = normalizedTxHash;
 
   return {
-    message: "Withdrawal approved and paid on-chain.",
+    message: "Withdrawal already processed",
     withdrawal,
     authorizationTxHash: normalizedTxHash,
     payoutTxHash: normalizedTxHash,
@@ -3992,7 +4014,7 @@ export async function getAdminOverview() {
       systemReserve: toPublicReserve(state.system_reserve),
       summary: {
         totalUsers: state.users.length,
-        totalWithdrawalsPending: withdrawals.filter((item) => item.status === "requested").length,
+        totalWithdrawalsPending: withdrawals.filter(isAdminActionableWithdrawal).length,
         totalPayouts: roundAmount(
           state.system_reserve.totalMlmPaid +
             state.system_reserve.totalRoyaltyPaid +
@@ -4007,7 +4029,7 @@ export async function getAdminOverview() {
           state.system_reserve.balance < state.admin_settings.perUserDailyPayoutCap,
       },
       withdrawals,
-      pendingWithdrawals: withdrawals.filter((item) => item.status === "requested"),
+      pendingWithdrawals: withdrawals.filter(isAdminActionableWithdrawal),
       blockedPayoutLogs,
       safetyLogs,
     };
@@ -4507,16 +4529,23 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     throw new ApiError(404, "Withdrawal request not found.");
   }
 
-  if (isFinalizedWithdrawal(pendingWithdrawal)) {
+  if (isIdempotentPaidWithdrawal(pendingWithdrawal)) {
+    console.info("[withdraw.idempotent]", {
+      withdrawalId: pendingWithdrawal.id,
+      status: pendingWithdrawal.status,
+      payoutStatus: pendingWithdrawal.payoutStatus,
+      onChainStatus: pendingWithdrawal.onChainStatus,
+      txHash: pendingWithdrawal.payoutTxHash ?? pendingWithdrawal.withdrawalTxHash,
+    });
     return {
-      message: "Withdrawal already paid on-chain.",
+      message: "Withdrawal already processed",
       withdrawal: pendingWithdrawal,
       authorizationTxHash: pendingWithdrawal.payoutTxHash ?? pendingWithdrawal.withdrawalTxHash,
       payoutTxHash: pendingWithdrawal.payoutTxHash ?? pendingWithdrawal.withdrawalTxHash,
     };
   }
 
-  if (pendingWithdrawal.status !== "requested") {
+  if (!isRetryableWithdrawalApproval(pendingWithdrawal)) {
     throw new ApiError(409, "Withdrawal request is already processed.");
   }
 
@@ -4532,13 +4561,50 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
   }
 
   const { user: pendingUser } = requireUser(current, { userId: pendingWithdrawal.userId });
-  console.info("[withdraw.approve]", {
+  console.info("[withdraw.retry.start]", {
     withdrawalId: pendingWithdrawal.id,
     userWallet: pendingUser.walletAddress,
     netAmount: pendingWithdrawal.netAmount,
+    status: pendingWithdrawal.status,
+    payoutStatus: pendingWithdrawal.payoutStatus,
+    onChainStatus: pendingWithdrawal.onChainStatus,
   });
   let authorization: Awaited<ReturnType<typeof authorizeUsdtWithdrawalOnChain>>;
   try {
+    const preflightResult = await withStoreTransaction(async (state) => {
+      const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
+      if (!withdrawal) {
+        throw new ApiError(404, "Withdrawal request not found.");
+      }
+
+      if (isIdempotentPaidWithdrawal(withdrawal)) {
+        console.info("[withdraw.idempotent]", {
+          withdrawalId: withdrawal.id,
+          txHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash,
+        });
+        return {
+          message: "Withdrawal already processed",
+          withdrawal,
+          authorizationTxHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash,
+          payoutTxHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash,
+        };
+      }
+
+      if (!isRetryableWithdrawalApproval(withdrawal)) {
+        throw new ApiError(409, "Withdrawal request is already processed.");
+      }
+
+      withdrawal.status = "approved_pending_tx";
+      withdrawal.payoutStatus = "PENDING";
+      withdrawal.onChainStatus = "PENDING";
+
+      return null;
+    });
+
+    if (preflightResult) {
+      return preflightResult;
+    }
+
     authorization = await authorizeUsdtWithdrawalOnChain({
       walletAddress: pendingUser.walletAddress,
       netAmount: pendingWithdrawal.netAmount,
@@ -4546,6 +4612,10 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
     });
   } catch (error) {
     if (isAlreadyProcessedPayoutError(error)) {
+      console.info("[withdraw.idempotent]", {
+        withdrawalId: input.withdrawalId,
+        message: error instanceof Error ? error.message : String(error),
+      });
       return withStoreTransaction(async (state) => {
         const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
         if (!withdrawal) {
@@ -4558,12 +4628,37 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
 
     await withStoreTransaction(async (state) => {
       const withdrawal = state.withdrawals.find((item) => item.id === input.withdrawalId);
-      if (withdrawal && withdrawal.status === "requested") {
+      if (withdrawal && !isIdempotentPaidWithdrawal(withdrawal)) {
         withdrawal.payoutStatus = "FAILED";
         withdrawal.onChainStatus = "FAILED";
+        pushSafetyLog(state, {
+          eventType: "BLOCKED_PAYOUT",
+          userId: withdrawal.userId,
+          amount: withdrawal.netAmount,
+          reason: "Withdrawal payout failed.",
+          metadata: {
+            payoutType: "WITHDRAWAL_APPROVAL",
+            withdrawalId: withdrawal.id,
+            error: error instanceof Error ? error.message : String(error),
+            step: error instanceof ApiError && typeof error.details?.step === "string" ? error.details.step : null,
+          },
+        });
       }
     });
-    throw error;
+    console.error("[withdraw.retry.failed]", {
+      withdrawalId: input.withdrawalId,
+      message: error instanceof Error ? error.message : String(error),
+      step: error instanceof ApiError && typeof error.details?.step === "string" ? error.details.step : null,
+    });
+    throw new ApiError(
+      error instanceof ApiError && error.statusCode !== 500 ? error.statusCode : 409,
+      error instanceof Error ? error.message : "Withdrawal payout failed.",
+      {
+        step: error instanceof ApiError && typeof error.details?.step === "string"
+          ? error.details.step
+          : "WITHDRAWAL_PAYOUT_FAILED",
+      },
+    );
   }
 
   return withStoreTransaction(async (state) => {
@@ -4587,11 +4682,20 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
       throw new ApiError(404, "Withdrawal request not found.");
     }
 
-    if (isFinalizedWithdrawal(withdrawal)) {
-      return finalizePaidWithdrawal(state, withdrawal, authorization.txHash);
+    if (isIdempotentPaidWithdrawal(withdrawal)) {
+      console.info("[withdraw.idempotent]", {
+        withdrawalId: withdrawal.id,
+        txHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash ?? authorization.txHash,
+      });
+      return {
+        message: "Withdrawal already processed",
+        withdrawal,
+        authorizationTxHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash ?? authorization.txHash,
+        payoutTxHash: withdrawal.payoutTxHash ?? withdrawal.withdrawalTxHash ?? authorization.txHash,
+      };
     }
 
-    if (withdrawal.status !== "requested") {
+    if (!isRetryableWithdrawalApproval(withdrawal)) {
       throw new ApiError(409, "Withdrawal request is already processed.");
     }
 
@@ -4606,7 +4710,14 @@ export async function approveWithdrawal(input: ApproveWithdrawalInput) {
       throw new ApiError(409, "Withdrawal approval blocked by safety controls.");
     }
 
-    return finalizePaidWithdrawal(state, withdrawal, authorization.txHash);
+    const result = finalizePaidWithdrawal(state, withdrawal, authorization.txHash);
+    result.message = "Withdrawal approved and paid on-chain.";
+    console.info("[withdraw.retry.success]", {
+      withdrawalId: withdrawal.id,
+      txHash: authorization.txHash,
+      requestId: authorization.requestId,
+    });
+    return result;
   });
 }
 

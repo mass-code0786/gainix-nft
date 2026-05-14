@@ -908,43 +908,58 @@ export default function AdminPage() {
         </div>
 
         <div className="mt-5 space-y-3">
-          {pendingWithdrawals.map((withdrawal) => (
-            <div
-              key={withdrawal.id}
-              className="rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(23,10,12,0.92),rgba(11,11,15,0.96))] p-4"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-medium text-white">
-                    {withdrawal.user?.walletAddress
-                      ? shortenAddress(withdrawal.user.walletAddress)
-                      : withdrawal.userId}
-                  </p>
-                  <p className="mt-1 text-sm text-zinc-400">
-                    Amount {formatUsdt(withdrawal.grossAmount)} | Fee {formatUsdt(withdrawal.feeAmount)} | GXN deduction {formatUsdt(withdrawal.gxnDeductionAmount)} | Net {formatUsdt(withdrawal.netAmount)}
-                  </p>
-                  <p className="mt-1 text-xs text-purple-200">
-                    GXN reward {withdrawal.gxnTokens.toLocaleString()} GXN
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    On-chain {withdrawal.onChainStatus}
-                    {withdrawal.withdrawalTxHash ? ` | ${withdrawal.withdrawalTxHash.slice(0, 10)}...${withdrawal.withdrawalTxHash.slice(-8)}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Requested {new Date(withdrawal.createdAt).toLocaleString()}
-                  </p>
+          {pendingWithdrawals.map((withdrawal) => {
+            const isFailedWithdrawal =
+              withdrawal.payoutStatus.toUpperCase() === "FAILED" ||
+              withdrawal.onChainStatus === "FAILED";
+            const isCompletedWithdrawal =
+              withdrawal.status === "completed" ||
+              withdrawal.payoutStatus.toUpperCase() === "PAID" ||
+              withdrawal.onChainStatus === "CONFIRMED";
+
+            return (
+              <div
+                key={withdrawal.id}
+                className="rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(23,10,12,0.92),rgba(11,11,15,0.96))] p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-medium text-white">
+                      {withdrawal.user?.walletAddress
+                        ? shortenAddress(withdrawal.user.walletAddress)
+                        : withdrawal.userId}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      Amount {formatUsdt(withdrawal.grossAmount)} | Fee {formatUsdt(withdrawal.feeAmount)} | GXN deduction {formatUsdt(withdrawal.gxnDeductionAmount)} | Net {formatUsdt(withdrawal.netAmount)}
+                    </p>
+                    <p className="mt-1 text-xs text-purple-200">
+                      GXN reward {withdrawal.gxnTokens.toLocaleString()} GXN
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      On-chain {withdrawal.onChainStatus}
+                      {withdrawal.withdrawalTxHash ? ` | ${withdrawal.withdrawalTxHash.slice(0, 10)}...${withdrawal.withdrawalTxHash.slice(-8)}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Payout {withdrawal.payoutStatus}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Requested {new Date(withdrawal.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  {!isCompletedWithdrawal ? (
+                    <button
+                      type="button"
+                      onClick={() => void admin.approve(withdrawal.id)}
+                      disabled={admin.isSaving || admin.isSigning || Boolean(settings?.payoutsPaused) || Boolean(settings?.systemStopped)}
+                      className="premium-button disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isFailedWithdrawal ? "Retry Approve" : "Approve"}
+                    </button>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void admin.approve(withdrawal.id)}
-                  disabled={admin.isSaving || admin.isSigning || Boolean(settings?.payoutsPaused) || Boolean(settings?.systemStopped)}
-                  className="premium-button disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Approve
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {!admin.isLoading && pendingWithdrawals.length === 0 ? (
             <div className="rounded-[24px] border border-white/10 bg-black/25 p-4 text-sm text-zinc-300">
